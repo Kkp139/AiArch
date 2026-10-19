@@ -7,7 +7,7 @@ import { MeetingCalendar } from './pages/Meetings/MeetingCalendar';
 import { StaffAttendance } from './pages/Attendance/StaffAttendance';
 import { PaymentLedger, PaymentRecord } from './pages/Payments/PaymentLedger';
 import { ProjectChatRoom, ChatMessageItem } from './pages/Chat/ProjectChatRoom';
-import { FolderKanban, ArrowRight, Shield, UserCheck, Eye, HardHat } from 'lucide-react';
+import { FolderKanban, ArrowRight, Shield, UserCheck, Eye, HardHat, RotateCcw } from 'lucide-react';
 
 const MOCK_USERS: Record<UserRole, UserProfile> = {
   ADMIN: {
@@ -118,18 +118,67 @@ function MainApp() {
   const [selectedRole, setSelectedRole] = useState<UserRole>('ADMIN');
   const [activeTab, setActiveTab] = useState('projects');
 
-  // Attendance simulation states
-  const [isClockedIn, setIsClockedIn] = useState(true);
-  const [pendingUpdates, setPendingUpdates] = useState<string[]>(['Slot +3h (12:00)']);
+  // Interactive Persistent State (Saves to localStorage so CRUD persists across refreshes)
+  const [isClockedIn, setIsClockedIn] = useState<boolean>(() => {
+    const saved = localStorage.getItem('af_is_clocked_in');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
 
-  // Verification simulation state
-  const [verifications, setVerifications] = useState<VerificationItem[]>(INITIAL_VERIFICATIONS);
+  const [pendingUpdates, setPendingUpdates] = useState<string[]>(() => {
+    const saved = localStorage.getItem('af_pending_updates');
+    return saved ? JSON.parse(saved) : ['Slot +3h (12:00)'];
+  });
 
-  // Payments simulation state
-  const [payments, setPayments] = useState<PaymentRecord[]>(INITIAL_PAYMENTS);
+  const [verifications, setVerifications] = useState<VerificationItem[]>(() => {
+    const saved = localStorage.getItem('af_verifications');
+    return saved ? JSON.parse(saved) : INITIAL_VERIFICATIONS;
+  });
 
-  // Chat simulation state
-  const [chatMessages, setChatMessages] = useState<ChatMessageItem[]>(INITIAL_CHAT_MESSAGES);
+  const [payments, setPayments] = useState<PaymentRecord[]>(() => {
+    const saved = localStorage.getItem('af_payments');
+    return saved ? JSON.parse(saved) : INITIAL_PAYMENTS;
+  });
+
+  const [chatMessages, setChatMessages] = useState<ChatMessageItem[]>(() => {
+    const saved = localStorage.getItem('af_chat_messages');
+    return saved ? JSON.parse(saved) : INITIAL_CHAT_MESSAGES;
+  });
+
+  // Sync to localStorage whenever state updates
+  React.useEffect(() => {
+    localStorage.setItem('af_is_clocked_in', JSON.stringify(isClockedIn));
+  }, [isClockedIn]);
+
+  React.useEffect(() => {
+    localStorage.setItem('af_pending_updates', JSON.stringify(pendingUpdates));
+  }, [pendingUpdates]);
+
+  React.useEffect(() => {
+    localStorage.setItem('af_verifications', JSON.stringify(verifications));
+  }, [verifications]);
+
+  React.useEffect(() => {
+    localStorage.setItem('af_payments', JSON.stringify(payments));
+  }, [payments]);
+
+  React.useEffect(() => {
+    localStorage.setItem('af_chat_messages', JSON.stringify(chatMessages));
+  }, [chatMessages]);
+
+  const handleResetDemoData = () => {
+    localStorage.removeItem('af_is_clocked_in');
+    localStorage.removeItem('af_pending_updates');
+    localStorage.removeItem('af_verifications');
+    localStorage.removeItem('af_payments');
+    localStorage.removeItem('af_chat_messages');
+    localStorage.removeItem('af_vault_files');
+    setIsClockedIn(true);
+    setPendingUpdates(['Slot +3h (12:00)']);
+    setVerifications(INITIAL_VERIFICATIONS);
+    setPayments(INITIAL_PAYMENTS);
+    setChatMessages(INITIAL_CHAT_MESSAGES);
+    window.location.reload();
+  };
 
   const currentUser = MOCK_USERS[selectedRole];
 
@@ -225,6 +274,27 @@ function MainApp() {
               {r === 'CLIENT_VIEWER' && '👁️ Client Viewer (Pooja)'}
             </button>
           ))}
+
+          <button
+            onClick={handleResetDemoData}
+            title="Reset all demo CRUD state back to clean initial values"
+            style={{
+              padding: '4px 10px',
+              borderRadius: '4px',
+              fontSize: '11px',
+              fontWeight: 600,
+              backgroundColor: '#21262d',
+              color: '#f87171',
+              border: '1px solid #4b1a1a',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              marginLeft: '8px',
+            }}
+          >
+            <RotateCcw size={11} />
+            <span>Reset Demo Data</span>
+          </button>
         </div>
       </div>
 

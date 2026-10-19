@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, Eye, Download, Clock } from 'lucide-react';
+import { FileText, Eye, Download, Clock, Trash2 } from 'lucide-react';
 
 export interface VaultFileItem {
   id: string;
@@ -15,10 +15,11 @@ export interface GridViewProps {
   files: VaultFileItem[];
   onOpenFile: (file: VaultFileItem) => void;
   onDownloadFile?: (file: VaultFileItem) => void;
+  onDeleteFile?: (file: VaultFileItem) => void;
   isViewOnly?: boolean;
 }
 
-export function GridView({ files, onOpenFile, onDownloadFile, isViewOnly }: GridViewProps) {
+export function GridView({ files, onOpenFile, onDownloadFile, onDeleteFile, isViewOnly }: GridViewProps) {
   if (files.length === 0) {
     return (
       <div
@@ -147,6 +148,7 @@ export function GridView({ files, onOpenFile, onDownloadFile, isViewOnly }: Grid
             {!isViewOnly && onDownloadFile && (
               <button
                 onClick={() => onDownloadFile(file)}
+                title="Download"
                 style={{
                   padding: '6px 10px',
                   backgroundColor: 'var(--bg-tertiary)',
@@ -158,6 +160,25 @@ export function GridView({ files, onOpenFile, onDownloadFile, isViewOnly }: Grid
                 }}
               >
                 <Download size={14} />
+              </button>
+            )}
+
+            {!isViewOnly && onDeleteFile && (
+              <button
+                onClick={() => onDeleteFile(file)}
+                title="Delete File"
+                style={{
+                  padding: '6px 10px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  color: '#ef4444',
+                  borderRadius: 'var(--radius-sm)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                }}
+              >
+                <Trash2 size={14} />
               </button>
             )}
           </div>

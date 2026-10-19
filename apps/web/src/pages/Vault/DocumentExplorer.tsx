@@ -37,47 +37,146 @@ const INITIAL_CATEGORIES: VaultCategory[] = [
   { id: '03_OTHER', name: '03 Other / Reference', group: 'OTHER', fileCount: 1 },
 ];
 
+const INITIAL_VAULT_FILES: VaultFileItem[] = [
+  {
+    id: 'doc-1',
+    fileName: 'AF-VILLA_ARCH_PLANS_GroundFloor_v3.dwg',
+    fileSize: 4.8 * 1024 * 1024,
+    mimeType: 'image/vnd.dwg',
+    revisionNumber: 3,
+    categoryFolder: '01_ARCHITECTURAL_PLANS',
+    updatedAt: '2026-10-18T10:30:00Z',
+  },
+  {
+    id: 'doc-2',
+    fileName: 'AF-VILLA_ARCH_PLANS_FirstFloor_v2.dwg',
+    fileSize: 5.2 * 1024 * 1024,
+    mimeType: 'image/vnd.dwg',
+    revisionNumber: 2,
+    categoryFolder: '01_ARCHITECTURAL_PLANS',
+    updatedAt: '2026-10-17T15:20:00Z',
+  },
+  {
+    id: 'doc-3',
+    fileName: 'AF-VILLA_STRUCT_DWG_FoundationSchedule_v2.dwg',
+    fileSize: 3.9 * 1024 * 1024,
+    mimeType: 'image/vnd.dwg',
+    revisionNumber: 2,
+    categoryFolder: '02_STRUCTURAL_DRAWINGS',
+    updatedAt: '2026-10-16T12:00:00Z',
+  },
+  {
+    id: 'doc-4',
+    fileName: 'AF-VILLA_ELEC_LAY_Switchboard_v1.dwg',
+    fileSize: 2.1 * 1024 * 1024,
+    mimeType: 'image/vnd.dwg',
+    revisionNumber: 1,
+    categoryFolder: '04_ELECTRICAL_LAYOUTS',
+    updatedAt: '2026-10-15T09:40:00Z',
+  },
+  {
+    id: 'doc-5',
+    fileName: 'AF-VILLA_INT_DET_LivingRoomCeiling_v1.dwg',
+    fileSize: 6.4 * 1024 * 1024,
+    mimeType: 'image/vnd.dwg',
+    revisionNumber: 1,
+    categoryFolder: '06_INTERIOR_DETAILS',
+    updatedAt: '2026-10-17T16:15:00Z',
+  },
+  {
+    id: 'doc-6',
+    fileName: 'AF-VILLA_BOQ_SanitaryFixtures_v1.pdf',
+    fileSize: 1.1 * 1024 * 1024,
+    mimeType: 'application/pdf',
+    revisionNumber: 1,
+    categoryFolder: '08_SPECIFICATIONS_BOQ',
+    updatedAt: '2026-10-14T14:10:00Z',
+  },
+  {
+    id: 'doc-7',
+    fileName: 'AF-VILLA_SITE_CTX_TopographicalSurvey_v1.pdf',
+    fileSize: 8.7 * 1024 * 1024,
+    mimeType: 'application/pdf',
+    revisionNumber: 1,
+    categoryFolder: '01_SITE_CONTEXT',
+    updatedAt: '2026-10-10T11:00:00Z',
+  },
+  {
+    id: 'doc-8',
+    fileName: 'AF-VILLA_SKETCH_FacadeInitialConcept_v2.pdf',
+    fileSize: 3.4 * 1024 * 1024,
+    mimeType: 'application/pdf',
+    revisionNumber: 2,
+    categoryFolder: '04_SKETCHES',
+    updatedAt: '2026-10-12T17:30:00Z',
+  },
+  {
+    id: 'doc-9',
+    fileName: 'AF-VILLA_OTHER_ClientMeetingNotes_v1.pdf',
+    fileSize: 0.5 * 1024 * 1024,
+    mimeType: 'application/pdf',
+    revisionNumber: 1,
+    categoryFolder: '03_OTHER',
+    updatedAt: '2026-10-18T18:00:00Z',
+  },
+];
+
 export function DocumentExplorer({
   projectCode,
   userRole,
   clientName = 'Client Representative',
   userEmail = 'client@example.com',
 }: DocumentExplorerProps) {
-  const [categories, setCategories] = useState<VaultCategory[]>(INITIAL_CATEGORIES);
   const [selectedCategoryId, setSelectedCategoryId] = useState('01_ARCHITECTURAL_PLANS');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [activePreviewFile, setActivePreviewFile] = useState<VaultFileItem | null>(null);
+
+  // Persistent Vault Files state
+  const [files, setFiles] = useState<VaultFileItem[]>(() => {
+    const saved = localStorage.getItem('af_vault_files');
+    return saved ? JSON.parse(saved) : INITIAL_VAULT_FILES;
+  });
+
+  // Sync to localStorage
+  React.useEffect(() => {
+    localStorage.setItem('af_vault_files', JSON.stringify(files));
+  }, [files]);
+
+  // Dynamically compute file count per category from actual files
+  const categories: VaultCategory[] = React.useMemo(() => {
+    return INITIAL_CATEGORIES.map((cat) => ({
+      ...cat,
+      fileCount: files.filter((f) => f.categoryFolder === cat.id).length,
+    }));
+  }, [files]);
 
   // 16-Category Progress Calculation: (count_with_files / 16) * 100%
   const populatedCategoriesCount = categories.filter((c) => c.fileCount > 0).length;
   const progressPercentage = Math.round((populatedCategoriesCount / 16) * 100);
 
-  const sampleFiles: VaultFileItem[] = [
-    {
-      id: 'doc-1',
-      fileName: `${projectCode}_ARCH_PLANS_GroundFloor_v3.dwg`,
-      fileSize: 4.8 * 1024 * 1024,
-      mimeType: 'image/vnd.dwg',
-      revisionNumber: 3,
-      categoryFolder: '01_ARCHITECTURAL_PLANS',
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'doc-2',
-      fileName: `${projectCode}_ARCH_PLANS_FirstFloor_v2.dwg`,
-      fileSize: 5.2 * 1024 * 1024,
-      mimeType: 'image/vnd.dwg',
-      revisionNumber: 2,
-      categoryFolder: '01_ARCHITECTURAL_PLANS',
-      updatedAt: new Date().toISOString(),
-    },
-  ];
+  // Files belonging to currently active category folder
+  const currentFolderFiles = files.filter((f) => f.categoryFolder === selectedCategoryId);
 
   const handleUploadComplete = (result: UploadResult) => {
-    // Update fileCount of target folder
-    setCategories((prev) =>
-      prev.map((c) => (c.id === result.routedCategory ? { ...c, fileCount: c.fileCount + 1 } : c))
-    );
+    const newFile: VaultFileItem = {
+      id: `doc-${Date.now()}`,
+      fileName: result.finalFileName,
+      fileSize: result.file.size || 2.5 * 1024 * 1024,
+      mimeType: result.file.type || 'image/vnd.dwg',
+      revisionNumber: 1,
+      categoryFolder: result.routedCategory,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setFiles((prev) => [newFile, ...prev]);
+    // Auto-switch to the category where file was placed so user sees it instantly
+    setSelectedCategoryId(result.routedCategory);
+  };
+
+  const handleDeleteFile = (fileToDelete: VaultFileItem) => {
+    if (confirm(`Are you sure you want to delete "${fileToDelete.fileName}"?`)) {
+      setFiles((prev) => prev.filter((f) => f.id !== fileToDelete.id));
+    }
   };
 
   return (
@@ -185,8 +284,10 @@ export function DocumentExplorer({
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <GridView
-            files={sampleFiles}
+            files={currentFolderFiles}
             onOpenFile={(file) => setActivePreviewFile(file)}
+            onDownloadFile={(file) => alert(`Downloading secure watermarked file: ${file.fileName}`)}
+            onDeleteFile={userRole === 'ADMIN' || userRole === 'STAFF' ? handleDeleteFile : undefined}
             isViewOnly={userRole === 'CLIENT_VIEWER'}
           />
         </div>
