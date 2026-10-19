@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "dev:api": "npm --workspace=@pronex/api run dev",
-    "dev:web": "npm --workspace=@pronex/web run dev",
+    "dev:web": "node ./node_modules/vite/bin/vite.js apps/web",
     "dev:worker": "npm --workspace=@pronex/worker run dev",
     "build": "node ./node_modules/typescript/bin/tsc --build",
     "test": "node ./node_modules/vitest/vitest.mjs run"
