@@ -21,6 +21,7 @@ export interface ShellProps {
     role: UserRole;
     showPricing?: boolean;
   };
+  studioName?: string;
   children: React.ReactNode;
   activeTab?: string;
   onTabChange?: (tab: string) => void;
@@ -45,7 +46,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'chat', label: 'Project Chat', icon: MessageSquare, roles: ['ADMIN', 'CLIENT_LEADER'] },
 ];
 
-export function Shell({ user, children, activeTab = 'projects', onTabChange, onLogout }: ShellProps) {
+export function Shell({ user, studioName = 'A&F Design', children, activeTab = 'projects', onTabChange, onLogout }: ShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
 
@@ -93,10 +94,10 @@ export function Shell({ user, children, activeTab = 'projects', onTabChange, onL
           {/* Studio Brand Header */}
           <div style={{ paddingBottom: '28px', borderBottom: '1px solid var(--border-subtle)', marginBottom: '20px' }}>
             <div style={{ fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--accent-gold)', fontWeight: 700 }}>
-              Studio Portal
+              Architecture Studio
             </div>
             <div style={{ fontSize: '18px', fontWeight: 600, letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
-              ProNex-ArchAI
+              {studioName}
             </div>
           </div>
 

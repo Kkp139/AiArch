@@ -2,7 +2,7 @@
 
 declare const self: ServiceWorkerGlobalScope;
 
-const CACHE_NAME = 'pronex-archai-v1';
+const CACHE_NAME = 'afdesign-portal-v1';
 const STATIC_ASSETS = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
@@ -48,7 +48,7 @@ self.addEventListener('push', (event) => {
 
   try {
     const data = event.data.json();
-    const title = data.title || 'ProNex-ArchAI Notification';
+    const title = data.title || 'A&F Design Notification';
     const options = {
       body: data.body || '',
       icon: '/icon-192.png',

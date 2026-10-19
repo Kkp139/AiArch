@@ -17,7 +17,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
-      service: 'ProNex-ArchAI API',
+      service: `${process.env.STUDIO_NAME || 'A&F Design'} Portal API`,
     };
   });
 

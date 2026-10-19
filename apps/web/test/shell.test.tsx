@@ -46,4 +46,16 @@ describe('App Shell Layout', () => {
 
     expect(screen.getByText('Payments')).toBeInTheDocument();
   });
+
+  it('renders Studio Name "A&F Design" in sidebar and never displays "ProNex"', () => {
+    const mockUser = { fullName: 'Kamal Patel', role: 'ADMIN' as const };
+    render(
+      <Shell user={mockUser}>
+        <div>Content Area</div>
+      </Shell>
+    );
+
+    expect(screen.getByText('A&F Design')).toBeInTheDocument();
+    expect(screen.queryByText(/ProNex/i)).not.toBeInTheDocument();
+  });
 });

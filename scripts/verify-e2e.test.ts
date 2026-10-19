@@ -17,7 +17,7 @@ describe('ProNex-ArchAI Turnkey End-to-End Baseline Suite', () => {
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
     expect(body.status).toBe('ok');
-    expect(body.service).toContain('ProNex-ArchAI');
+    expect(body.service).toContain('Portal API');
   });
 
   it('E2E Baseline 2: verifies 16-Category Progress Calculation across project lifecycle', () => {

@@ -198,7 +198,7 @@ export function DwgViewer({
               {userEmail} • {new Date().toISOString().split('T')[0]}
             </div>
             <div style={{ fontSize: '20px', fontWeight: 800, color: '#000000' }}>
-              CONFIDENTIAL • PRO-NEX ARCH-AI
+              CONFIDENTIAL • A&F DESIGN
             </div>
           </div>
 
