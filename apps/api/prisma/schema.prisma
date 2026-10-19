@@ -1,0 +1,320 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  ADMIN
+  STAFF
+  CLIENT_LEADER
+  CLIENT_VIEWER
+}
+
+enum UserStatus {
+  ACTIVE
+  DEACTIVATED
+}
+
+enum ProjectStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum DownloadPermission {
+  VIEW_ONLY
+  VIEW_AND_DOWNLOAD
+}
+
+enum VerificationStatus {
+  PENDING_REVIEW
+  APPROVED
+  REVISION_REQUIRED
+}
+
+enum MeetingType {
+  OFFICE_MEETING
+  SITE_VISIT
+}
+
+enum MeetingStatus {
+  REQUESTED
+  CONFIRMED
+  REJECTED
+  RESCHEDULE_PENDING
+  CANCELLED
+}
+
+enum TimeSlot {
+  SLOT_12_00_13_30
+  SLOT_16_00_17_30
+  SLOT_18_00_19_30
+}
+
+enum PaymentMode {
+  CHEQUE
+  UPI
+  NEFT_RTGS
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING_CLEARANCE
+  CONFIRMED
+  REVISION_REQUESTED
+}
+
+model User {
+  id                  String      @id @default(uuid())
+  username            String      @unique
+  fullName            String
+  mobile              String?
+  email               String?
+  passwordHash        String
+  role                UserRole
+  status              UserStatus  @default(ACTIVE)
+  setupToken          String?
+  setupTokenExpiresAt DateTime?
+  approvalPending     Boolean     @default(false)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  assignedProjects    ProjectAssignment[]
+  uploadedDocuments   ProjectDocument[]
+  verifications       DesignVerification[]    @relation("SubmittedBy")
+  reviewedVerifications DesignVerification[]  @relation("ReviewedBy")
+  requestedMeetings   Meeting[]               @relation("RequestedBy")
+  approvedMeetings    Meeting[]               @relation("ApprovedBy")
+  recordedPayments    Payment[]               @relation("RecordedBy")
+  attendanceRecords   Attendance[]
+  dailyWorkUpdates    DailyWorkUpdate[]
+  chatMessages        ChatMessage[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+}
+
+model Project {
+  id                       String             @id @default(uuid())
+  projectCode              String             @unique
+  name                     String
+  category                 String
+  siteLocation             String
+  status                   ProjectStatus      @default(ACTIVE)
+  totalAgreedFee           Decimal            @default(0.00) @db.Decimal(14, 2)
+  advancePaymentReceived   Decimal            @default(0.00) @db.Decimal(14, 2)
+  allowClientDownloads     DownloadPermission @default(VIEW_AND_DOWNLOAD)
+  showPricingClientLeader  Boolean            @default(false)
+  showPricingClientViewer  Boolean            @default(false)
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+
+  folders                  ProjectFolder[]
+  documents                ProjectDocument[]
+  verifications            DesignVerification[]
+  payments                 Payment[]
+  chatMessages             ChatMessage[]
+  dailyUpdates             DailyWorkUpdate[]
+  assignments              ProjectAssignment[]
+  folderPermissions        ProjectFolderPermission[]
+  notifications            Notification[]
+}
+
+model ProjectAssignment {
+  id        String   @id @default(uuid())
+  userId    String
+  projectId String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
+}
+
+model ProjectFolder {
+  id           String   @id @default(uuid())
+  projectId    String
+  categoryCode String
+  folderName   String
+  phaseGroup   String
+  displayOrder Int
+  isCounted    Boolean  @default(true)
+
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documents    ProjectDocument[]
+  verifications DesignVerification[]
+  permissions  ProjectFolderPermission[]
+
+  @@unique([projectId, categoryCode])
+}
+
+model ProjectFolderPermission {
+  id           String             @id @default(uuid())
+  projectId    String
+  folderId     String
+  role         UserRole
+  accessLevel  DownloadPermission @default(VIEW_AND_DOWNLOAD)
+
+  project      Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  folder       ProjectFolder      @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, folderId, role])
+}
+
+model ProjectDocument {
+  id                 String        @id @default(uuid())
+  projectId          String
+  folderId           String
+  fileName           String
+  originalKey        String
+  previewKey         String?
+  fileSizeBytes      BigInt
+  mimeType           String
+  isDwg              Boolean       @default(false)
+  isApprovedDrawing  Boolean       @default(false)
+  uploadedBy         String?
+  createdAt          DateTime      @default(now())
+
+  project            Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  folder             ProjectFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  uploader           User?         @relation(fields: [uploadedBy], references: [id])
+}
+
+model DesignVerification {
+  id             String             @id @default(uuid())
+  projectId      String
+  folderId       String
+  drawingTitle   String
+  fileKey        String
+  previewKey     String?
+  submittedBy    String
+  revisionNumber Int                @default(1)
+  status         VerificationStatus @default(PENDING_REVIEW)
+  feedbackNote   String?
+  reviewedBy     String?
+  reviewedAt     DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  project        Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  folder         ProjectFolder      @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  submitter      User               @relation("SubmittedBy", fields: [submittedBy], references: [id])
+  reviewer       User?              @relation("ReviewedBy", fields: [reviewedBy], references: [id])
+}
+
+model Meeting {
+  id                 String        @id @default(uuid())
+  bookingDate        DateTime      @db.Date
+  slot               TimeSlot
+  type               MeetingType
+  status             MeetingStatus @default(REQUESTED)
+  notes              String?
+  requestedBy        String
+  approvedBy         String?
+  replacesMeetingId  String?       @unique
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  requester          User          @relation("RequestedBy", fields: [requestedBy], references: [id])
+  approver           User?         @relation("ApprovedBy", fields: [approvedBy], references: [id])
+  replacesMeeting    Meeting?      @relation("MeetingReschedule", fields: [replacesMeetingId], references: [id])
+  rescheduledBy      Meeting?      @relation("MeetingReschedule")
+
+  @@unique([bookingDate, slot])
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  projectId       String
+  amount          Decimal       @db.Decimal(14, 2)
+  paymentMode     PaymentMode
+  referenceNumber String?
+  bankName        String?
+  receiptKey      String?
+  status          PaymentStatus @default(PENDING_CLEARANCE)
+  recordedBy      String
+  discrepancyNote String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  recorder        User          @relation("RecordedBy", fields: [recordedBy], references: [id])
+}
+
+model Attendance {
+  id              String             @id @default(uuid())
+  userId          String
+  clockInAt       DateTime
+  clockInLat      Decimal            @db.Decimal(10, 7)
+  clockInLng      Decimal            @db.Decimal(10, 7)
+  clockInAddress  String?
+  clockOutAt      DateTime?
+  clockOutLat     Decimal?           @db.Decimal(10, 7)
+  clockOutLng     Decimal?           @db.Decimal(10, 7)
+  clockOutAddress String?
+  isRegularized   Boolean            @default(false)
+  createdAt       DateTime           @default(now())
+
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dailyUpdates    DailyWorkUpdate[]
+}
+
+model DailyWorkUpdate {
+  id            String      @id @default(uuid())
+  userId        String
+  projectId     String
+  attendanceId  String
+  workSummary   String
+  scheduledSlot String
+  submittedAt   DateTime    @default(now())
+
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  attendance    Attendance  @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+}
+
+model ChatMessage {
+  id            String      @id @default(uuid())
+  projectId     String
+  senderId      String
+  messageText   String?
+  attachmentKey String?
+  createdAt     DateTime    @default(now())
+
+  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sender        User        @relation(fields: [senderId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  recipientId String
+  projectId   String?
+  category    String
+  title       String
+  message     String
+  deepLink    String?
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  recipient   User     @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  actorName  String
+  actorRole  UserRole
+  action     String
+  entityType String
+  entityId   String
+  oldData    Json?
+  newData    Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+}
