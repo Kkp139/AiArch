@@ -1,6 +1,8 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 
+import { chatRoutes } from './modules/chat/chat.controller';
+
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
 
@@ -8,6 +10,8 @@ export async function buildApp(): Promise<FastifyInstance> {
     origin: true,
     credentials: true,
   });
+
+  await app.register(chatRoutes);
 
   app.get('/api/health', async () => {
     return {
