@@ -1,0 +1,36 @@
+name: Studio Portal CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+      - 'feature/**'
+  pull_request:
+    branches:
+      - main
+      - staging
+
+jobs:
+  test-and-validate:
+    name: Run Automated Tests & Build Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js (LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Positive, Negative & Edge-Case Automated Tests (96 Tests)
+        run: npm test
+
+      - name: Verify Web Production Bundle Compilation
+        run: npm run build:web
