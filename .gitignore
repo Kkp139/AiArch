@@ -1,7 +1,14 @@
 node_modules
 dist
-.env
-.env.local
 *.log
 .system_generated
 .superpowers
+
+# Environment Files (Keep .env.example tracked, ignore actual credentials)
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.*.local
+!.env.example
