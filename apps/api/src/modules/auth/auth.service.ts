@@ -32,3 +32,85 @@ export async function hashPassword(password: string): Promise<string> {
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   return bcrypt.compare(password, hash);
 }
+
+// In-memory temp token store for 2-step OTP flows
+const tempTokenStore = new Map<string, { data: any; expiresAt: number }>();
+
+export function createTempToken(data: any, ttlMinutes: number = 10): string {
+  const token = 'temp_' + crypto.randomBytes(24).toString('hex');
+  const expiresAt = Date.now() + ttlMinutes * 60 * 1000;
+  tempTokenStore.set(token, { data, expiresAt });
+  return token;
+}
+
+export function verifyTempToken(token: string): any | null {
+  const record = tempTokenStore.get(token);
+  if (!record) return null;
+  if (Date.now() > record.expiresAt) {
+    tempTokenStore.delete(token);
+    return null;
+  }
+  return record.data;
+}
+
+export function consumeTempToken(token: string): any | null {
+  const data = verifyTempToken(token);
+  if (data) {
+    tempTokenStore.delete(token);
+  }
+  return data;
+}
+
+export interface SeedUser {
+  id: string;
+  username: string;
+  fullName: string;
+  role: 'ADMIN' | 'STAFF' | 'CLIENT_LEADER' | 'CLIENT_VIEWER';
+  mobile: string;
+  passwordPlainText: string;
+  showPricing: boolean;
+  status: 'ACTIVE' | 'DEACTIVATED';
+}
+
+export const SEED_USERS: Record<string, SeedUser> = {
+  admin: {
+    id: 'usr-admin-1',
+    username: 'admin',
+    fullName: 'Kamal Patel',
+    role: 'ADMIN',
+    mobile: '+91 98251 00001',
+    passwordPlainText: 'admin123',
+    showPricing: true,
+    status: 'ACTIVE',
+  },
+  staff: {
+    id: 'usr-staff-1',
+    username: 'staff',
+    fullName: 'Raj Patel',
+    role: 'STAFF',
+    mobile: '+91 98251 99887',
+    passwordPlainText: 'staff123',
+    showPricing: false,
+    status: 'ACTIVE',
+  },
+  client_leader: {
+    id: 'usr-client-1',
+    username: 'client_leader',
+    fullName: 'Rajesh Mehta',
+    role: 'CLIENT_LEADER',
+    mobile: '+91 98765 43210',
+    passwordPlainText: 'client123',
+    showPricing: true,
+    status: 'ACTIVE',
+  },
+  client_viewer: {
+    id: 'usr-viewer-1',
+    username: 'client_viewer',
+    fullName: 'Pooja Mehta',
+    role: 'CLIENT_VIEWER',
+    mobile: '+91 98765 11223',
+    passwordPlainText: 'viewer123',
+    showPricing: false,
+    status: 'ACTIVE',
+  },
+};

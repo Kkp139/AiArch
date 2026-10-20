@@ -66,3 +66,126 @@ describe('Auth, RBAC & OTP Security Rules', () => {
     expect(checkRoleAccess('CLIENT_LEADER', ['CLIENT_LEADER'])).toBe(true);
   });
 });
+
+describe('Full-Stack Auth Controller API Routes', () => {
+  it('allows Admin to sign in directly without OTP', async () => {
+    const { buildApp } = await import('../src/server');
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: {
+        username: 'admin',
+        password: 'admin123',
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.requireOtp).toBe(false);
+    expect(body.user.role).toBe('ADMIN');
+    expect(body.token).toBeDefined();
+  });
+
+  it('routes Staff through 2-Step OTP flow', async () => {
+    const { buildApp } = await import('../src/server');
+    const app = await buildApp();
+
+    // Step 1: Login
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: {
+        username: 'staff',
+        password: 'staff123',
+      },
+    });
+
+    expect(loginRes.statusCode).toBe(200);
+    const loginBody = JSON.parse(loginRes.body);
+    expect(loginBody.success).toBe(true);
+    expect(loginBody.requireOtp).toBe(true);
+    expect(loginBody.tempToken).toBeDefined();
+    expect(loginBody.user.role).toBe('STAFF');
+
+    // Step 2: Send OTP
+    const otpRes = await app.inject({
+      method: 'POST',
+      url: '/api/auth/send-otp',
+      payload: {
+        tempToken: loginBody.tempToken,
+        fullName: loginBody.user.fullName,
+        mobile: loginBody.user.mobile,
+      },
+    });
+
+    expect(otpRes.statusCode).toBe(200);
+    const otpBody = JSON.parse(otpRes.body);
+    expect(otpBody.success).toBe(true);
+    expect(otpBody.debugOtp).toBe('123456');
+
+    // Step 3: Verify OTP with fixed test OTP 123456
+    const verifyRes = await app.inject({
+      method: 'POST',
+      url: '/api/auth/verify-otp',
+      payload: {
+        tempToken: loginBody.tempToken,
+        otp: '123456',
+      },
+    });
+
+    expect(verifyRes.statusCode).toBe(200);
+    const verifyBody = JSON.parse(verifyRes.body);
+    expect(verifyBody.success).toBe(true);
+    expect(verifyBody.token).toBeDefined();
+    expect(verifyBody.user.role).toBe('STAFF');
+  });
+
+  it('rejects incorrect passwords with 401', async () => {
+    const { buildApp } = await import('../src/server');
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: {
+        username: 'admin',
+        password: 'wrongpassword',
+      },
+    });
+
+    expect(response.statusCode).toBe(401);
+    const body = JSON.parse(response.body);
+    expect(body.error).toContain('Invalid username or password');
+  });
+
+  it('rejects incorrect OTPs with 401', async () => {
+    const { buildApp } = await import('../src/server');
+    const app = await buildApp();
+
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: {
+        username: 'client_leader',
+        password: 'client123',
+      },
+    });
+    const { tempToken } = JSON.parse(loginRes.body);
+
+    const verifyRes = await app.inject({
+      method: 'POST',
+      url: '/api/auth/verify-otp',
+      payload: {
+        tempToken,
+        otp: '000000',
+      },
+    });
+
+    expect(verifyRes.statusCode).toBe(401);
+    const body = JSON.parse(verifyRes.body);
+    expect(body.error).toContain('Invalid or expired verification code');
+  });
+});
