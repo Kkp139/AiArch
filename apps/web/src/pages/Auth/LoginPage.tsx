@@ -73,8 +73,8 @@ export const LoginPage: React.FC = () => {
           <div className="form-header-row">
             <div className="form-logo-badge">
               <img
-                src="/assets/auth/asf_logo.png"
-                alt="asf design logo"
+                src="/assets/auth/asf_logo.svg"
+                alt="asf design"
                 className="form-logo-img"
               />
             </div>

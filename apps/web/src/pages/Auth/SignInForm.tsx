@@ -11,8 +11,8 @@ interface SignInFormProps {
 }
 
 export const SignInForm: React.FC<SignInFormProps> = ({ onSuccess }) => {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -49,12 +49,6 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onSuccess }) => {
     }
   };
 
-  const handleQuickFill = (u: string, p: string) => {
-    setUsername(u);
-    setPassword(p);
-    setErrorMessage(null);
-  };
-
   return (
     <div className="form-body-wrapper">
       <h2 className="form-heading">Sign In to Your Workspace</h2>
@@ -79,7 +73,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onSuccess }) => {
               type="text"
               autoComplete="username"
               className={`form-input ${errorMessage ? 'has-error' : ''}`}
-              placeholder="e.g. admin or staff"
+              placeholder="admin"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               disabled={isLoading}
@@ -121,7 +115,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onSuccess }) => {
             className="form-text-link"
             onClick={(e) => {
               e.preventDefault();
-              alert('Password reset instructions: Please contact your Studio Administrator or check registered email.');
+              alert('Password reset instructions: Please contact your Studio Administrator or project team.');
             }}
           >
             Forgot password?
@@ -143,44 +137,6 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onSuccess }) => {
           )}
         </button>
       </form>
-
-      {/* Quick Demo Credentials Switcher for convenience */}
-      <div className="demo-credentials-pill">
-        <div className="demo-credentials-header">
-          <span>Demo Credentials</span>
-          <span style={{ fontSize: '10px', color: 'var(--bronze-primary)' }}>Fixed OTP: 123456</span>
-        </div>
-        <div className="demo-btn-group">
-          <button
-            type="button"
-            className="demo-quick-btn"
-            onClick={() => handleQuickFill('admin', 'admin123')}
-          >
-            👑 <strong>Admin</strong> (Direct)
-          </button>
-          <button
-            type="button"
-            className="demo-quick-btn"
-            onClick={() => handleQuickFill('staff', 'staff123')}
-          >
-            📐 <strong>Staff</strong> (OTP)
-          </button>
-          <button
-            type="button"
-            className="demo-quick-btn"
-            onClick={() => handleQuickFill('client_leader', 'client123')}
-          >
-            👔 <strong>Client Leader</strong> (OTP)
-          </button>
-          <button
-            type="button"
-            className="demo-quick-btn"
-            onClick={() => handleQuickFill('client_viewer', 'viewer123')}
-          >
-            👁️ <strong>Client Viewer</strong> (OTP)
-          </button>
-        </div>
-      </div>
     </div>
   );
 };

@@ -214,31 +214,6 @@ export const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
             </button>
           )}
         </div>
-
-        {/* Quick Helper for Test Mode */}
-        {debugOtp && (
-          <div
-            style={{
-              marginTop: '20px',
-              textAlign: 'center',
-              fontSize: '12px',
-              color: 'var(--bronze-primary)',
-            }}
-          >
-            Fixed Dev OTP: <code>{debugOtp}</code>{' '}
-            <button
-              type="button"
-              className="form-text-link"
-              style={{ marginLeft: '6px', background: 'none', border: 'none', textDecoration: 'underline' }}
-              onClick={() => {
-                setDigits(debugOtp.split(''));
-                inputRefs.current[5]?.focus();
-              }}
-            >
-              (Click to fill)
-            </button>
-          </div>
-        )}
       </form>
     </div>
   );

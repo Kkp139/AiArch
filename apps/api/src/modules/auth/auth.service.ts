@@ -76,41 +76,43 @@ export const SEED_USERS: Record<string, SeedUser> = {
   admin: {
     id: 'usr-admin-1',
     username: 'admin',
-    fullName: 'Kamal Patel',
+    fullName: 'Farhaz Admin',
     role: 'ADMIN',
     mobile: '+91 98251 00001',
     passwordPlainText: 'admin123',
     showPricing: true,
     status: 'ACTIVE',
   },
-  staff: {
-    id: 'usr-staff-1',
-    username: 'staff',
-    fullName: 'Raj Patel',
-    role: 'STAFF',
-    mobile: '+91 98251 99887',
-    passwordPlainText: 'staff123',
-    showPricing: false,
-    status: 'ACTIVE',
-  },
-  client_leader: {
-    id: 'usr-client-1',
-    username: 'client_leader',
-    fullName: 'Rajesh Mehta',
-    role: 'CLIENT_LEADER',
-    mobile: '+91 98765 43210',
-    passwordPlainText: 'client123',
-    showPricing: true,
-    status: 'ACTIVE',
-  },
-  client_viewer: {
-    id: 'usr-viewer-1',
-    username: 'client_viewer',
-    fullName: 'Pooja Mehta',
-    role: 'CLIENT_VIEWER',
-    mobile: '+91 98765 11223',
-    passwordPlainText: 'viewer123',
-    showPricing: false,
-    status: 'ACTIVE',
-  },
 };
+
+export function createUser(userData: {
+  username: string;
+  fullName: string;
+  role: 'ADMIN' | 'STAFF' | 'CLIENT_LEADER' | 'CLIENT_VIEWER';
+  mobile: string;
+  passwordPlainText: string;
+  showPricing?: boolean;
+}): SeedUser {
+  const normalizedUsername = userData.username.trim().toLowerCase();
+  if (SEED_USERS[normalizedUsername]) {
+    throw new Error('A user with this username already exists.');
+  }
+
+  const newUser: SeedUser = {
+    id: `usr-${userData.role.toLowerCase()}-${Date.now()}`,
+    username: normalizedUsername,
+    fullName: userData.fullName.trim(),
+    role: userData.role,
+    mobile: userData.mobile.trim(),
+    passwordPlainText: userData.passwordPlainText,
+    showPricing: userData.showPricing ?? (userData.role !== 'CLIENT_VIEWER' && userData.role !== 'STAFF'),
+    status: 'ACTIVE',
+  };
+
+  SEED_USERS[normalizedUsername] = newUser;
+  return newUser;
+}
+
+export function listUsers(): SeedUser[] {
+  return Object.values(SEED_USERS);
+}

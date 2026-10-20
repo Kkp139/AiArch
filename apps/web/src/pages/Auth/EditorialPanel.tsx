@@ -2,9 +2,9 @@ import React from 'react';
 
 export const EditorialPanel: React.FC = () => {
   return (
-    <div className="auth-editorial-col">
+    <div className="auth-editorial-col" aria-label="A&F Design Architectural Courtyard - Great spaces. Built together.">
       <img
-        src="/assets/auth/editorial_courtyard.png"
+        src="/assets/auth/editorial_courtyard_clean.png"
         alt="A&F Design Architectural Courtyard"
         className="editorial-bg"
       />

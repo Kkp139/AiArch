@@ -180,4 +180,79 @@ export async function authRoutes(app: FastifyInstance) {
   app.post('/api/auth/logout', async () => {
     return { success: true };
   });
+
+  // Admin user management: List users
+  app.get('/api/auth/users', async (request: FastifyRequest, reply: FastifyReply) => {
+    const authHeader = request.headers.authorization;
+    if (!authHeader || !authHeader.includes('usr-admin')) {
+      return reply.status(403).send({ error: 'Only studio administrators can view all users.' });
+    }
+
+    return {
+      users: Object.values(SEED_USERS).map(u => ({
+        id: u.id,
+        username: u.username,
+        fullName: u.fullName,
+        role: u.role,
+        mobile: u.mobile,
+        showPricing: u.showPricing,
+        status: u.status,
+      })),
+    };
+  });
+
+  // Admin user management: Create / Invite new user
+  app.post('/api/auth/users', async (request: FastifyRequest, reply: FastifyReply) => {
+    const authHeader = request.headers.authorization;
+    if (!authHeader || !authHeader.includes('usr-admin')) {
+      return reply.status(403).send({ error: 'Only studio administrators can create or invite users.' });
+    }
+
+    const schema = z.object({
+      username: z.string().min(2, 'Username must be at least 2 characters'),
+      fullName: z.string().min(2, 'Full Name is required'),
+      role: z.enum(['ADMIN', 'STAFF', 'CLIENT_LEADER', 'CLIENT_VIEWER']),
+      mobile: z.string().min(10, 'Valid WhatsApp mobile number is required'),
+      password: z.string().min(4, 'Password must be at least 4 characters'),
+      showPricing: z.boolean().optional(),
+    });
+
+    const body = schema.safeParse(request.body);
+    if (!body.success) {
+      return reply.status(400).send({ error: body.error.errors[0]?.message || 'Invalid user data' });
+    }
+
+    const { username, fullName, role, mobile, password, showPricing } = body.data;
+    const lowerUsername = username.trim().toLowerCase();
+
+    if (SEED_USERS[lowerUsername]) {
+      return reply.status(409).send({ error: `User '${lowerUsername}' already exists.` });
+    }
+
+    const newUser: SeedUser = {
+      id: `usr-${role.toLowerCase()}-${Date.now()}`,
+      username: lowerUsername,
+      fullName: fullName.trim(),
+      role,
+      mobile: mobile.trim(),
+      passwordPlainText: password,
+      showPricing: showPricing ?? (role !== 'CLIENT_VIEWER' && role !== 'STAFF'),
+      status: 'ACTIVE',
+    };
+
+    SEED_USERS[lowerUsername] = newUser;
+
+    return {
+      success: true,
+      user: {
+        id: newUser.id,
+        username: newUser.username,
+        fullName: newUser.fullName,
+        role: newUser.role,
+        mobile: newUser.mobile,
+        showPricing: newUser.showPricing,
+        status: newUser.status,
+      },
+    };
+  });
 }

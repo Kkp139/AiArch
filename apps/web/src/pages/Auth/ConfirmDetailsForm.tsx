@@ -16,8 +16,8 @@ export const ConfirmDetailsForm: React.FC<ConfirmDetailsFormProps> = ({
   onBack,
   onSuccess,
 }) => {
-  const [fullName, setFullName] = useState(initialFullName || 'Raj Patel');
-  const [mobile, setMobile] = useState(initialMobile || '+91 98251 99887');
+  const [fullName, setFullName] = useState(initialFullName || '');
+  const [mobile, setMobile] = useState(initialMobile || '');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
