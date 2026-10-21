@@ -1,0 +1,15 @@
+node_modules
+dist
+*.log
+.system_generated
+.superpowers
+
+# Environment Files (Keep .env.example tracked, ignore actual credentials)
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.*.local
+!.env.example
+scratch/

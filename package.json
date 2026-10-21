@@ -1,0 +1,20 @@
+{
+  "name": "pronex-archai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ProNex-ArchAI Studio Collaboration Portal",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm --workspace=@pronex/api run dev",
+    "dev:web": "node ./node_modules/vite/bin/vite.js apps/web",
+    "dev:worker": "npm --workspace=@pronex/worker run dev",
+    "build": "node ./node_modules/typescript/bin/tsc --build",
+    "build:web": "node ./node_modules/vite/bin/vite.js build apps/web",
+    "test": "node ./node_modules/vitest/vitest.mjs run"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
