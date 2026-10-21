@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth, UserProfile, UserRole } from './context/AuthContext';
+import { LoginPage } from './pages/Auth/LoginPage';
 import { Shell } from './components/layout/Shell';
 import { DocumentExplorer } from './pages/Vault/DocumentExplorer';
 import { VerificationList, VerificationItem } from './pages/Verification/VerificationList';
@@ -7,7 +8,8 @@ import { MeetingCalendar } from './pages/Meetings/MeetingCalendar';
 import { StaffAttendance } from './pages/Attendance/StaffAttendance';
 import { PaymentLedger, PaymentRecord } from './pages/Payments/PaymentLedger';
 import { ProjectChatRoom, ChatMessageItem } from './pages/Chat/ProjectChatRoom';
-import { FolderKanban, ArrowRight, Shield, UserCheck, Eye, HardHat, RotateCcw } from 'lucide-react';
+import { FolderKanban, ArrowRight, Shield, UserCheck, Eye, HardHat, RotateCcw, UserPlus } from 'lucide-react';
+import { AdminUserManagementModal } from './components/AdminUserManagementModal';
 
 const MOCK_USERS: Record<UserRole, UserProfile> = {
   ADMIN: {
@@ -115,8 +117,9 @@ const INITIAL_CHAT_MESSAGES: ChatMessageItem[] = [
 ];
 
 function MainApp() {
-  const [selectedRole, setSelectedRole] = useState<UserRole>('ADMIN');
+  const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('projects');
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
 
   // Interactive Persistent State (Saves to localStorage so CRUD persists across refreshes)
   const [isClockedIn, setIsClockedIn] = useState<boolean>(() => {
@@ -180,13 +183,18 @@ function MainApp() {
     window.location.reload();
   };
 
-  const currentUser = MOCK_USERS[selectedRole];
+  // If user is not authenticated, render Figma High-Fidelity Login Page
+  if (!user) {
+    return <LoginPage />;
+  }
 
-  const handleRoleChange = (role: UserRole) => {
-    setSelectedRole(role);
-    // If Staff is selected and current tab is Payments or Chat, navigate to Projects
-    if (role === 'STAFF' && (activeTab === 'payments' || activeTab === 'chat' || activeTab === 'meetings')) {
-      setActiveTab('projects');
+  const currentUser = user;
+
+  const handleRoleSwitch = (role: UserRole) => {
+    const mock = MOCK_USERS[role];
+    if (mock) {
+      localStorage.setItem('pronex_auth_user', JSON.stringify(mock));
+      window.location.reload();
     }
   };
 
@@ -236,73 +244,80 @@ function MainApp() {
 
   return (
     <div>
-      {/* Interactive Role Switcher Bar (For local preview & workflow testing) */}
+      {/* Studio Header Action Bar */}
       <div
         style={{
           backgroundColor: '#161b22',
           borderBottom: '1px solid #30363d',
-          padding: '8px 24px',
+          padding: '10px 24px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          fontSize: '12px',
+          fontSize: '13px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-gold)' }}>
-          <Shield size={14} />
-          <strong>Local Workflow Simulator:</strong> Switch roles to test access control & user experience
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#c9d1d9' }}>
+          <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--accent-gold)', fontWeight: 700 }}>
+            {currentUser.role}
+          </span>
+          <span style={{ color: '#8b949e' }}>•</span>
+          <strong style={{ color: '#f0f6fc' }}>{currentUser.fullName}</strong>
+          <span style={{ color: '#8b949e', fontSize: '12px' }}>({currentUser.username || 'admin'})</span>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {(['ADMIN', 'STAFF', 'CLIENT_LEADER', 'CLIENT_VIEWER'] as UserRole[]).map((r) => (
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {currentUser.role === 'ADMIN' && (
             <button
-              key={r}
-              onClick={() => handleRoleChange(r)}
+              onClick={() => setIsOnboardingOpen(true)}
               style={{
-                padding: '4px 12px',
-                borderRadius: '4px',
-                fontSize: '11px',
+                padding: '6px 14px',
+                borderRadius: '6px',
+                fontSize: '12px',
                 fontWeight: 600,
-                backgroundColor: selectedRole === r ? 'var(--accent-gold)' : '#21262d',
-                color: selectedRole === r ? '#0d0f12' : '#c9d1d9',
-                border: '1px solid #30363d',
+                backgroundColor: '#BF935A',
+                color: '#FFFFFF',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'background-color 0.15s',
               }}
             >
-              {r === 'ADMIN' && '👑 Admin (Kamal)'}
-              {r === 'STAFF' && '👷 Staff (Ronak)'}
-              {r === 'CLIENT_LEADER' && '🤝 Client Leader (Rajesh)'}
-              {r === 'CLIENT_VIEWER' && '👁️ Client Viewer (Pooja)'}
+              <UserPlus size={14} />
+              <span>+ Onboard Team & Clients</span>
             </button>
-          ))}
+          )}
 
           <button
-            onClick={handleResetDemoData}
-            title="Reset all demo CRUD state back to clean initial values"
+            onClick={logout}
             style={{
-              padding: '4px 10px',
-              borderRadius: '4px',
-              fontSize: '11px',
+              padding: '6px 14px',
+              borderRadius: '6px',
+              fontSize: '12px',
               fontWeight: 600,
               backgroundColor: '#21262d',
               color: '#f87171',
               border: '1px solid #4b1a1a',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              marginLeft: '8px',
+              cursor: 'pointer',
             }}
           >
-            <RotateCcw size={11} />
-            <span>Reset Demo Data</span>
+            Sign out
           </button>
         </div>
       </div>
+
+      <AdminUserManagementModal
+        isOpen={isOnboardingOpen}
+        onClose={() => setIsOnboardingOpen(false)}
+      />
 
       <Shell
         user={currentUser}
         studioName="A&F Design"
         activeTab={activeTab}
         onTabChange={(tab) => setActiveTab(tab)}
+        onLogout={logout}
       >
         {/* TAB 1: PROJECTS OVERVIEW DASHBOARD */}
         {activeTab === 'projects' && (
