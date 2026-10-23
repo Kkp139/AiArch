@@ -11,10 +11,11 @@
     "dev:web": "node ./node_modules/vite/bin/vite.js apps/web",
     "dev:worker": "npm --workspace=@pronex/worker run dev",
     "build": "node ./node_modules/typescript/bin/tsc --build",
-    "build:web": "node ./node_modules/vite/bin/vite.js build apps/web",
+    "build:web": "node ./node_modules/vite/bin/vite.js build apps/web && node ./scripts/sync-dist.js",
     "test": "node ./node_modules/vitest/vitest.mjs run"
   },
   "devDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "^4.65.0",
     "typescript": "^5.4.5"
   }
 }

@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node ../../node_modules/vite/bin/vite.js",
-    "build": "node ../../node_modules/vite/bin/vite.js build",
-    "build:web": "node ../../node_modules/vite/bin/vite.js build",
+    "build": "node ../../node_modules/vite/bin/vite.js build && node ../../scripts/sync-dist.js",
+    "build:web": "node ../../node_modules/vite/bin/vite.js build && node ../../scripts/sync-dist.js",
     "preview": "node ../../node_modules/vite/bin/vite.js preview",
     "test": "node ../../node_modules/vitest/vitest.mjs run"
   },
