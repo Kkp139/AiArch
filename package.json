@@ -15,7 +15,6 @@
     "test": "node ./node_modules/vitest/vitest.mjs run"
   },
   "devDependencies": {
-    "@rollup/rollup-win32-x64-msvc": "^4.65.0",
     "typescript": "^5.4.5"
   }
 }
