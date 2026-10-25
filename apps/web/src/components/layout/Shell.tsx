@@ -20,6 +20,7 @@ export interface ShellProps {
     fullName: string;
     role: UserRole;
     showPricing?: boolean;
+    allowMeetings?: boolean;
   };
   studioName?: string;
   children: React.ReactNode;
@@ -31,7 +32,7 @@ export interface ShellProps {
 interface NavItem {
   id: string;
   label: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: any;
   roles: UserRole[];
   requiresPricingToggle?: boolean;
 }
@@ -39,7 +40,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'projects', label: 'Projects', icon: FolderKanban, roles: ['ADMIN', 'STAFF', 'CLIENT_LEADER', 'CLIENT_VIEWER'] },
   { id: 'vault', label: 'Document Vault', icon: FileBox, roles: ['ADMIN', 'STAFF', 'CLIENT_LEADER', 'CLIENT_VIEWER'] },
-  { id: 'verification', label: 'Verifications', icon: CheckSquare, roles: ['ADMIN', 'STAFF', 'CLIENT_LEADER', 'CLIENT_VIEWER'] },
+  { id: 'verification', label: 'Verifications', icon: CheckSquare, roles: ['ADMIN', 'STAFF'] }, // STRICT SPEC: Admin & Staff only
   { id: 'meetings', label: 'Meetings', icon: CalendarDays, roles: ['ADMIN', 'CLIENT_LEADER', 'CLIENT_VIEWER'] },
   { id: 'payments', label: 'Payments', icon: CreditCard, roles: ['ADMIN', 'CLIENT_LEADER', 'CLIENT_VIEWER'], requiresPricingToggle: true },
   { id: 'attendance', label: 'Attendance', icon: Clock, roles: ['ADMIN', 'STAFF'] },
@@ -56,7 +57,7 @@ export function Shell({ user, studioName = 'A&F Design', children, activeTab = '
     document.documentElement.setAttribute('data-theme', nextTheme);
   };
 
-  // Filter navigation items by role and client pricing permission
+  // Filter navigation items by role, dynamic meetings setting, and client pricing permission
   const allowedNavItems = NAV_ITEMS.filter((item) => {
     // 1. Check basic role permission
     if (!item.roles.includes(user.role)) {
@@ -71,6 +72,11 @@ export function Shell({ user, studioName = 'A&F Design', children, activeTab = '
     // 3. For Client roles, payments require showPricing toggle
     if (item.id === 'payments' && (user.role === 'CLIENT_LEADER' || user.role === 'CLIENT_VIEWER')) {
       return !!user.showPricing;
+    }
+
+    // 4. Dynamic Meetings Rule: Admin is always allowed; Client Leader/Viewer require allowMeetings toggle
+    if (item.id === 'meetings' && (user.role === 'CLIENT_LEADER' || user.role === 'CLIENT_VIEWER')) {
+      return user.allowMeetings !== false;
     }
 
     return true;

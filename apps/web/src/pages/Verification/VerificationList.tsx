@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { UserRole } from '../../context/AuthContext';
 import { CheckCircle2, RotateCcw, AlertCircle, Clock, FileCheck } from 'lucide-react';
 
-export type VerificationStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'REVISION_REQUIRED';
+export type VerificationStatus = 'PENDING_APPROVAL' | 'PENDING_REVIEW' | 'APPROVED' | 'REVISION_REQUIRED' | 'REVISION_REQUESTED';
 
 export interface VerificationItem {
   id: string;
@@ -12,6 +12,8 @@ export interface VerificationItem {
   status: VerificationStatus;
   submittedAt: string;
   adminNotes?: string;
+  feedbackNote?: string;
+  submittedBy?: string;
 }
 
 export interface VerificationListProps {
@@ -47,6 +49,7 @@ export function VerificationList({ userRole, items, onApprove, onRequestRevision
           </span>
         );
       case 'REVISION_REQUIRED':
+      case 'REVISION_REQUESTED':
         return (
           <span
             style={{
@@ -65,6 +68,7 @@ export function VerificationList({ userRole, items, onApprove, onRequestRevision
           </span>
         );
       case 'PENDING_APPROVAL':
+      case 'PENDING_REVIEW':
       default:
         return (
           <span
@@ -161,9 +165,9 @@ export function VerificationList({ userRole, items, onApprove, onRequestRevision
                   <span>{item.category}</span>
                   <span style={{ margin: '0 6px' }}>•</span>
                   <span>Submitted {new Date(item.submittedAt).toLocaleDateString()}</span>
-                  {item.adminNotes && (
+                  {(item.feedbackNote || item.adminNotes) && (
                     <span style={{ marginLeft: '10px', color: 'var(--accent-rose)' }}>
-                      Note: {item.adminNotes}
+                      Note: {item.feedbackNote || item.adminNotes}
                     </span>
                   )}
                 </div>
@@ -174,7 +178,7 @@ export function VerificationList({ userRole, items, onApprove, onRequestRevision
               {getStatusBadge(item.status)}
 
               {/* Admin Approval & Revision Actions */}
-              {isAdmin && item.status === 'PENDING_APPROVAL' && (
+              {isAdmin && (item.status === 'PENDING_APPROVAL' || item.status === 'PENDING_REVIEW') && (
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
                     onClick={() => onApprove && onApprove(item.id)}

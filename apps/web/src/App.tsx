@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AuthProvider, useAuth, UserProfile, UserRole } from './context/AuthContext';
 import { LoginPage } from './pages/Auth/LoginPage';
 import { Shell } from './components/layout/Shell';
@@ -8,179 +8,332 @@ import { MeetingCalendar } from './pages/Meetings/MeetingCalendar';
 import { StaffAttendance } from './pages/Attendance/StaffAttendance';
 import { PaymentLedger, PaymentRecord } from './pages/Payments/PaymentLedger';
 import { ProjectChatRoom, ChatMessageItem } from './pages/Chat/ProjectChatRoom';
-import { FolderKanban, ArrowRight, Shield, UserCheck, Eye, HardHat, RotateCcw, UserPlus } from 'lucide-react';
+import { FolderKanban, ArrowRight, UserPlus, RefreshCw } from 'lucide-react';
 import { AdminUserManagementModal } from './components/AdminUserManagementModal';
 
-const MOCK_USERS: Record<UserRole, UserProfile> = {
-  ADMIN: {
-    id: 'usr-admin-1',
-    fullName: 'Kamal Patel',
-    role: 'ADMIN',
-    showPricing: true,
-  },
-  STAFF: {
-    id: 'usr-staff-1',
-    fullName: 'Ronak Shah',
-    role: 'STAFF',
-    showPricing: false,
-  },
-  CLIENT_LEADER: {
-    id: 'usr-client-1',
-    fullName: 'Rajesh Mehta',
-    role: 'CLIENT_LEADER',
-    showPricing: true,
-  },
-  CLIENT_VIEWER: {
-    id: 'usr-viewer-1',
-    fullName: 'Pooja Mehta',
-    role: 'CLIENT_VIEWER',
-    showPricing: false,
-  },
-};
-
-const INITIAL_VERIFICATIONS: VerificationItem[] = [
-  {
-    id: 'ver-1',
-    drawingTitle: 'Ground Floor Architectural Layout Plan',
-    category: '01_ARCHITECTURAL_PLANS',
-    revisionNumber: 3,
-    status: 'PENDING_APPROVAL',
-    submittedAt: '2026-10-18T14:30:00Z',
-  },
-  {
-    id: 'ver-2',
-    drawingTitle: 'RCC Foundation & Column Schedule',
-    category: '02_STRUCTURAL_DRAWINGS',
-    revisionNumber: 2,
-    status: 'APPROVED',
-    submittedAt: '2026-10-16T10:00:00Z',
-  },
-  {
-    id: 'ver-3',
-    drawingTitle: 'Living Room Ceiling & Lighting Detail',
-    category: '06_INTERIOR_DETAILS',
-    revisionNumber: 1,
-    status: 'REVISION_REQUIRED',
-    submittedAt: '2026-10-17T16:15:00Z',
-    adminNotes: 'Increase cove light offset by 50mm as requested by client.',
-  },
-];
-
-const INITIAL_PAYMENTS: PaymentRecord[] = [
-  {
-    id: 'pay-1',
-    milestoneTitle: 'Mobilization & Concept Sign-off (10%)',
-    amount: 500000,
-    paymentMode: 'NEFT_RTGS',
-    status: 'CONFIRMED',
-    referenceNumber: 'NEFT99887711',
-    bankName: 'HDFC Bank',
-    createdAt: '2026-09-15',
-  },
-  {
-    id: 'pay-2',
-    milestoneTitle: 'Municipal Permit Drawings Approval (25%)',
-    amount: 1250000,
-    paymentMode: 'CHEQUE',
-    status: 'CONFIRMED',
-    referenceNumber: 'CHQ-445566',
-    bankName: 'ICICI Bank',
-    createdAt: '2026-10-01',
-  },
-  {
-    id: 'pay-3',
-    milestoneTitle: 'Structural Working Drawings Release (25%)',
-    amount: 1250000,
-    paymentMode: 'NEFT_RTGS',
-    status: 'PENDING_CLEARANCE',
-    referenceNumber: 'UTR-20261019-8822',
-    bankName: 'Axis Bank',
-    createdAt: '2026-10-18',
-  },
-];
-
-const INITIAL_CHAT_MESSAGES: ChatMessageItem[] = [
-  {
-    id: 'msg-1',
-    senderName: 'Kamal Patel',
-    senderRole: 'ADMIN',
-    text: 'Good morning Rajesh bhai. We have updated the ground floor electrical layout with the Italian marble island lighting.',
-    createdAt: '2026-10-19T09:30:00Z',
-  },
-  {
-    id: 'msg-2',
-    senderName: 'Rajesh Mehta',
-    senderRole: 'CLIENT_LEADER',
-    text: 'Thank you Kamal. Can we review the lighting switchboards in our 4:00 PM consultation slot today?',
-    createdAt: '2026-10-19T09:45:00Z',
-  },
-];
+export interface ProjectSummary {
+  id: string;
+  projectCode: string;
+  name: string;
+  category: string;
+  siteLocation: string;
+  status: string;
+  totalAgreedFee: number;
+  advancePaymentReceived: number;
+  allowClientDownloads: string;
+  showPricingClientLeader: boolean;
+  showPricingClientViewer: boolean;
+  allowClientMeetings: boolean;
+  documentCount: number;
+  folderCount: number;
+  completionPercentage: number;
+  populatedFolders: number;
+}
 
 function MainApp() {
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('projects');
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Interactive Persistent State (Saves to localStorage so CRUD persists across refreshes)
-  const [isClockedIn, setIsClockedIn] = useState<boolean>(() => {
-    const saved = localStorage.getItem('af_is_clocked_in');
-    return saved !== null ? JSON.parse(saved) : true;
-  });
+  // Active Project Context
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [selectedProjectCode, setSelectedProjectCode] = useState<string>('AF-VILLA');
 
-  const [pendingUpdates, setPendingUpdates] = useState<string[]>(() => {
-    const saved = localStorage.getItem('af_pending_updates');
-    return saved ? JSON.parse(saved) : ['Slot +3h (12:00)'];
-  });
+  // Real Database Collections
+  const [verifications, setVerifications] = useState<VerificationItem[]>([]);
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessageItem[]>([]);
+  const [meetings, setMeetings] = useState<any[]>([]);
 
-  const [verifications, setVerifications] = useState<VerificationItem[]>(() => {
-    const saved = localStorage.getItem('af_verifications');
-    return saved ? JSON.parse(saved) : INITIAL_VERIFICATIONS;
-  });
+  // Real Attendance Session State
+  const [isClockedIn, setIsClockedIn] = useState(false);
+  const [pendingUpdates, setPendingUpdates] = useState<string[]>([]);
 
-  const [payments, setPayments] = useState<PaymentRecord[]>(() => {
-    const saved = localStorage.getItem('af_payments');
-    return saved ? JSON.parse(saved) : INITIAL_PAYMENTS;
-  });
+  const getAuthHeaders = useCallback(() => {
+    const roleSlug = user?.role ? user.role.toLowerCase() : 'admin';
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': token ? `Bearer ${token}` : `Bearer ${roleSlug}`,
+    };
+  }, [user?.role, token]);
 
-  const [chatMessages, setChatMessages] = useState<ChatMessageItem[]>(() => {
-    const saved = localStorage.getItem('af_chat_messages');
-    return saved ? JSON.parse(saved) : INITIAL_CHAT_MESSAGES;
-  });
+  // Load Projects from Database
+  const fetchProjects = useCallback(async () => {
+    try {
+      const res = await fetch('/api/projects', { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setProjects(data);
+        if (data.length > 0 && !data.some((p: ProjectSummary) => p.projectCode === selectedProjectCode)) {
+          setSelectedProjectCode(data[0].projectCode);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load projects from DB', err);
+    }
+  }, [getAuthHeaders, selectedProjectCode]);
 
-  // Sync to localStorage whenever state updates
-  React.useEffect(() => {
-    localStorage.setItem('af_is_clocked_in', JSON.stringify(isClockedIn));
-  }, [isClockedIn]);
+  // Load Verifications (Admin & Staff)
+  const fetchVerifications = useCallback(async () => {
+    if (user?.role !== 'ADMIN' && user?.role !== 'STAFF') return;
+    try {
+      const res = await fetch('/api/verification/list', { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setVerifications(data);
+      }
+    } catch (err) {
+      console.error('Failed to load verifications from DB', err);
+    }
+  }, [getAuthHeaders, user?.role]);
 
-  React.useEffect(() => {
-    localStorage.setItem('af_pending_updates', JSON.stringify(pendingUpdates));
-  }, [pendingUpdates]);
+  // Load Payments for active project
+  const fetchPayments = useCallback(async () => {
+    if (user?.role === 'STAFF') return;
+    try {
+      const res = await fetch(`/api/payments/project/${selectedProjectCode}`, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setPayments(data);
+      }
+    } catch (err) {
+      console.error('Failed to load payments from DB', err);
+    }
+  }, [getAuthHeaders, user?.role, selectedProjectCode]);
 
-  React.useEffect(() => {
-    localStorage.setItem('af_verifications', JSON.stringify(verifications));
-  }, [verifications]);
+  // Load Meetings for active project
+  const fetchMeetings = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/meetings?projectCode=${selectedProjectCode}`, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setMeetings(data);
+      }
+    } catch (err) {
+      console.error('Failed to load meetings from DB', err);
+    }
+  }, [getAuthHeaders, selectedProjectCode]);
 
-  React.useEffect(() => {
-    localStorage.setItem('af_payments', JSON.stringify(payments));
-  }, [payments]);
+  // Load Attendance Session (Staff)
+  const fetchAttendance = useCallback(async () => {
+    try {
+      const res = await fetch('/api/attendance/status', { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setIsClockedIn(Boolean(data.isClockedIn));
+        setPendingUpdates(data.pendingUpdates || []);
+      }
+    } catch (err) {
+      console.error('Failed to load attendance from DB', err);
+    }
+  }, [getAuthHeaders]);
 
-  React.useEffect(() => {
-    localStorage.setItem('af_chat_messages', JSON.stringify(chatMessages));
-  }, [chatMessages]);
+  // Load Chat Messages for active project
+  const fetchChat = useCallback(async () => {
+    if (user?.role !== 'ADMIN' && user?.role !== 'CLIENT_LEADER') return;
+    try {
+      const res = await fetch(`/api/chat/projects/${selectedProjectCode}/messages`, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setChatMessages(data);
+      }
+    } catch (err) {
+      console.error('Failed to load chat from DB', err);
+    }
+  }, [getAuthHeaders, user?.role, selectedProjectCode]);
 
-  const handleResetDemoData = () => {
-    localStorage.removeItem('af_is_clocked_in');
-    localStorage.removeItem('af_pending_updates');
-    localStorage.removeItem('af_verifications');
-    localStorage.removeItem('af_payments');
-    localStorage.removeItem('af_chat_messages');
-    localStorage.removeItem('af_vault_files');
-    setIsClockedIn(true);
-    setPendingUpdates(['Slot +3h (12:00)']);
-    setVerifications(INITIAL_VERIFICATIONS);
-    setPayments(INITIAL_PAYMENTS);
-    setChatMessages(INITIAL_CHAT_MESSAGES);
-    window.location.reload();
+  // Refresh all active module data
+  const refreshAllData = useCallback(async () => {
+    setIsRefreshing(true);
+    await Promise.allSettled([
+      fetchProjects(),
+      fetchVerifications(),
+      fetchPayments(),
+      fetchMeetings(),
+      fetchAttendance(),
+      fetchChat(),
+    ]);
+    setIsRefreshing(false);
+  }, [fetchProjects, fetchVerifications, fetchPayments, fetchMeetings, fetchAttendance, fetchChat]);
+
+  // Fetch initial data on mount
+  useEffect(() => {
+    if (user) {
+      refreshAllData();
+    }
+  }, [user, refreshAllData]);
+
+  // Refetch when switching project
+  useEffect(() => {
+    if (user && selectedProjectCode) {
+      fetchPayments();
+      fetchMeetings();
+      fetchChat();
+    }
+  }, [selectedProjectCode, fetchPayments, fetchMeetings, fetchChat, user]);
+
+  // Verification Approvals
+  const handleApproveVerification = async (id: string) => {
+    try {
+      const res = await fetch(`/api/verification/${id}/approve`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        await fetchVerifications();
+        await fetchProjects();
+      } else {
+        const err = await res.json();
+        alert(`Approval failed: ${err.error || 'Server error'}`);
+      }
+    } catch (err) {
+      console.error('Approval failed', err);
+    }
+  };
+
+  // Verification Revision Request
+  const handleRequestRevision = async (id: string, notes: string) => {
+    try {
+      const res = await fetch(`/api/verification/${id}/revision`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ notes }),
+      });
+      if (res.ok) {
+        await fetchVerifications();
+      } else {
+        const err = await res.json();
+        alert(`Revision request failed: ${err.error || 'Server error'}`);
+      }
+    } catch (err) {
+      console.error('Revision request failed', err);
+    }
+  };
+
+  // Payment Discrepancy Submission
+  const handleDiscrepancySubmit = async (paymentId: string, note: string) => {
+    try {
+      const res = await fetch(`/api/payments/${paymentId}/discrepancy`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ note }),
+      });
+      if (res.ok) {
+        await fetchPayments();
+        alert('Discrepancy note registered. Studio accountant notified.');
+      } else {
+        const err = await res.json();
+        alert(`Failed to submit discrepancy note: ${err.error || 'Server error'}`);
+      }
+    } catch (err) {
+      console.error('Payment discrepancy error', err);
+    }
+  };
+
+  // Send Chat Message
+  const handleSendMessage = async (text: string) => {
+    try {
+      const res = await fetch(`/api/chat/projects/${selectedProjectCode}/messages`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ messageText: text }),
+      });
+      if (res.ok) {
+        await fetchChat();
+      } else {
+        const err = await res.json();
+        alert(`Failed to send message: ${err.error || 'Server error'}`);
+      }
+    } catch (err) {
+      console.error('Chat error', err);
+    }
+  };
+
+  // Book Consultation Slot (with Atomic Collision Prevention)
+  const handleBookSlot = async (slot: string, agenda: string, date: string) => {
+    try {
+      const res = await fetch('/api/meetings/request', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          projectCode: selectedProjectCode,
+          bookingDate: date,
+          slot,
+          agenda,
+        }),
+      });
+      if (res.ok) {
+        alert(`Consultation successfully booked for ${date} (${slot})!`);
+        await fetchMeetings();
+      } else {
+        const err = await res.json();
+        alert(`Booking rejected: ${err.error || 'Slot collision or not allowed'}`);
+      }
+    } catch (err) {
+      console.error('Booking error', err);
+    }
+  };
+
+  // Staff Clock-In (Mandatory GPS)
+  const handleClockIn = async (coords: { lat: number; lng: number; address: string }) => {
+    try {
+      const res = await fetch('/api/attendance/clock-in', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(coords),
+      });
+      if (res.ok) {
+        await fetchAttendance();
+      } else {
+        const err = await res.json();
+        alert(`Clock-in rejected: ${err.error || 'Validation error'}`);
+      }
+    } catch (err) {
+      console.error('Clock-in error', err);
+    }
+  };
+
+  // Staff Daily Work Update
+  const handleDailyUpdate = async (slot: string, notes: string) => {
+    try {
+      const res = await fetch('/api/attendance/daily-update', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          scheduledSlot: slot,
+          workSummary: notes,
+        }),
+      });
+      if (res.ok) {
+        alert(`Daily update submitted for ${slot}! Gate updated.`);
+        await fetchAttendance();
+      } else {
+        const err = await res.json();
+        alert(`Update rejected: ${err.error || 'Server error'}`);
+      }
+    } catch (err) {
+      console.error('Update error', err);
+    }
+  };
+
+  // Staff Clock-Out with Hard Gate Safeguard
+  const handleClockOut = async () => {
+    try {
+      const res = await fetch('/api/attendance/clock-out', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        alert('Session closed. Clocked out successfully!');
+        await fetchAttendance();
+      } else {
+        const err = await res.json();
+        alert(`CLOCK-OUT GATE BLOCKED: ${err.error || 'Pending daily work updates must be submitted first.'}`);
+      }
+    } catch (err) {
+      console.error('Clock-out error', err);
+    }
   };
 
   // If user is not authenticated, render Figma High-Fidelity Login Page
@@ -190,57 +343,9 @@ function MainApp() {
 
   const currentUser = user;
 
-  const handleRoleSwitch = (role: UserRole) => {
-    const mock = MOCK_USERS[role];
-    if (mock) {
-      localStorage.setItem('pronex_auth_user', JSON.stringify(mock));
-      window.location.reload();
-    }
-  };
-
-  const handleApproveVerification = (id: string) => {
-    setVerifications((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, status: 'APPROVED' } : v))
-    );
-  };
-
-  const handleRequestRevision = (id: string, notes: string) => {
-    setVerifications((prev) =>
-      prev.map((v) =>
-        v.id === id
-          ? {
-              ...v,
-              status: 'REVISION_REQUIRED',
-              revisionNumber: v.revisionNumber + 1,
-              adminNotes: notes,
-            }
-          : v
-      )
-    );
-  };
-
-  const handleDiscrepancySubmit = (paymentId: string, note: string) => {
-    setPayments((prev) =>
-      prev.map((p) =>
-        p.id === paymentId
-          ? { ...p, status: 'REVISION_REQUESTED', discrepancyNote: note }
-          : p
-      )
-    );
-  };
-
-  const handleSendMessage = (text: string, attachment?: { name: string; size: number; url: string }) => {
-    const newMsg: ChatMessageItem = {
-      id: `msg-${Date.now()}`,
-      senderName: currentUser.fullName,
-      senderRole: currentUser.role,
-      text,
-      attachmentName: attachment?.name,
-      attachmentUrl: attachment?.url,
-      createdAt: new Date().toISOString(),
-    };
-    setChatMessages((prev) => [...prev, newMsg]);
-  };
+  // Active meeting and booked slots calculations
+  const bookedSlots = meetings.map((m: any) => m.slotTime || m.slot);
+  const activeMeeting = meetings.find((m: any) => m.status === 'CONFIRMED' || m.status === 'PENDING_APPROVAL');
 
   return (
     <div>
@@ -262,10 +367,57 @@ function MainApp() {
           </span>
           <span style={{ color: '#8b949e' }}>•</span>
           <strong style={{ color: '#f0f6fc' }}>{currentUser.fullName}</strong>
-          <span style={{ color: '#8b949e', fontSize: '12px' }}>({currentUser.username || 'admin'})</span>
+          <span style={{ color: '#8b949e', fontSize: '12px' }}>({currentUser.username || 'user'})</span>
+
+          {/* Active Project Switcher */}
+          {projects.length > 0 && (
+            <div style={{ marginLeft: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ color: '#8b949e', fontSize: '12px' }}>Active Project:</span>
+              <select
+                value={selectedProjectCode}
+                onChange={(e) => setSelectedProjectCode(e.target.value)}
+                style={{
+                  backgroundColor: '#21262d',
+                  border: '1px solid #30363d',
+                  borderRadius: '6px',
+                  color: 'var(--accent-gold)',
+                  padding: '3px 8px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  outline: 'none',
+                }}
+              >
+                {projects.map((p) => (
+                  <option key={p.id} value={p.projectCode}>
+                    {p.projectCode} - {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button
+            onClick={refreshAllData}
+            title="Refresh database records"
+            style={{
+              padding: '6px 10px',
+              borderRadius: '6px',
+              backgroundColor: '#21262d',
+              color: '#c9d1d9',
+              border: '1px solid #30363d',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '12px',
+            }}
+          >
+            <RefreshCw size={13} className={isRefreshing ? 'animate-spin' : ''} />
+            <span>Sync DB</span>
+          </button>
+
           {currentUser.role === 'ADMIN' && (
             <button
               onClick={() => setIsOnboardingOpen(true)}
@@ -309,7 +461,10 @@ function MainApp() {
 
       <AdminUserManagementModal
         isOpen={isOnboardingOpen}
-        onClose={() => setIsOnboardingOpen(false)}
+        onClose={() => {
+          setIsOnboardingOpen(false);
+          fetchProjects();
+        }}
       />
 
       <Shell
@@ -319,7 +474,7 @@ function MainApp() {
         onTabChange={(tab) => setActiveTab(tab)}
         onLogout={logout}
       >
-        {/* TAB 1: PROJECTS OVERVIEW DASHBOARD */}
+        {/* TAB 1: PROJECTS OVERVIEW DASHBOARD (REAL SUPABASE DB) */}
         {activeTab === 'projects' && (
           <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
             <div style={{ marginBottom: '24px' }}>
@@ -327,7 +482,7 @@ function MainApp() {
                 Active Studio Portfolios
               </span>
               <h1 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                Architectural Projects
+                Architectural Projects ({projects.length})
               </h1>
               <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
                 Manage design workflows, category milestones, and client handoffs.
@@ -335,148 +490,113 @@ function MainApp() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-              {/* Project Card 1 */}
-              <div
-                style={{
-                  backgroundColor: 'var(--bg-secondary)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 'var(--radius-lg)',
-                  padding: '24px',
-                  boxShadow: 'var(--shadow-sm)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                    <span
-                      style={{
-                        fontSize: '11px',
-                        padding: '2px 8px',
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        color: 'var(--accent-emerald)',
-                        borderRadius: '10px',
-                        fontWeight: 600,
-                      }}
-                    >
-                      ACTIVE
-                    </span>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                      AF-VILLA
-                    </span>
-                  </div>
-
-                  <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                    Villa Horizon
-                  </h3>
-                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                    4-BHK Luxury Bungalow • Client: Rajesh Mehta
-                  </p>
-
-                  {/* 16-Category Progress Meter */}
-                  <div style={{ marginBottom: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '6px' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Workflow Progress</span>
-                      <span style={{ color: 'var(--accent-gold)', fontWeight: 700 }}>56% (9/16 Folders)</span>
-                    </div>
-                    <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--bg-surface)', borderRadius: '4px', overflow: 'hidden' }}>
-                      <div style={{ width: '56%', height: '100%', backgroundColor: 'var(--accent-gold)', borderRadius: '4px' }} />
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setActiveTab('vault')}
+              {projects.map((proj) => (
+                <div
+                  key={proj.id}
                   style={{
+                    backgroundColor: 'var(--bg-secondary)',
+                    border: selectedProjectCode === proj.projectCode ? '2px solid var(--accent-gold)' : '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-lg)',
+                    padding: '24px',
+                    boxShadow: 'var(--shadow-sm)',
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    padding: '10px',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 'var(--radius-md)',
-                    color: 'var(--text-primary)',
-                    fontSize: '13px',
-                    fontWeight: 600,
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
                   }}
                 >
-                  <span>Open Document Vault</span>
-                  <ArrowRight size={15} />
-                </button>
-              </div>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          padding: '2px 8px',
+                          backgroundColor: proj.status === 'ACTIVE' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                          color: proj.status === 'ACTIVE' ? 'var(--accent-emerald)' : 'var(--accent-blue)',
+                          borderRadius: '10px',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {proj.status}
+                      </span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                        {proj.projectCode}
+                      </span>
+                    </div>
 
-              {/* Project Card 2 */}
-              <div
-                style={{
-                  backgroundColor: 'var(--bg-secondary)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 'var(--radius-lg)',
-                  padding: '24px',
-                  boxShadow: 'var(--shadow-sm)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                    <span
+                    <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                      {proj.name}
+                    </h3>
+                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                      {proj.category} • Location: {proj.siteLocation}
+                    </p>
+
+                    {/* 16-Category Progress Meter */}
+                    <div style={{ marginBottom: '20px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '6px' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>Workflow Progress</span>
+                        <span style={{ color: 'var(--accent-gold)', fontWeight: 700 }}>
+                          {proj.completionPercentage}% ({proj.populatedFolders}/16 Folders)
+                        </span>
+                      </div>
+                      <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--bg-surface)', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div
+                          style={{
+                            width: `${proj.completionPercentage}%`,
+                            height: '100%',
+                            backgroundColor: 'var(--accent-gold)',
+                            borderRadius: '4px',
+                            transition: 'width 0.3s ease',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => {
+                        setSelectedProjectCode(proj.projectCode);
+                        setActiveTab('vault');
+                      }}
                       style={{
-                        fontSize: '11px',
-                        padding: '2px 8px',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        color: 'var(--accent-blue)',
-                        borderRadius: '10px',
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        padding: '10px',
+                        backgroundColor: 'var(--bg-tertiary)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 'var(--radius-md)',
+                        color: 'var(--text-primary)',
+                        fontSize: '13px',
                         fontWeight: 600,
+                        cursor: 'pointer',
                       }}
                     >
-                      CONCEPT PHASE
-                    </span>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                      AF-SKYLN
-                    </span>
-                  </div>
-
-                  <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                    Skyline Penthouse
-                  </h3>
-                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                    Duplex Interior Renovation • Client: Anand Shah
-                  </p>
-
-                  <div style={{ marginBottom: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '6px' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Workflow Progress</span>
-                      <span style={{ color: 'var(--accent-gold)', fontWeight: 700 }}>25% (4/16 Folders)</span>
-                    </div>
-                    <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--bg-surface)', borderRadius: '4px', overflow: 'hidden' }}>
-                      <div style={{ width: '25%', height: '100%', backgroundColor: 'var(--accent-gold)', borderRadius: '4px' }} />
-                    </div>
+                      <span>Open Vault</span>
+                      <ArrowRight size={15} />
+                    </button>
+                    {selectedProjectCode !== proj.projectCode && (
+                      <button
+                        onClick={() => setSelectedProjectCode(proj.projectCode)}
+                        style={{
+                          padding: '10px 14px',
+                          backgroundColor: '#21262d',
+                          border: '1px solid #30363d',
+                          borderRadius: 'var(--radius-md)',
+                          color: '#c9d1d9',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Set Active
+                      </button>
+                    )}
                   </div>
                 </div>
-
-                <button
-                  onClick={() => setActiveTab('vault')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    padding: '10px',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 'var(--radius-md)',
-                    color: 'var(--text-primary)',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                  }}
-                >
-                  <span>Open Document Vault</span>
-                  <ArrowRight size={15} />
-                </button>
-              </div>
+              ))}
             </div>
           </div>
         )}
@@ -484,10 +604,10 @@ function MainApp() {
         {/* TAB 2: DOCUMENT VAULT & 16 CATEGORIES */}
         {activeTab === 'vault' && (
           <DocumentExplorer
-            projectCode="AF-VILLA"
+            projectCode={selectedProjectCode}
             userRole={currentUser.role}
             clientName={currentUser.fullName}
-            userEmail="rajesh@mehta-holdings.com"
+            userEmail={currentUser.email || 'client@studio.com'}
           />
         )}
 
@@ -504,9 +624,16 @@ function MainApp() {
         {/* TAB 4: CONSULTATION MEETINGS (3 FIXED SLOTS) */}
         {activeTab === 'meetings' && (
           <MeetingCalendar
-            projectCode="AF-VILLA"
-            bookedSlots={['12:00–13:30']}
-            onBookSlot={(slot, agenda) => alert(`Meeting booked for ${slot}! Agenda: ${agenda}`)}
+            projectCode={selectedProjectCode}
+            bookedSlots={bookedSlots}
+            onBookSlot={handleBookSlot}
+            activeMeeting={activeMeeting ? {
+              id: activeMeeting.id,
+              slotTime: activeMeeting.slotTime || activeMeeting.slot,
+              date: activeMeeting.bookingDate,
+              agenda: activeMeeting.agenda || 'Design Review',
+              status: activeMeeting.status === 'RESCHEDULE_PENDING' ? 'RESCHEDULE_PENDING' : 'CONFIRMED',
+            } : undefined}
           />
         )}
 
@@ -515,18 +642,9 @@ function MainApp() {
           <StaffAttendance
             isClockedIn={isClockedIn}
             pendingUpdates={pendingUpdates}
-            onClockIn={(coords) => {
-              setIsClockedIn(true);
-              setPendingUpdates(['Slot +3h (12:00)']);
-            }}
-            onClockOut={() => {
-              setIsClockedIn(false);
-              alert('Successfully clocked out! Session closed.');
-            }}
-            onSubmitUpdate={(slot, notes) => {
-              setPendingUpdates((prev) => prev.filter((s) => s !== slot));
-              alert(`Daily work update submitted for ${slot}! Clock-Out gate unlocked.`);
-            }}
+            onClockIn={handleClockIn}
+            onClockOut={handleClockOut}
+            onSubmitUpdate={handleDailyUpdate}
           />
         )}
 
@@ -534,7 +652,7 @@ function MainApp() {
         {activeTab === 'payments' && (
           <PaymentLedger
             userRole={currentUser.role}
-            showPricing={currentUser.showPricing ?? false}
+            showPricing={currentUser.showPricing ?? true}
             payments={payments}
             onSubmitDiscrepancy={handleDiscrepancySubmit}
           />
@@ -543,7 +661,7 @@ function MainApp() {
         {/* TAB 7: ENCRYPTED PROJECT CHAT */}
         {activeTab === 'chat' && (
           <ProjectChatRoom
-            projectCode="AF-VILLA"
+            projectCode={selectedProjectCode}
             userRole={currentUser.role}
             userName={currentUser.fullName}
             messages={chatMessages}

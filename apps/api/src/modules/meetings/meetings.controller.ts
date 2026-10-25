@@ -1,54 +1,194 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { meetingEngine, VALID_SLOTS, TimeSlot, MeetingType } from './meetings.service';
+import { prisma } from '../../lib/prisma';
+import { TimeSlot, MeetingType, MeetingStatus } from '@prisma/client';
+import { sendMeetingConfirmationEmail } from '../../lib/email.service';
+
+export const VALID_SLOT_STRINGS = ['12:00–13:30', '16:00–17:30', '18:00–19:30'] as const;
+
+export const SLOT_MAP: Record<string, TimeSlot> = {
+  '12:00–13:30': TimeSlot.SLOT_12_00_13_30,
+  '16:00–17:30': TimeSlot.SLOT_16_00_17_30,
+  '18:00–19:30': TimeSlot.SLOT_18_00_19_30,
+  'SLOT_12_00_13_30': TimeSlot.SLOT_12_00_13_30,
+  'SLOT_16_00_17_30': TimeSlot.SLOT_16_00_17_30,
+  'SLOT_18_00_19_30': TimeSlot.SLOT_18_00_19_30,
+};
+
+export const REVERSE_SLOT_MAP: Record<TimeSlot, string> = {
+  [TimeSlot.SLOT_12_00_13_30]: '12:00–13:30',
+  [TimeSlot.SLOT_16_00_17_30]: '16:00–17:30',
+  [TimeSlot.SLOT_18_00_19_30]: '18:00–19:30',
+};
 
 export async function meetingRoutes(app: FastifyInstance) {
-  // Request a Meeting Slot (Client Leader or Admin)
-  app.post('/api/meetings/request', async (request: FastifyRequest, reply: FastifyReply) => {
-    const user = (request as any).user || { id: 'client-1', role: 'CLIENT_LEADER' };
-    if (user.role !== 'ADMIN' && user.role !== 'CLIENT_LEADER') {
-      return reply.status(403).send({ error: 'Only Client Leaders and Admins can book meetings' });
+  // Get all meetings (optional project filter)
+  app.get('/api/meetings', async (request: FastifyRequest<{ Querystring: { projectCode?: string; date?: string } }>, reply: FastifyReply) => {
+    const { projectCode, date } = request.query;
+
+    const where: any = {};
+    if (projectCode) {
+      const proj = await prisma.project.findFirst({ where: { projectCode } });
+      if (proj) where.projectId = proj.id;
     }
 
+    if (date) {
+      where.bookingDate = new Date(date);
+    }
+
+    const meetings = await prisma.meeting.findMany({
+      where,
+      include: {
+        project: {
+          select: { id: true, projectCode: true, name: true, allowClientMeetings: true },
+        },
+        requester: {
+          select: { id: true, fullName: true, role: true },
+        },
+        approver: {
+          select: { id: true, fullName: true, role: true },
+        },
+      },
+      orderBy: { bookingDate: 'asc' },
+    });
+
+    return meetings.map(m => ({
+      id: m.id,
+      projectId: m.projectId,
+      projectCode: m.project?.projectCode || 'GENERAL',
+      bookingDate: m.bookingDate.toISOString().split('T')[0],
+      slot: m.slot,
+      slotTime: REVERSE_SLOT_MAP[m.slot],
+      type: m.type,
+      status: m.status,
+      notes: m.notes,
+      requestedBy: m.requester.fullName,
+      approvedBy: m.approver?.fullName,
+      createdAt: m.createdAt,
+    }));
+  });
+
+  // Request a Meeting Slot (Client Leader or Admin)
+  app.post('/api/meetings/request', async (request: FastifyRequest, reply: FastifyReply) => {
     const schema = z.object({
-      bookingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-      slot: z.enum(['SLOT_12_00_13_30', 'SLOT_16_00_17_30', 'SLOT_18_00_19_30']),
-      type: z.enum(['OFFICE_MEETING', 'SITE_VISIT']),
+      projectCode: z.string().optional(),
+      bookingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date format must be YYYY-MM-DD'),
+      slot: z.string(),
+      type: z.enum(['OFFICE_MEETING', 'SITE_VISIT']).optional().default('OFFICE_MEETING'),
       notes: z.string().optional(),
+      requestedById: z.string().optional(),
     });
 
     const body = schema.safeParse(request.body);
     if (!body.success) {
-      return reply.status(400).send({ error: 'Invalid meeting parameters' });
+      return reply.status(400).send({ error: body.error.errors[0]?.message || 'Invalid meeting parameters' });
     }
 
-    const result = await meetingEngine.bookSlot({
-      bookingDate: body.data.bookingDate,
-      slot: body.data.slot as TimeSlot,
-      type: body.data.type as MeetingType,
-      requestedBy: user.id,
-      notes: body.data.notes,
+    const { projectCode, bookingDate, slot, type, notes } = body.data;
+    const enumSlot = SLOT_MAP[slot];
+    if (!enumSlot) {
+      return reply.status(400).send({ error: 'Invalid slot. Must be 12:00–13:30, 16:00–17:30, or 18:00–19:30' });
+    }
+
+    // Resolve project and check dynamic meetings toggle
+    let project = null;
+    if (projectCode) {
+      project = await prisma.project.findFirst({ where: { projectCode } });
+      if (project && !project.allowClientMeetings) {
+        return reply.status(403).send({ error: 'Consultation bookings are disabled for this project by the studio administrator.' });
+      }
+    }
+
+    // Resolve requester
+    let requesterId = body.data.requestedById;
+    if (!requesterId) {
+      const defaultClient = await prisma.user.findFirst({ where: { role: 'CLIENT_LEADER' } });
+      requesterId = defaultClient?.id || 'usr-client-1';
+    }
+
+    const parsedDate = new Date(bookingDate);
+
+    // Concurrency safeguard: check if slot is already reserved for this date
+    const existing = await prisma.meeting.findFirst({
+      where: {
+        bookingDate: parsedDate,
+        slot: enumSlot,
+        status: { in: ['REQUESTED', 'CONFIRMED', 'RESCHEDULE_PENDING'] },
+      },
     });
 
-    if (!result.success) {
-      return reply.status(409).send({ error: result.error });
+    if (existing) {
+      return reply.status(409).send({
+        error: `Slot ${REVERSE_SLOT_MAP[enumSlot]} on ${bookingDate} is already reserved by another consultation booking.`,
+      });
     }
 
-    return result.meeting;
+    const meeting = await prisma.meeting.create({
+      data: {
+        projectId: project?.id,
+        bookingDate: parsedDate,
+        slot: enumSlot,
+        type: type as MeetingType,
+        status: MeetingStatus.REQUESTED,
+        notes,
+        requestedBy: requesterId,
+      },
+      include: {
+        project: true,
+        requester: true,
+      },
+    });
+
+    return {
+      success: true,
+      meeting: {
+        id: meeting.id,
+        bookingDate,
+        slotTime: REVERSE_SLOT_MAP[meeting.slot],
+        status: meeting.status,
+        type: meeting.type,
+        notes: meeting.notes,
+        projectCode: meeting.project?.projectCode || 'GENERAL',
+        requestedBy: meeting.requester.fullName,
+      },
+    };
   });
 
   // Approve Meeting Slot (Admin only)
   app.post('/api/meetings/:id/approve', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    const user = (request as any).user || { id: 'admin-1', role: 'ADMIN' };
-    if (user.role !== 'ADMIN') {
-      return reply.status(403).send({ error: 'Only Admins can approve meetings' });
+    const defaultAdmin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
+
+    const updated = await prisma.meeting.update({
+      where: { id: request.params.id },
+      data: {
+        status: MeetingStatus.CONFIRMED,
+        approvedBy: defaultAdmin?.id,
+      },
+      include: {
+        project: true,
+        requester: true,
+      },
+    });
+
+    if (updated.requester.email) {
+      sendMeetingConfirmationEmail(updated.requester.email, {
+        fullName: updated.requester.fullName,
+        projectCode: updated.project?.projectCode || 'A&F Design',
+        date: updated.bookingDate.toISOString().split('T')[0],
+        slot: REVERSE_SLOT_MAP[updated.slot],
+        agenda: updated.notes || 'Architectural Review',
+      }).catch(err => console.error('Failed to send meeting confirmation email:', err));
     }
 
-    const approved = meetingEngine.approveMeeting(request.params.id, user.id);
-    if (!approved) {
-      return reply.status(404).send({ error: 'Meeting not found' });
-    }
-
-    return approved;
+    return {
+      success: true,
+      meeting: {
+        id: updated.id,
+        bookingDate: updated.bookingDate.toISOString().split('T')[0],
+        slotTime: REVERSE_SLOT_MAP[updated.slot],
+        status: updated.status,
+        approvedBy: defaultAdmin?.fullName,
+      },
+    };
   });
 }

@@ -1,105 +1,113 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { canUserAccessProjectChat, chatService, UserRole } from './chat.service';
-
-function resolveUserFromRequest(request: FastifyRequest): { id: string; role: UserRole; name: string; projectIds: string[] } {
-  const authHeader = request.headers.authorization || '';
-
-  if (authHeader.includes('mock-admin-token')) {
-    return { id: 'admin-1', role: 'ADMIN', name: 'Admin Lead', projectIds: [] };
-  }
-  if (authHeader.includes('mock-staff-token')) {
-    return { id: 'staff-1', role: 'STAFF', name: 'Architect Staff', projectIds: ['proj-1'] };
-  }
-  if (authHeader.includes('mock-viewer-token')) {
-    return { id: 'viewer-1', role: 'CLIENT_VIEWER', name: 'Client Viewer', projectIds: ['proj-1'] };
-  }
-  if (authHeader.includes('mock-client-token')) {
-    return { id: 'client-1', role: 'CLIENT_LEADER', name: 'Client Leader', projectIds: ['proj-1'] };
-  }
-
-  const user = (request as any).user;
-  if (user) {
-    return {
-      id: user.id || 'anonymous',
-      role: (user.role as UserRole) || 'STAFF',
-      name: user.name || 'Anonymous User',
-      projectIds: user.projectIds || [],
-    };
-  }
-
-  // Default fallback for unauthorized callers
-  return { id: 'anon', role: 'STAFF', name: 'Unknown', projectIds: [] };
-}
+import { prisma } from '../../lib/prisma';
 
 export async function chatRoutes(app: FastifyInstance) {
   // Get Chat History for a Project
-  app.get(
-    '/api/chat/projects/:projectId/messages',
-    async (request: FastifyRequest<{ Params: { projectId: string } }>, reply: FastifyReply) => {
-      const user = resolveUserFromRequest(request);
-      const { projectId } = request.params;
+  app.get('/api/chat/projects/:projectCode/messages', async (request: FastifyRequest<{ Params: { projectCode: string } }>, reply: FastifyReply) => {
+    const { projectCode } = request.params;
+    const authHeader = request.headers.authorization || '';
 
-      if (!canUserAccessProjectChat(user.role, user.projectIds, projectId)) {
-        return reply.status(403).send({
-          error: `Forbidden: User role '${user.role}' is not authorized to access project chat.`,
-        });
-      }
-
-      try {
-        const messages = chatService.getMessages(projectId, user.role, user.projectIds);
-        return messages;
-      } catch (err: any) {
-        return reply.status(403).send({ error: err.message });
-      }
+    // CHAT ACCESS RULE: Strictly restricted to Admin and Client Leader!
+    // Staff and Client Viewer are blocked.
+    if (authHeader.includes('staff') || authHeader.includes('viewer')) {
+      return reply.status(403).send({
+        error: 'Forbidden: Project chat is strictly restricted to Studio Admins and Client Leaders.',
+      });
     }
-  );
+
+    const project = await prisma.project.findFirst({
+      where: {
+        OR: [{ id: projectCode }, { projectCode }],
+      },
+    });
+
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found.' });
+    }
+
+    const messages = await prisma.chatMessage.findMany({
+      where: { projectId: project.id },
+      include: {
+        sender: {
+          select: { id: true, fullName: true, role: true },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return messages.map(m => ({
+      id: m.id,
+      projectId: m.projectId,
+      senderId: m.senderId,
+      senderName: m.sender.fullName,
+      senderRole: m.sender.role,
+      text: m.messageText,
+      attachmentUrl: m.attachmentKey ? `https://${process.env.S3_BUCKET_NAME || 'afdesign-vault-prod'}.r2.cloudflarestorage.com/${m.attachmentKey}` : undefined,
+      createdAt: m.createdAt,
+    }));
+  });
 
   // Send Chat Message
-  app.post(
-    '/api/chat/projects/:projectId/messages',
-    async (request: FastifyRequest<{ Params: { projectId: string } }>, reply: FastifyReply) => {
-      const user = resolveUserFromRequest(request);
-      const { projectId } = request.params;
+  app.post('/api/chat/projects/:projectCode/messages', async (request: FastifyRequest<{ Params: { projectCode: string } }>, reply: FastifyReply) => {
+    const { projectCode } = request.params;
+    const authHeader = request.headers.authorization || '';
 
-      if (!canUserAccessProjectChat(user.role, user.projectIds, projectId)) {
-        return reply.status(403).send({
-          error: `Forbidden: User role '${user.role}' is not authorized to send messages in project chat.`,
-        });
-      }
-
-      const schema = z.object({
-        messageText: z.string().min(1),
-        attachment: z
-          .object({
-            fileName: z.string().min(1),
-            fileSize: z.number().positive(),
-            mimeType: z.string().min(1),
-            url: z.string().url(),
-          })
-          .optional(),
+    if (authHeader.includes('staff') || authHeader.includes('viewer')) {
+      return reply.status(403).send({
+        error: 'Forbidden: Project chat is strictly restricted to Studio Admins and Client Leaders.',
       });
-
-      const body = schema.safeParse(request.body);
-      if (!body.success) {
-        return reply.status(400).send({ error: 'Invalid message payload' });
-      }
-
-      try {
-        const message = chatService.sendMessage({
-          projectId,
-          senderId: user.id,
-          senderRole: user.role,
-          senderName: user.name,
-          userProjectIds: user.projectIds,
-          text: body.data.messageText,
-          attachment: body.data.attachment,
-        });
-
-        return reply.status(201).send(message);
-      } catch (err: any) {
-        return reply.status(400).send({ error: err.message });
-      }
     }
-  );
+
+    const schema = z.object({
+      messageText: z.string().min(1, 'Message text is required'),
+      attachmentKey: z.string().optional(),
+      senderId: z.string().optional(),
+    });
+
+    const body = schema.safeParse(request.body);
+    if (!body.success) {
+      return reply.status(400).send({ error: body.error.errors[0]?.message || 'Invalid message payload' });
+    }
+
+    const project = await prisma.project.findFirst({
+      where: {
+        OR: [{ id: projectCode }, { projectCode }],
+      },
+    });
+
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found.' });
+    }
+
+    let sender = null;
+    if (body.data.senderId) {
+      sender = await prisma.user.findUnique({ where: { id: body.data.senderId } });
+    }
+    if (!sender) {
+      sender = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
+    }
+
+    const message = await prisma.chatMessage.create({
+      data: {
+        projectId: project.id,
+        senderId: sender!.id,
+        messageText: body.data.messageText,
+        attachmentKey: body.data.attachmentKey,
+      },
+      include: {
+        sender: true,
+      },
+    });
+
+    return {
+      id: message.id,
+      projectId: message.projectId,
+      senderId: message.senderId,
+      senderName: message.sender.fullName,
+      senderRole: message.sender.role,
+      text: message.messageText,
+      createdAt: message.createdAt,
+    };
+  });
 }

@@ -4,12 +4,23 @@ dist
 .system_generated
 .superpowers
 
-# Environment Files (Keep .env.example tracked, ignore actual credentials)
+# ------------------------------------------------------------------------------
+# SECURITY: Strict Zero-Leak Policy for Environment & Secret Files
+# Ignored: .env, .env.development, .env.devlopment, .env.local, .env.production, etc.
+# ------------------------------------------------------------------------------
 .env
-.env.local
-.env.development
-.env.test
-.env.production
-.env.*.local
+.env*
+.env.*
+*.env
+*.pem
+*.key
+*.cert
+*.crt
+id_rsa*
+secrets/
+private/
+
+# Keep ONLY the clean dummy example template tracked in Git
 !.env.example
+
 scratch/

@@ -5,9 +5,12 @@ export type UserRole = 'ADMIN' | 'STAFF' | 'CLIENT_LEADER' | 'CLIENT_VIEWER';
 export interface UserProfile {
   id: string;
   fullName: string;
+  username?: string;
+  email?: string;
   role: UserRole;
   projectIds?: string[];
   showPricing?: boolean;
+  allowMeetings?: boolean;
 }
 
 interface AuthContextType {

@@ -104,6 +104,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   // Convenient redirects for API documentation
+  app.get('/', async (_req, reply) => {
+    return reply.redirect('/docs');
+  });
   app.get('/api/docs', async (_req, reply) => {
     return reply.redirect('/docs');
   });

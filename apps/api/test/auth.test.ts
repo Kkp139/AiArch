@@ -84,49 +84,81 @@ describe('Full-Stack Auth Controller API Routes', () => {
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
     expect(body.success).toBe(true);
-    expect(body.requireOtp).toBe(false);
-    expect(body.user.role).toBe('ADMIN');
-    expect(body.token).toBeDefined();
+    // User Decision: Universal WhatsApp OTP applies to ALL roles including Admin
+    expect(body.requireOtp).toBe(true);
+    expect(body.tempToken).toBeDefined();
+
+    // Verify OTP for Admin
+    const verifyRes = await app.inject({
+      method: 'POST',
+      url: '/api/auth/verify-otp',
+      payload: {
+        tempToken: body.tempToken,
+        otp: '123456',
+      },
+    });
+    expect(verifyRes.statusCode).toBe(200);
+    const verifyBody = JSON.parse(verifyRes.body);
+    expect(verifyBody.user.role).toBe('ADMIN');
+    expect(verifyBody.token).toBeDefined();
   });
 
   it('allows Admin to create/invite new team members & clients who then log in via 2-Step OTP', async () => {
     const { buildApp } = await import('../src/server');
     const app = await buildApp();
 
-    // 1. Admin logs in
+    // 1. Admin logs in with Universal OTP
     const adminLogin = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
       payload: { username: 'admin', password: 'admin123' },
     });
-    const adminToken = JSON.parse(adminLogin.body).token;
+    const adminTempToken = JSON.parse(adminLogin.body).tempToken;
+    const adminVerify = await app.inject({
+      method: 'POST',
+      url: '/api/auth/verify-otp',
+      payload: { tempToken: adminTempToken, otp: '123456' },
+    });
+    const adminToken = JSON.parse(adminVerify.body).token;
 
-    // 2. Admin creates a new staff member
+    // 2. Admin onboards a new staff member (No permanent password - single-use setup link issued)
+    const testUsername = `priya_${Date.now()}`;
     const createRes = await app.inject({
       method: 'POST',
       url: '/api/auth/users',
       headers: { authorization: `Bearer ${adminToken}` },
       payload: {
-        username: 'priya.architect',
+        username: testUsername,
         fullName: 'Ar. Priya Sharma',
         role: 'STAFF',
         mobile: '+919876543210',
-        password: 'password123',
       },
     });
 
     expect(createRes.statusCode).toBe(200);
     const createBody = JSON.parse(createRes.body);
     expect(createBody.success).toBe(true);
-    expect(createBody.user.username).toBe('priya.architect');
+    expect(createBody.user.username).toBe(testUsername);
+    expect(createBody.setupLink).toBeDefined();
 
-    // 3. New staff member attempts Step 1 Login
+    // 3. User completes password setup using single-use link
+    const setupRes = await app.inject({
+      method: 'POST',
+      url: '/api/auth/setup-password',
+      payload: {
+        setupToken: createBody.setupToken,
+        newPassword: 'SecureStaffPassword123!',
+      },
+    });
+    expect(setupRes.statusCode).toBe(200);
+
+    // 4. New staff member attempts Step 1 Login
     const loginRes = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
       payload: {
-        username: 'priya.architect',
-        password: 'password123',
+        username: testUsername,
+        password: 'SecureStaffPassword123!',
       },
     });
 
@@ -137,7 +169,7 @@ describe('Full-Stack Auth Controller API Routes', () => {
     expect(loginBody.tempToken).toBeDefined();
     expect(loginBody.user.fullName).toBe('Ar. Priya Sharma');
 
-    // 4. Step 2: Send OTP
+    // 5. Step 2: Send OTP
     const otpRes = await app.inject({
       method: 'POST',
       url: '/api/auth/send-otp',
@@ -152,8 +184,8 @@ describe('Full-Stack Auth Controller API Routes', () => {
     const otpBody = JSON.parse(otpRes.body);
     expect(otpBody.success).toBe(true);
 
-    // 5. Step 3: Verify OTP
-    const verifyRes = await app.inject({
+    // 6. Step 3: Verify OTP
+    const staffVerifyRes = await app.inject({
       method: 'POST',
       url: '/api/auth/verify-otp',
       payload: {
@@ -162,10 +194,10 @@ describe('Full-Stack Auth Controller API Routes', () => {
       },
     });
 
-    expect(verifyRes.statusCode).toBe(200);
-    const verifyBody = JSON.parse(verifyRes.body);
-    expect(verifyBody.success).toBe(true);
-    expect(verifyBody.user.role).toBe('STAFF');
+    expect(staffVerifyRes.statusCode).toBe(200);
+    const staffVerifyBody = JSON.parse(staffVerifyRes.body);
+    expect(staffVerifyBody.success).toBe(true);
+    expect(staffVerifyBody.user.role).toBe('STAFF');
   });
 
   it('rejects non-admin from creating users', async () => {

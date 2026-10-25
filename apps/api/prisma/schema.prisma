@@ -108,12 +108,14 @@ model Project {
   allowClientDownloads     DownloadPermission @default(VIEW_AND_DOWNLOAD)
   showPricingClientLeader  Boolean            @default(false)
   showPricingClientViewer  Boolean            @default(false)
+  allowClientMeetings      Boolean            @default(true)
   createdAt                DateTime           @default(now())
   updatedAt                DateTime           @updatedAt
 
   folders                  ProjectFolder[]
   documents                ProjectDocument[]
   verifications            DesignVerification[]
+  meetings                 Meeting[]
   payments                 Payment[]
   chatMessages             ChatMessage[]
   dailyUpdates             DailyWorkUpdate[]
@@ -207,6 +209,7 @@ model DesignVerification {
 
 model Meeting {
   id                 String        @id @default(uuid())
+  projectId          String?
   bookingDate        DateTime      @db.Date
   slot               TimeSlot
   type               MeetingType
@@ -218,6 +221,7 @@ model Meeting {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
+  project            Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
   requester          User          @relation("RequestedBy", fields: [requestedBy], references: [id])
   approver           User?         @relation("ApprovedBy", fields: [approvedBy], references: [id])
   replacesMeeting    Meeting?      @relation("MeetingReschedule", fields: [replacesMeetingId], references: [id])

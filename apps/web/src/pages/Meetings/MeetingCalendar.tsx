@@ -6,7 +6,8 @@ export const FIXED_MEETING_SLOTS = ['12:00–13:30', '16:00–17:30', '18:00–1
 export interface MeetingCalendarProps {
   projectCode: string;
   bookedSlots: string[]; // List of slot times that are already booked for this date
-  onBookSlot?: (slot: string, agenda: string) => void;
+  onBookSlot?: (slot: string, agenda: string, date: string) => void;
+  onDateChange?: (date: string) => void;
   activeMeeting?: {
     id: string;
     slotTime: string;
@@ -20,16 +21,23 @@ export function MeetingCalendar({
   projectCode,
   bookedSlots,
   onBookSlot,
+  onDateChange,
   activeMeeting,
 }: MeetingCalendarProps) {
-  const [selectedDate, setSelectedDate] = useState('2026-10-20');
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [agenda, setAgenda] = useState('');
+
+  const handleDateChange = (newDate: string) => {
+    setSelectedDate(newDate);
+    setSelectedSlot(null);
+    if (onDateChange) onDateChange(newDate);
+  };
 
   const handleConfirmBooking = () => {
     if (!selectedSlot || !agenda.trim()) return;
     if (onBookSlot) {
-      onBookSlot(selectedSlot, agenda);
+      onBookSlot(selectedSlot, agenda, selectedDate);
     }
     setSelectedSlot(null);
     setAgenda('');
@@ -96,10 +104,26 @@ export function MeetingCalendar({
         </div>
       )}
 
-      {/* 3 Fixed Consultation Slots */}
-      <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px' }}>
-        Available Consultation Slots for {selectedDate}
-      </h3>
+      {/* Date Selector & 3 Fixed Consultation Slots */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+          Available Consultation Slots for {selectedDate}
+        </h3>
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => handleDateChange(e.target.value)}
+          style={{
+            backgroundColor: 'var(--bg-tertiary)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-sm)',
+            color: 'var(--text-primary)',
+            padding: '6px 12px',
+            fontSize: '13px',
+            fontFamily: 'inherit',
+          }}
+        />
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
         {FIXED_MEETING_SLOTS.map((slot) => {

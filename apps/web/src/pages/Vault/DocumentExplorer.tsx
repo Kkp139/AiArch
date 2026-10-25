@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TreeView, VaultCategory } from '../../components/vault/TreeView';
 import { GridView, VaultFileItem } from '../../components/vault/GridView';
 import { UploadModal, UploadResult } from '../../components/vault/UploadModal';
@@ -13,112 +13,29 @@ export interface DocumentExplorerProps {
   userEmail?: string;
 }
 
-const INITIAL_CATEGORIES: VaultCategory[] = [
+// SPECIFICATION APPENDIX A: Official 16 Folders
+const STANDARD_16_CATEGORIES: VaultCategory[] = [
   // Concept Design (6)
-  { id: '01_SITE_CONTEXT', name: '01 Site Context', group: 'CONCEPT', fileCount: 1 },
-  { id: '02_MOOD_BOARDS', name: '02 Mood Boards', group: 'CONCEPT', fileCount: 1 },
-  { id: '03_ZONING_DIAGRAMS', name: '03 Zoning Diagrams', group: 'CONCEPT', fileCount: 0 },
-  { id: '04_SKETCHES', name: '04 Initial Sketches', group: 'CONCEPT', fileCount: 2 },
-  { id: '05_MASSING_STUDIES', name: '05 Massing Studies', group: 'CONCEPT', fileCount: 0 },
-  { id: '06_PRESENTATION_DECKS', name: '06 Client Presentations', group: 'CONCEPT', fileCount: 1 },
+  { id: '01_SITE_DRGS', name: '01 Site Drawings & Topographic Layout', group: 'CONCEPT', fileCount: 0 },
+  { id: '02_ZONING_PLANNING', name: '02 Zoning & Space Planning', group: 'CONCEPT', fileCount: 0 },
+  { id: '03_SPACE_OBJECT_DESIGN', name: '03 Space & Object Studies', group: 'CONCEPT', fileCount: 0 },
+  { id: '04_COMPLETE_SET_DRGS', name: '04 Complete Architectural Schematic Package', group: 'CONCEPT', fileCount: 0 },
+  { id: '05_MATERIAL_SELECTION', name: '05 Material Selection & Moodboards', group: 'CONCEPT', fileCount: 0 },
+  { id: '06_3D_IMAGES', name: '06 3D Photorealistic CGI Renders', group: 'CONCEPT', fileCount: 0 },
 
   // Construction Drawings (9)
-  { id: '01_ARCHITECTURAL_PLANS', name: '01 Architectural Plans', group: 'CONSTRUCTION', fileCount: 4 },
-  { id: '02_STRUCTURAL_DRAWINGS', name: '02 Structural Drawings', group: 'CONSTRUCTION', fileCount: 2 },
-  { id: '03_PLUMBING_SANITARY', name: '03 Plumbing & Sanitary', group: 'CONSTRUCTION', fileCount: 0 },
-  { id: '04_ELECTRICAL_LAYOUTS', name: '04 Electrical Layouts', group: 'CONSTRUCTION', fileCount: 1 },
-  { id: '05_HVAC_DUCTING', name: '05 HVAC & Ventilation', group: 'CONSTRUCTION', fileCount: 0 },
-  { id: '06_INTERIOR_DETAILS', name: '06 Interior Millwork & Finishes', group: 'CONSTRUCTION', fileCount: 3 },
-  { id: '07_LANDSCAPE_CIVIL', name: '07 Landscape & Hardscape', group: 'CONSTRUCTION', fileCount: 0 },
-  { id: '08_SPECIFICATIONS_BOQ', name: '08 Specs & Bill of Quantities', group: 'CONSTRUCTION', fileCount: 1 },
-  { id: '09_PERMITS_APPROVALS', name: '09 Municipal Approvals', group: 'CONSTRUCTION', fileCount: 0 },
+  { id: '07_CIVIL_DRGS', name: '07 Civil Footing & Column Layouts', group: 'CONSTRUCTION', fileCount: 0 },
+  { id: '08_PLUMBING_DRGS', name: '08 Plumbing & Drainage Schematics', group: 'CONSTRUCTION', fileCount: 0 },
+  { id: '09_FIRE_DRGS', name: '09 Fire Hydrant & Life Safety Plans', group: 'CONSTRUCTION', fileCount: 0 },
+  { id: '10_HVAC_DRGS', name: '10 HVAC Chilled Water & Ducting', group: 'CONSTRUCTION', fileCount: 0 },
+  { id: '11_FLOORING_DRGS', name: '11 Marble & Tile Flooring Layouts', group: 'CONSTRUCTION', fileCount: 0 },
+  { id: '12_CEILING_DRGS', name: '12 Reflected Ceiling & Lighting Drops', group: 'CONSTRUCTION', fileCount: 0 },
+  { id: '13_ELECTRICAL_DRGS', name: '13 Electrical SLD & Power Conduit Routes', group: 'CONSTRUCTION', fileCount: 0 },
+  { id: '14_WALL_ELEVATION', name: '14 Internal & External Wall Elevations', group: 'CONSTRUCTION', fileCount: 0 },
+  { id: '15_ELEMENT_DRGS', name: '15 Architectural Joinery & Element Details', group: 'CONSTRUCTION', fileCount: 0 },
 
   // Catch-All (1)
-  { id: '03_OTHER', name: '03 Other / Reference', group: 'OTHER', fileCount: 1 },
-];
-
-const INITIAL_VAULT_FILES: VaultFileItem[] = [
-  {
-    id: 'doc-1',
-    fileName: 'AF-VILLA_ARCH_PLANS_GroundFloor_v3.dwg',
-    fileSize: 4.8 * 1024 * 1024,
-    mimeType: 'image/vnd.dwg',
-    revisionNumber: 3,
-    categoryFolder: '01_ARCHITECTURAL_PLANS',
-    updatedAt: '2026-10-18T10:30:00Z',
-  },
-  {
-    id: 'doc-2',
-    fileName: 'AF-VILLA_ARCH_PLANS_FirstFloor_v2.dwg',
-    fileSize: 5.2 * 1024 * 1024,
-    mimeType: 'image/vnd.dwg',
-    revisionNumber: 2,
-    categoryFolder: '01_ARCHITECTURAL_PLANS',
-    updatedAt: '2026-10-17T15:20:00Z',
-  },
-  {
-    id: 'doc-3',
-    fileName: 'AF-VILLA_STRUCT_DWG_FoundationSchedule_v2.dwg',
-    fileSize: 3.9 * 1024 * 1024,
-    mimeType: 'image/vnd.dwg',
-    revisionNumber: 2,
-    categoryFolder: '02_STRUCTURAL_DRAWINGS',
-    updatedAt: '2026-10-16T12:00:00Z',
-  },
-  {
-    id: 'doc-4',
-    fileName: 'AF-VILLA_ELEC_LAY_Switchboard_v1.dwg',
-    fileSize: 2.1 * 1024 * 1024,
-    mimeType: 'image/vnd.dwg',
-    revisionNumber: 1,
-    categoryFolder: '04_ELECTRICAL_LAYOUTS',
-    updatedAt: '2026-10-15T09:40:00Z',
-  },
-  {
-    id: 'doc-5',
-    fileName: 'AF-VILLA_INT_DET_LivingRoomCeiling_v1.dwg',
-    fileSize: 6.4 * 1024 * 1024,
-    mimeType: 'image/vnd.dwg',
-    revisionNumber: 1,
-    categoryFolder: '06_INTERIOR_DETAILS',
-    updatedAt: '2026-10-17T16:15:00Z',
-  },
-  {
-    id: 'doc-6',
-    fileName: 'AF-VILLA_BOQ_SanitaryFixtures_v1.pdf',
-    fileSize: 1.1 * 1024 * 1024,
-    mimeType: 'application/pdf',
-    revisionNumber: 1,
-    categoryFolder: '08_SPECIFICATIONS_BOQ',
-    updatedAt: '2026-10-14T14:10:00Z',
-  },
-  {
-    id: 'doc-7',
-    fileName: 'AF-VILLA_SITE_CTX_TopographicalSurvey_v1.pdf',
-    fileSize: 8.7 * 1024 * 1024,
-    mimeType: 'application/pdf',
-    revisionNumber: 1,
-    categoryFolder: '01_SITE_CONTEXT',
-    updatedAt: '2026-10-10T11:00:00Z',
-  },
-  {
-    id: 'doc-8',
-    fileName: 'AF-VILLA_SKETCH_FacadeInitialConcept_v2.pdf',
-    fileSize: 3.4 * 1024 * 1024,
-    mimeType: 'application/pdf',
-    revisionNumber: 2,
-    categoryFolder: '04_SKETCHES',
-    updatedAt: '2026-10-12T17:30:00Z',
-  },
-  {
-    id: 'doc-9',
-    fileName: 'AF-VILLA_OTHER_ClientMeetingNotes_v1.pdf',
-    fileSize: 0.5 * 1024 * 1024,
-    mimeType: 'application/pdf',
-    revisionNumber: 1,
-    categoryFolder: '03_OTHER',
-    updatedAt: '2026-10-18T18:00:00Z',
-  },
+  { id: '03_OTHER', name: '03 Other / Miscellaneous Reference', group: 'OTHER', fileCount: 0 },
 ];
 
 export function DocumentExplorer({
@@ -127,26 +44,53 @@ export function DocumentExplorer({
   clientName = 'Client Representative',
   userEmail = 'client@example.com',
 }: DocumentExplorerProps) {
-  const [selectedCategoryId, setSelectedCategoryId] = useState('01_ARCHITECTURAL_PLANS');
+  const [selectedCategoryId, setSelectedCategoryId] = useState('01_SITE_DRGS');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [activePreviewFile, setActivePreviewFile] = useState<VaultFileItem | null>(null);
+  const [files, setFiles] = useState<VaultFileItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Persistent Vault Files state
-  const [files, setFiles] = useState<VaultFileItem[]>(() => {
-    const saved = localStorage.getItem('af_vault_files');
-    return saved ? JSON.parse(saved) : INITIAL_VAULT_FILES;
-  });
+  // Fetch real documents from Supabase API
+  const fetchDocuments = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/vault/projects/${projectCode}/documents`);
+      if (res.ok) {
+        const data = await res.json();
+        const allFiles: VaultFileItem[] = [];
 
-  // Sync to localStorage
-  React.useEffect(() => {
-    localStorage.setItem('af_vault_files', JSON.stringify(files));
-  }, [files]);
+        data.folders?.forEach((folder: any) => {
+          folder.documents?.forEach((doc: any) => {
+            allFiles.push({
+              id: doc.id,
+              fileName: doc.fileName,
+              fileSize: doc.fileSizeBytes || 2.5 * 1024 * 1024,
+              mimeType: doc.mimeType,
+              revisionNumber: 1,
+              categoryFolder: folder.categoryCode === '16_OTHER' ? '03_OTHER' : folder.categoryCode,
+              updatedAt: doc.createdAt,
+            });
+          });
+        });
+
+        setFiles(allFiles);
+      }
+    } catch (e) {
+      console.error('Failed to load documents from API', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [projectCode]);
 
   // Dynamically compute file count per category from actual files
   const categories: VaultCategory[] = React.useMemo(() => {
-    return INITIAL_CATEGORIES.map((cat) => ({
+    return STANDARD_16_CATEGORIES.map((cat) => ({
       ...cat,
-      fileCount: files.filter((f) => f.categoryFolder === cat.id).length,
+      fileCount: files.filter((f) => f.categoryFolder === cat.id || (cat.id === '03_OTHER' && f.categoryFolder === '16_OTHER')).length,
     }));
   }, [files]);
 
@@ -155,22 +99,27 @@ export function DocumentExplorer({
   const progressPercentage = Math.round((populatedCategoriesCount / 16) * 100);
 
   // Files belonging to currently active category folder
-  const currentFolderFiles = files.filter((f) => f.categoryFolder === selectedCategoryId);
+  const currentFolderFiles = files.filter((f) => f.categoryFolder === selectedCategoryId || (selectedCategoryId === '03_OTHER' && f.categoryFolder === '16_OTHER'));
 
-  const handleUploadComplete = (result: UploadResult) => {
-    const newFile: VaultFileItem = {
-      id: `doc-${Date.now()}`,
-      fileName: result.finalFileName,
-      fileSize: result.file.size || 2.5 * 1024 * 1024,
-      mimeType: result.file.type || 'image/vnd.dwg',
-      revisionNumber: 1,
-      categoryFolder: result.routedCategory,
-      updatedAt: new Date().toISOString(),
-    };
+  const handleUploadComplete = async (result: UploadResult) => {
+    try {
+      // Post upload to live API
+      await fetch('/api/vault/presigned-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectCode,
+          filename: result.finalFileName,
+          fileSizeBytes: result.file.size,
+        }),
+      });
 
-    setFiles((prev) => [newFile, ...prev]);
-    // Auto-switch to the category where file was placed so user sees it instantly
-    setSelectedCategoryId(result.routedCategory);
+      // Refresh documents from API
+      await fetchDocuments();
+      setSelectedCategoryId(result.routedCategory === '16_OTHER' ? '03_OTHER' : result.routedCategory);
+    } catch (err) {
+      console.error('Upload failed', err);
+    }
   };
 
   const handleDeleteFile = (fileToDelete: VaultFileItem) => {
@@ -204,104 +153,114 @@ export function DocumentExplorer({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div>
-            <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>
-              Project Vault
-            </span>
-            <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              {projectCode} Document Explorer
-            </h3>
+            <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>
+              Unified Progress (16 Folders)
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--accent-gold)' }}>
+                {progressPercentage}%
+              </span>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                ({populatedCategoriesCount}/16 Categories Populated)
+              </span>
+            </div>
           </div>
 
-          {/* 16-Category Progress Meter */}
+          {/* Minimal Progress Bar */}
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '6px 14px',
-              backgroundColor: 'var(--bg-secondary)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--radius-md)',
+              width: '180px',
+              height: '6px',
+              backgroundColor: 'var(--border-strong)',
+              borderRadius: '3px',
+              overflow: 'hidden',
             }}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Workflow Progress</span>
-                <span style={{ color: 'var(--accent-gold)', fontWeight: 700 }}>
-                  {progressPercentage}% ({populatedCategoriesCount}/16 Categories)
-                </span>
-              </div>
-              <div
-                style={{
-                  width: '160px',
-                  height: '6px',
-                  backgroundColor: 'var(--bg-surface)',
-                  borderRadius: '3px',
-                  overflow: 'hidden',
-                }}
-              >
-                <div
-                  style={{
-                    width: `${progressPercentage}%`,
-                    height: '100%',
-                    backgroundColor: 'var(--accent-gold)',
-                    borderRadius: '3px',
-                    transition: 'width 0.3s ease',
-                  }}
-                />
-              </div>
-            </div>
+            <div
+              style={{
+                width: `${progressPercentage}%`,
+                height: '100%',
+                backgroundColor: 'var(--accent-gold)',
+                transition: 'width 0.4s ease',
+              }}
+            />
           </div>
         </div>
 
-        {/* Upload Action */}
-        <button
-          onClick={() => setIsUploadModalOpen(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 18px',
-            backgroundColor: 'var(--accent-gold)',
-            color: '#0d0f12',
-            borderRadius: 'var(--radius-md)',
-            fontSize: '13px',
-            fontWeight: 600,
-          }}
-        >
-          <Upload size={16} />
-          <span>Upload Document</span>
-        </button>
+        {/* Action Controls */}
+        <div style={{ display: 'flex', gap: '12px' }}>
+          {/* Upload Button: Allowed for Admin and Staff */}
+          {(userRole === 'ADMIN' || userRole === 'STAFF') && (
+            <button
+              onClick={() => setIsUploadModalOpen(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                backgroundColor: 'var(--accent-gold)',
+                color: '#0d0f12',
+                border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <Upload size={16} />
+              <span>Upload Drawing</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Main Vault Explorer Workspace: Sidebar Tree + Content Grid */}
+      {/* Main Dual-Pane Workspace */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <TreeView
-          categories={categories}
-          selectedCategoryId={selectedCategoryId}
-          onSelectCategory={setSelectedCategoryId}
-        />
+        {/* Left Pane: Interactive Tree View */}
+        <div
+          style={{
+            width: '320px',
+            borderRight: '1px solid var(--border-subtle)',
+            backgroundColor: 'var(--bg-secondary)',
+            overflowY: 'auto',
+          }}
+        >
+          <TreeView
+            categories={categories}
+            selectedCategoryId={selectedCategoryId}
+            onSelectCategory={setSelectedCategoryId}
+          />
+        </div>
 
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        {/* Right Pane: Grid/Card View & Preview Area */}
+        <div
+          style={{
+            flex: 1,
+            backgroundColor: 'var(--bg-primary)',
+            overflowY: 'auto',
+            padding: '24px',
+          }}
+        >
           <GridView
             files={currentFolderFiles}
-            onOpenFile={(file) => setActivePreviewFile(file)}
-            onDownloadFile={(file) => alert(`Downloading secure watermarked file: ${file.fileName}`)}
-            onDeleteFile={userRole === 'ADMIN' || userRole === 'STAFF' ? handleDeleteFile : undefined}
+            onOpenFile={setActivePreviewFile}
+            onDeleteFile={handleDeleteFile}
             isViewOnly={userRole === 'CLIENT_VIEWER'}
           />
         </div>
       </div>
 
-      {/* Upload Modal with Interactive Rename Warning */}
-      <UploadModal
-        projectCode={projectCode}
-        isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
-        onUpload={handleUploadComplete}
-      />
+      {/* Upload Modal */}
+      {isUploadModalOpen && (
+        <UploadModal
+          isOpen={isUploadModalOpen}
+          projectCode={projectCode}
+          onClose={() => setIsUploadModalOpen(false)}
+          onUpload={handleUploadComplete}
+        />
+      )}
 
-      {/* Embedded DWG Preview Viewer Modal */}
+      {/* High-Resolution DWG / Vector Preview Modal with Dynamic Stamping */}
       {activePreviewFile && (
         <div
           style={{
@@ -311,33 +270,33 @@ export function DocumentExplorer({
             right: 0,
             bottom: 0,
             backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            zIndex: 1100,
-            padding: '40px',
+            zIndex: 1000,
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            flexDirection: 'column',
+            padding: '24px',
           }}
         >
-          <div style={{ width: '90vw', height: '85vh' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
             <button
               onClick={() => setActivePreviewFile(null)}
               style={{
-                position: 'absolute',
-                top: '20px',
-                right: '20px',
-                color: '#ffffff',
-                fontSize: '14px',
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                backgroundColor: '#21262d',
+                color: '#f0f6fc',
+                border: '1px solid #30363d',
                 padding: '6px 14px',
-                borderRadius: 'var(--radius-sm)',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: 600,
               }}
             >
-              Close Preview
+              ✕ Close Preview
             </button>
+          </div>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
             <DwgViewer
               documentId={activePreviewFile.id}
               documentTitle={activePreviewFile.fileName}
-              previewUrl="/sample-preview.pdf"
+              previewUrl={`https://afdesign-vault-prod.r2.cloudflarestorage.com/${activePreviewFile.fileName}`}
               projectCode={projectCode}
               userRole={userRole}
               clientName={clientName}

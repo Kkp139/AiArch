@@ -1,20 +1,18 @@
-/// <reference lib="webworker" />
-
-declare const self: ServiceWorkerGlobalScope;
+const sw = globalThis as unknown as any;
 
 const CACHE_NAME = 'afdesign-portal-v1';
 const STATIC_ASSETS = ['/', '/index.html', '/manifest.json'];
 
-self.addEventListener('install', (event) => {
+sw.addEventListener('install', (event: any) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS);
     })
   );
-  self.skipWaiting();
+  sw.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
+sw.addEventListener('activate', (event: any) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
@@ -22,10 +20,10 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
-  self.clients.claim();
+  sw.clients.claim();
 });
 
-self.addEventListener('fetch', (event) => {
+sw.addEventListener('fetch', (event: any) => {
   // Network-first strategy for API and fast caching for assets
   if (event.request.url.includes('/api/')) {
     return;
@@ -43,7 +41,7 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-self.addEventListener('push', (event) => {
+sw.addEventListener('push', (event: any) => {
   if (!event.data) return;
 
   try {
@@ -56,7 +54,7 @@ self.addEventListener('push', (event) => {
       data: data.url || '/',
     };
 
-    event.waitUntil(self.registration.showNotification(title, options));
+    event.waitUntil(sw.registration.showNotification(title, options));
   } catch (err) {
     console.error('Error receiving push message', err);
   }
