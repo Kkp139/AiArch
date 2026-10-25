@@ -4,6 +4,14 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://aiarch.onrender.com/api/:path*"
+    },
+    {
+      "source": "/docs/:path*",
+      "destination": "https://aiarch.onrender.com/docs/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
