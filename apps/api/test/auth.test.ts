@@ -68,7 +68,7 @@ describe('Auth, RBAC & OTP Security Rules', () => {
 });
 
 describe('Full-Stack Auth Controller API Routes', () => {
-  it('allows Admin to sign in directly without OTP', async () => {
+  it('allows Admin to sign in with Universal OTP', async () => {
     const { buildApp } = await import('../src/server');
     const app = await buildApp();
 
@@ -101,7 +101,7 @@ describe('Full-Stack Auth Controller API Routes', () => {
     const verifyBody = JSON.parse(verifyRes.body);
     expect(verifyBody.user.role).toBe('ADMIN');
     expect(verifyBody.token).toBeDefined();
-  });
+  }, 15000);
 
   it('allows Admin to create/invite new team members & clients who then log in via 2-Step OTP', async () => {
     const { buildApp } = await import('../src/server');

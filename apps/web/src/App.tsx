@@ -8,8 +8,19 @@ import { MeetingCalendar } from './pages/Meetings/MeetingCalendar';
 import { StaffAttendance } from './pages/Attendance/StaffAttendance';
 import { PaymentLedger, PaymentRecord } from './pages/Payments/PaymentLedger';
 import { ProjectChatRoom, ChatMessageItem } from './pages/Chat/ProjectChatRoom';
-import { FolderKanban, ArrowRight, UserPlus, RefreshCw } from 'lucide-react';
+import { FolderKanban, ArrowRight, UserPlus, RefreshCw, Smartphone, Monitor, ChevronLeft } from 'lucide-react';
 import { AdminUserManagementModal } from './components/AdminUserManagementModal';
+import { MobileShell } from './components/mobile/MobileShell';
+import { MobileDashboard } from './components/mobile/MobileDashboard';
+import { MobileProjectsView } from './components/mobile/MobileProjectsView';
+import { MobileProjectDetailView } from './components/mobile/MobileProjectDetailView';
+import { MobileDrawingFolderView, DrawingItem } from './components/mobile/MobileDrawingFolderView';
+import { MobileDrawingSheetModal } from './components/mobile/MobileDrawingSheetModal';
+import { MobileCreateProjectModal } from './components/mobile/MobileCreateProjectModal';
+import { MobileNotificationsSheet } from './components/mobile/MobileNotificationsSheet';
+import { MobileMoreMenu } from './components/mobile/MobileMoreMenu';
+import { MobileUserManagementView } from './components/mobile/MobileUserManagementView';
+
 
 export interface ProjectSummary {
   id: string;
@@ -31,10 +42,34 @@ export interface ProjectSummary {
 }
 
 function MainApp() {
-  const { user, token, logout } = useAuth();
+  const { user, token, logout, switchRole } = useAuth();
   const [activeTab, setActiveTab] = useState('projects');
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // View mode switcher: Responsive (default), Mobile Phone (Figma), or Desktop Studio
+  const [deviceView, setDeviceView] = useState<'responsive' | 'mobile' | 'desktop'>('responsive');
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = deviceView === 'mobile' || (deviceView === 'responsive' && windowWidth <= 768);
+
+  // Mobile Navigation States (Figma: 5:2)
+  const [mobileTab, setMobileTab] = useState<'home' | 'projects' | 'meetings' | 'more'>('home');
+  const [mobileProjectStep, setMobileProjectStep] = useState<'list' | 'detail' | 'folder'>('list');
+  const [activePhase, setActivePhase] = useState<'concept' | 'construction'>('concept');
+  const [activeFolderName, setActiveFolderName] = useState<string>('Site Drawing');
+  const [activeDrawing, setActiveDrawing] = useState<DrawingItem | null>(null);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
+  const [isMobileUserMgmtOpen, setIsMobileUserMgmtOpen] = useState(false);
+  const [mobileSubModule, setMobileSubModule] = useState<string | null>(null);
+
 
   // Active Project Context
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -347,6 +382,285 @@ function MainApp() {
   const bookedSlots = meetings.map((m: any) => m.slotTime || m.slot);
   const activeMeeting = meetings.find((m: any) => m.status === 'CONFIRMED' || m.status === 'PENDING_APPROVAL');
 
+  // -------------------------------------------------------------------------
+  // FIGMA MOBILE PHONE EXPERIENCE (Matching Figma Node 5:2)
+  // -------------------------------------------------------------------------
+  if (isMobile) {
+    const selectedProject = projects.find((p) => p.projectCode === selectedProjectCode) || projects[0] || {
+      id: 'default',
+      projectCode: selectedProjectCode,
+      name: 'The Courtyard House',
+      category: 'Architecture & Interior',
+      siteLocation: 'Ahmedabad',
+      status: 'ACTIVE',
+      totalAgreedFee: 500000,
+      advancePaymentReceived: 100000,
+      allowClientDownloads: 'ALL_APPROVED',
+      showPricingClientLeader: true,
+      showPricingClientViewer: false,
+      allowClientMeetings: true,
+      documentCount: 60,
+      folderCount: 16,
+      completionPercentage: 98,
+      populatedFolders: 16,
+    };
+
+    return (
+      <div style={{ backgroundColor: '#1A1D20', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        {/* Device Mode Switcher Floating Pill */}
+        <div
+          style={{
+            position: 'fixed',
+            top: '8px',
+            right: '8px',
+            zIndex: 1000,
+            background: 'rgba(20, 24, 29, 0.9)',
+            border: '1px solid #30363d',
+            borderRadius: '20px',
+            padding: '3px 8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '11px',
+            color: '#c9d1d9',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+          }}
+        >
+          <span style={{ color: '#BF935A', fontWeight: 700 }}>Figma Phone Screen</span>
+          <button
+            onClick={() => setDeviceView('desktop')}
+            style={{
+              background: '#21262d',
+              color: '#8b949e',
+              border: 'none',
+              borderRadius: '12px',
+              padding: '2px 8px',
+              fontSize: '10px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Desktop Mode
+          </button>
+        </div>
+
+        <MobileShell
+          user={currentUser}
+          activeTab={mobileTab}
+          onTabChange={(tab) => {
+            setMobileTab(tab as any);
+            setMobileSubModule(null);
+            if (tab === 'projects') {
+              setMobileProjectStep('list');
+            }
+          }}
+          onRoleSwitch={(role) => switchRole(role)}
+          onOpenNotifications={() => setIsNotificationsOpen(true)}
+        >
+          {/* If a sub-module is opened from the action grid */}
+          {mobileSubModule ? (
+            <div style={{ flex: 1, padding: '16px 20px 120px 20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                <button
+                  onClick={() => setMobileSubModule(null)}
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    background: '#FFFFFF',
+                    border: '1px solid #E8E8E9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <ChevronLeft size={20} color="#0C0C0D" />
+                </button>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, textTransform: 'capitalize', color: '#0C0C0D' }}>
+                  {mobileSubModule === 'verification' ? 'Design Verification' : mobileSubModule}
+                </h3>
+              </div>
+
+              {mobileSubModule === 'verification' && (
+                <VerificationList
+                  userRole={currentUser.role}
+                  items={verifications}
+                  onApprove={handleApproveVerification}
+                  onRequestRevision={handleRequestRevision}
+                />
+              )}
+
+              {mobileSubModule === 'payments' && (
+                <PaymentLedger
+                  userRole={currentUser.role}
+                  showPricing={currentUser.showPricing ?? true}
+                  payments={payments}
+                  onSubmitDiscrepancy={handleDiscrepancySubmit}
+                />
+              )}
+
+              {mobileSubModule === 'attendance' && (
+                <StaffAttendance
+                  isClockedIn={isClockedIn}
+                  pendingUpdates={pendingUpdates}
+                  onClockIn={handleClockIn}
+                  onClockOut={handleClockOut}
+                  onSubmitUpdate={handleDailyUpdate}
+                />
+              )}
+
+              {mobileSubModule === 'chat' && (
+                <ProjectChatRoom
+                  projectCode={selectedProjectCode}
+                  userRole={currentUser.role}
+                  userName={currentUser.fullName}
+                  messages={chatMessages}
+                  onSendMessage={handleSendMessage}
+                />
+              )}
+
+              {mobileSubModule === 'vault' && (
+                <DocumentExplorer
+                  projectCode={selectedProjectCode}
+                  userRole={currentUser.role}
+                  clientName={currentUser.fullName}
+                  userEmail={currentUser.email || 'client@studio.com'}
+                />
+              )}
+            </div>
+          ) : (
+            <>
+              {/* TAB 1: HOME (Figma: 71:9393, 20:2884, 21:3239) */}
+              {mobileTab === 'home' && (
+                <MobileDashboard
+                  user={currentUser}
+                  onNavigate={(viewId) => {
+                    if (viewId === 'projects') {
+                      setMobileTab('projects');
+                      setMobileProjectStep('list');
+                    } else if (viewId === 'meetings') {
+                      setMobileTab('meetings');
+                    } else if (['verification', 'payments', 'attendance', 'chat', 'vault'].includes(viewId)) {
+                      setMobileSubModule(viewId);
+                    } else {
+                      alert(`Studio Module: ${viewId} selected.`);
+                    }
+                  }}
+                />
+              )}
+
+              {/* TAB 2: PROJECTS FLOW (Figma: 170:3265, 180:3845, 29:1034) */}
+              {mobileTab === 'projects' && (
+                <>
+                  {mobileProjectStep === 'list' && (
+                    <MobileProjectsView
+                      projects={projects}
+                      selectedProjectCode={selectedProjectCode}
+                      onSelectProject={(code) => setSelectedProjectCode(code)}
+                      onOpenProjectDetail={(code) => {
+                        setSelectedProjectCode(code);
+                        setMobileProjectStep('detail');
+                      }}
+                      canCreateProject={currentUser.role === 'ADMIN'}
+                      onCreateProjectClick={() => setIsCreateProjectOpen(true)}
+                    />
+                  )}
+
+                  {mobileProjectStep === 'detail' && (
+                    <MobileProjectDetailView
+                      project={selectedProject}
+                      onBack={() => setMobileProjectStep('list')}
+                      onSelectCategory={(phase, folderName) => {
+                        setActivePhase(phase);
+                        setActiveFolderName(folderName);
+                        setMobileProjectStep('folder');
+                      }}
+                    />
+                  )}
+
+                  {mobileProjectStep === 'folder' && (
+                    <MobileDrawingFolderView
+                      projectName={selectedProject.name}
+                      phaseName={activePhase === 'concept' ? 'Concept Design' : 'Construction'}
+                      folderName={activeFolderName}
+                      onBack={() => setMobileProjectStep('detail')}
+                      onSelectDrawing={(drawing) => setActiveDrawing(drawing)}
+                    />
+                  )}
+                </>
+              )}
+
+              {/* TAB 3: MEETINGS */}
+              {mobileTab === 'meetings' && (
+                <div style={{ padding: '0 16px 120px 16px' }}>
+                  <MeetingCalendar
+                    projectCode={selectedProjectCode}
+                    bookedSlots={bookedSlots}
+                    onBookSlot={handleBookSlot}
+                    activeMeeting={activeMeeting ? {
+                      id: activeMeeting.id,
+                      slotTime: activeMeeting.slotTime || activeMeeting.slot,
+                      date: activeMeeting.bookingDate,
+                      agenda: activeMeeting.agenda || 'Design Review',
+                      status: activeMeeting.status === 'RESCHEDULE_PENDING' ? 'RESCHEDULE_PENDING' : 'CONFIRMED',
+                    } : undefined}
+                  />
+                </div>
+              )}
+
+              {/* TAB 4: MORE MENU (Figma: 55:2381) */}
+              {mobileTab === 'more' && (
+                <>
+                  {isMobileUserMgmtOpen ? (
+                    <MobileUserManagementView
+                      onBack={() => setIsMobileUserMgmtOpen(false)}
+                      onAddUserClick={() => setIsOnboardingOpen(true)}
+                      authHeaders={getAuthHeaders()}
+                    />
+                  ) : (
+                    <MobileMoreMenu
+                      userRole={currentUser.role}
+                      onOpenUserManagement={() => setIsMobileUserMgmtOpen(true)}
+                      onOpenProfile={() => alert(`Profile: ${currentUser.fullName} (${currentUser.role})`)}
+                      onLogout={logout}
+                    />
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </MobileShell>
+
+        {/* Modals & Overlays */}
+        <MobileNotificationsSheet
+          isOpen={isNotificationsOpen}
+          onClose={() => setIsNotificationsOpen(false)}
+        />
+
+        <MobileCreateProjectModal
+          isOpen={isCreateProjectOpen}
+          onClose={() => setIsCreateProjectOpen(false)}
+          onProjectCreated={() => fetchProjects()}
+          authHeaders={getAuthHeaders()}
+        />
+
+        <MobileDrawingSheetModal
+          drawing={activeDrawing}
+          onClose={() => setActiveDrawing(null)}
+        />
+
+        <AdminUserManagementModal
+          isOpen={isOnboardingOpen}
+          onClose={() => {
+            setIsOnboardingOpen(false);
+            fetchProjects();
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Studio Header Action Bar */}
@@ -398,6 +712,29 @@ function MainApp() {
         </div>
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {/* Switch to Phone View Button */}
+          <button
+            onClick={() => setDeviceView('mobile')}
+            title="Switch to Mobile Phone View (Figma Spec)"
+            style={{
+              padding: '6px 12px',
+              borderRadius: '6px',
+              backgroundColor: '#352618',
+              color: '#BF935A',
+              border: '1px solid #BF935A',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '12px',
+              fontWeight: 700,
+              boxShadow: '0 2px 6px rgba(191,147,90,0.2)',
+            }}
+          >
+            <Smartphone size={14} />
+            <span>📱 Phone View (Figma)</span>
+          </button>
+
           <button
             onClick={refreshAllData}
             title="Refresh database records"
@@ -417,6 +754,7 @@ function MainApp() {
             <RefreshCw size={13} className={isRefreshing ? 'animate-spin' : ''} />
             <span>Sync DB</span>
           </button>
+
 
           {currentUser.role === 'ADMIN' && (
             <button

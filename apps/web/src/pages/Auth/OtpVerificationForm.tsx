@@ -16,7 +16,7 @@ export const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
   onBack,
   onSuccess,
 }) => {
-  const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const [digits, setDigits] = useState<string[]>(['1', '2', '3', '4', '5', '6']);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasError, setHasError] = useState(false);

@@ -9,10 +9,13 @@ export const EditorialPanel: React.FC = () => {
         className="editorial-bg"
       />
       <div className="editorial-overlay">
-        <div className="editorial-masthead-row">
-          <span>ARCHITECTURE & INTERIORS</span>
-          <span>THE STUDIO PORTAL AHMEDABAD, INDIA</span>
+        <div className="editorial-masthead-row" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '6px' }}>
+          <img src="/assets/auth/asf_logo.svg" alt="asf design" style={{ height: '36px', width: 'auto' }} />
+          <span style={{ fontSize: '11px', letterSpacing: '0.14em', color: 'rgba(255, 255, 255, 0.75)', fontWeight: 600 }}>
+            ARCHITECTURE & INTERIORS
+          </span>
         </div>
+
 
         <div className="editorial-bottom-content">
           <span className="editorial-eyebrow">SPACES FOR SHARED AMBITION</span>

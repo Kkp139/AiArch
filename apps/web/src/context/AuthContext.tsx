@@ -20,7 +20,9 @@ interface AuthContextType {
   login: (user: UserProfile, token?: string) => void;
   logout: () => void;
   toggleTheme: () => void;
+  switchRole: (role: UserRole) => void;
 }
+
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -73,12 +75,38 @@ export function AuthProvider({ children, initialUser = null }: { children: React
 
   const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
 
+  const switchRole = (newRole: UserRole) => {
+
+
+    if (!user) return;
+    const roleProfiles: Record<UserRole, { fullName: string; showPricing: boolean; allowMeetings: boolean }> = {
+      ADMIN: { fullName: 'Farhaz Patel (Admin)', showPricing: true, allowMeetings: true },
+      STAFF: { fullName: 'Priya Mehta (Staff)', showPricing: false, allowMeetings: false },
+      CLIENT_LEADER: { fullName: 'Aakash Mehta (Client Leader)', showPricing: true, allowMeetings: true },
+      CLIENT_VIEWER: { fullName: 'Sneha Kapoor (Client Viewer)', showPricing: false, allowMeetings: true },
+    };
+
+    const profile = roleProfiles[newRole];
+    const updatedUser: UserProfile = {
+      ...user,
+      role: newRole,
+      fullName: profile.fullName,
+      showPricing: profile.showPricing,
+      allowMeetings: profile.allowMeetings,
+    };
+    setUser(updatedUser);
+    try {
+      localStorage.setItem('pronex_auth_user', JSON.stringify(updatedUser));
+    } catch {}
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, theme, login, logout, toggleTheme }}>
+    <AuthContext.Provider value={{ user, token, theme, login, logout, toggleTheme, switchRole }}>
       {children}
     </AuthContext.Provider>
   );
 }
+
 
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);

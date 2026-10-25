@@ -458,14 +458,24 @@
   }
 
   .editorial-headline {
-    font-size: 32px;
+    font-size: 26px;
+    line-height: 1.2;
+    margin-bottom: 6px;
   }
 
-  .editorial-supporting,
+  .editorial-supporting {
+    display: block;
+    font-size: 13px;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.85);
+    margin: 0;
+  }
+
   .editorial-caption-row,
   .editorial-divider {
     display: none;
   }
+
 
   .auth-form-col {
     flex: 1;
