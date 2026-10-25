@@ -3,10 +3,16 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { vaultService } from './vault.service';
 import { isAllowedFileType, parseFileName } from './naming.service';
+import { resolveUserFromRequest, userHasProjectAccess } from '../../lib/auth-guard';
 
 export async function vaultRoutes(app: FastifyInstance) {
   // Get all documents for a project grouped by folder
   app.get('/api/vault/projects/:projectCode/documents', async (request: FastifyRequest<{ Params: { projectCode: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required. Please sign in to view documents.' });
+    }
+
     const { projectCode } = request.params;
 
     const project = await prisma.project.findFirst({
@@ -32,6 +38,10 @@ export async function vaultRoutes(app: FastifyInstance) {
 
     if (!project) {
       return reply.status(404).send({ error: 'Project not found' });
+    }
+
+    if (!userHasProjectAccess(user, project.id)) {
+      return reply.status(403).send({ error: 'Access denied: You are not assigned to this project.' });
     }
 
     return {
@@ -60,11 +70,19 @@ export async function vaultRoutes(app: FastifyInstance) {
 
   // Request Presigned Upload & Evaluate Naming Convention
   app.post('/api/vault/presigned-upload', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+
+    if (user.role === 'CLIENT_VIEWER') {
+      return reply.status(403).send({ error: 'Forbidden: Client Viewers cannot upload documents.' });
+    }
+
     const schema = z.object({
       projectCode: z.string().min(1),
       filename: z.string().min(1),
       fileSizeBytes: z.number().optional().default(1024),
-      uploaderId: z.string().optional(),
     });
 
     const body = schema.safeParse(request.body);
@@ -72,7 +90,7 @@ export async function vaultRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'Valid projectCode and filename required' });
     }
 
-    const { projectCode, filename, fileSizeBytes, uploaderId } = body.data;
+    const { projectCode, filename, fileSizeBytes } = body.data;
 
     if (!isAllowedFileType(filename)) {
       return reply.status(400).send({
@@ -92,6 +110,10 @@ export async function vaultRoutes(app: FastifyInstance) {
 
     if (!project) {
       return reply.status(404).send({ error: `Project '${projectCode}' not found.` });
+    }
+
+    if (!userHasProjectAccess(user, project.id)) {
+      return reply.status(403).send({ error: 'Access denied: You are not assigned to this project.' });
     }
 
     // Evaluate standard naming convention: [ProjectName]_[Category]_[SubCategory]_[FileName]
@@ -120,7 +142,10 @@ export async function vaultRoutes(app: FastifyInstance) {
         fileSizeBytes: BigInt(fileSizeBytes),
         mimeType: isDwg ? 'image/vnd.dwg' : 'application/pdf',
         isDwg,
-        uploadedBy: uploaderId,
+        uploadedBy: user.id,
+      },
+      include: {
+        uploader: true,
       },
     });
 

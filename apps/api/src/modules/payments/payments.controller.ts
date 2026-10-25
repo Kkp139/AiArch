@@ -2,15 +2,19 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { PaymentMode, PaymentStatus } from '@prisma/client';
+import { resolveUserFromRequest, userHasProjectAccess } from '../../lib/auth-guard';
 
 export async function paymentRoutes(app: FastifyInstance) {
   // Get Payments for Project (Strict Staff Block + Client Project Toggle Check)
   app.get('/api/payments/project/:projectIdentifier', async (request: FastifyRequest<{ Params: { projectIdentifier: string } }>, reply: FastifyReply) => {
-    const authHeader = request.headers.authorization || '';
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required. Please sign in to view payment records.' });
+    }
 
     // STRICT STAFF ISOLATION RULE: Staff role is unconditionally forbidden from payments
-    if (authHeader.includes('staff') || authHeader.includes('usr-staff')) {
-      return reply.status(403).send({ error: 'Access Denied: Staff accounts cannot access payment records or pricing metadata.' });
+    if (user.role === 'STAFF') {
+      return reply.status(403).send({ error: 'Access denied: Staff accounts cannot access payment records or pricing metadata.' });
     }
 
     const { projectIdentifier } = request.params;
@@ -24,14 +28,15 @@ export async function paymentRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Project not found.' });
     }
 
-    // Client pricing permission check
-    const isClientLeader = authHeader.includes('client_leader') || authHeader.includes('CLIENT_LEADER');
-    const isClientViewer = authHeader.includes('client_viewer') || authHeader.includes('CLIENT_VIEWER');
+    if (!userHasProjectAccess(user, project.id)) {
+      return reply.status(403).send({ error: 'Access denied: You are not assigned to this project.' });
+    }
 
-    if (isClientLeader && !project.showPricingClientLeader) {
+    // Client pricing permission check
+    if (user.role === 'CLIENT_LEADER' && !project.showPricingClientLeader) {
       return reply.status(403).send({ error: 'Pricing visibility is disabled for Client Leaders on this project.' });
     }
-    if (isClientViewer && !project.showPricingClientViewer) {
+    if (user.role === 'CLIENT_VIEWER' && !project.showPricingClientViewer) {
       return reply.status(403).send({ error: 'Pricing visibility is disabled for Client Viewers on this project.' });
     }
 
@@ -61,7 +66,13 @@ export async function paymentRoutes(app: FastifyInstance) {
 
   // Create Payment Entry (Admin Only)
   app.post('/api/payments', async (request: FastifyRequest, reply: FastifyReply) => {
-    const defaultAdmin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only studio Admins can record payment transactions.' });
+    }
 
     const schema = z.object({
       projectCode: z.string().min(1),
@@ -95,7 +106,7 @@ export async function paymentRoutes(app: FastifyInstance) {
         referenceNumber: body.data.referenceNumber,
         bankName: body.data.bankName,
         status: body.data.status as PaymentStatus,
-        recordedBy: defaultAdmin?.id || 'usr-admin-1',
+        recordedBy: user.id,
       },
       include: {
         recorder: true,
@@ -128,6 +139,14 @@ export async function paymentRoutes(app: FastifyInstance) {
 
   // Client Submits Discrepancy Note (Sets status to REVISION_REQUESTED without altering payment amount)
   app.post('/api/payments/:id/discrepancy', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role === 'STAFF') {
+      return reply.status(403).send({ error: 'Access denied: Staff accounts cannot access payment operations.' });
+    }
+
     const schema = z.object({
       discrepancyNote: z.string().min(1, 'Discrepancy note is required'),
     });
@@ -135,6 +154,17 @@ export async function paymentRoutes(app: FastifyInstance) {
     const body = schema.safeParse(request.body);
     if (!body.success) {
       return reply.status(400).send({ error: 'Discrepancy note is required' });
+    }
+
+    const payment = await prisma.payment.findUnique({
+      where: { id: request.params.id },
+    });
+    if (!payment) {
+      return reply.status(404).send({ error: 'Payment record not found' });
+    }
+
+    if (!userHasProjectAccess(user, payment.projectId)) {
+      return reply.status(403).send({ error: 'Access denied: You are not assigned to this project.' });
     }
 
     const updated = await prisma.payment.update({

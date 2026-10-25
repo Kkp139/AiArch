@@ -166,9 +166,9 @@ function MainApp() {
     }
   }, [getAuthHeaders]);
 
-  // Load Chat Messages for active project
+  // Load Chat Messages for active project (Admin, Client Leader & Client Viewer)
   const fetchChat = useCallback(async () => {
-    if (user?.role !== 'ADMIN' && user?.role !== 'CLIENT_LEADER') return;
+    if (user?.role === 'STAFF') return;
     try {
       const res = await fetch(`/api/chat/projects/${selectedProjectCode}/messages`, { headers: getAuthHeaders() });
       if (res.ok) {

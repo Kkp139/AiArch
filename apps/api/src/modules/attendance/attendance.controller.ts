@@ -2,19 +2,29 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { validateClockIn, validateClockOutWithWorkUpdatesGate } from './attendance.service';
+import { resolveUserFromRequest } from '../../lib/auth-guard';
 
 export async function attendanceRoutes(app: FastifyInstance) {
-  // Get active session status and pending updates
+  // Get active session status and pending updates (Staff and Admin only)
   app.get('/api/attendance/status', async (request: FastifyRequest, reply: FastifyReply) => {
-    const defaultStaff = await prisma.user.findFirst({ where: { role: 'STAFF' } });
-    if (!defaultStaff) {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required. Please sign in to access attendance.' });
+    }
+
+    if (user.role !== 'STAFF' && user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Attendance tracking is restricted to Staff and Admin.' });
+    }
+
+    const targetStaffId = user.role === 'STAFF' ? user.id : (await prisma.user.findFirst({ where: { role: 'STAFF' } }))?.id;
+    if (!targetStaffId) {
       return { isClockedIn: false, pendingUpdates: [] };
     }
 
     // Find active attendance session (clockOutAt is null)
     const activeSession = await prisma.attendance.findFirst({
       where: {
-        userId: defaultStaff.id,
+        userId: targetStaffId,
         clockOutAt: null,
       },
       include: {
@@ -54,11 +64,18 @@ export async function attendanceRoutes(app: FastifyInstance) {
 
   // Staff Clock-In with mandatory GPS
   app.post('/api/attendance/clock-in', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'STAFF' && user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only staff can clock in.' });
+    }
+
     const schema = z.object({
       lat: z.number(),
       lng: z.number(),
       address: z.string().optional().default('Ahmedabad Studio HQ'),
-      userId: z.string().optional(),
     });
 
     const body = schema.safeParse(request.body);
@@ -66,11 +83,7 @@ export async function attendanceRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'Valid GPS coordinates (lat, lng) are mandatory' });
     }
 
-    let staffId = body.data.userId;
-    if (!staffId) {
-      const defaultStaff = await prisma.user.findFirst({ where: { role: 'STAFF' } });
-      staffId = defaultStaff?.id || 'usr-staff-1';
-    }
+    const staffId = user.id;
 
     // Check for existing active session
     const existingActive = await prisma.attendance.findFirst({
@@ -107,6 +120,14 @@ export async function attendanceRoutes(app: FastifyInstance) {
 
   // Submit Daily Work Update
   app.post('/api/attendance/daily-update', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'STAFF' && user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only staff can submit daily updates.' });
+    }
+
     const schema = z.object({
       attendanceId: z.string().optional(),
       projectCode: z.string().optional().default('AF-VILLA'),
@@ -119,18 +140,13 @@ export async function attendanceRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: body.error.errors[0]?.message || 'Invalid update parameters' });
     }
 
-    const defaultStaff = await prisma.user.findFirst({ where: { role: 'STAFF' } });
-    if (!defaultStaff) {
-      return reply.status(404).send({ error: 'Staff user not found' });
-    }
-
     // Find active attendance session
     let attendance = null;
     if (body.data.attendanceId) {
       attendance = await prisma.attendance.findUnique({ where: { id: body.data.attendanceId } });
     } else {
       attendance = await prisma.attendance.findFirst({
-        where: { userId: defaultStaff.id, clockOutAt: null },
+        where: { userId: user.id, clockOutAt: null },
         orderBy: { clockInAt: 'desc' },
       });
     }
@@ -151,7 +167,7 @@ export async function attendanceRoutes(app: FastifyInstance) {
 
     const update = await prisma.dailyWorkUpdate.create({
       data: {
-        userId: defaultStaff.id,
+        userId: user.id,
         projectId: project.id,
         attendanceId: attendance.id,
         workSummary: body.data.workSummary,
@@ -170,6 +186,14 @@ export async function attendanceRoutes(app: FastifyInstance) {
 
   // Staff Clock-Out with Work Updates Hard Gate
   app.post('/api/attendance/clock-out', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'STAFF' && user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only staff can clock out.' });
+    }
+
     const schema = z.object({
       lat: z.number(),
       lng: z.number(),
@@ -182,11 +206,6 @@ export async function attendanceRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'Valid GPS coordinates (lat, lng) are mandatory' });
     }
 
-    const defaultStaff = await prisma.user.findFirst({ where: { role: 'STAFF' } });
-    if (!defaultStaff) {
-      return reply.status(404).send({ error: 'Staff user not found' });
-    }
-
     // Find active session
     let attendance = null;
     if (body.data.attendanceId) {
@@ -196,7 +215,7 @@ export async function attendanceRoutes(app: FastifyInstance) {
       });
     } else {
       attendance = await prisma.attendance.findFirst({
-        where: { userId: defaultStaff.id, clockOutAt: null },
+        where: { userId: user.id, clockOutAt: null },
         include: { dailyUpdates: true },
         orderBy: { clockInAt: 'desc' },
       });

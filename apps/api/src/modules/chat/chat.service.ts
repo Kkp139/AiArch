@@ -31,8 +31,8 @@ const ALLOWED_IMAGE_MIMES = new Set([
 
 /**
  * Access Control Rule:
- * Real-Time Project Chat is strictly between Admin and assigned Client Leaders.
- * Staff and Client Viewers are strictly prohibited.
+ * Real-Time Project Chat is accessible to Admin, assigned Client Leaders, and assigned Client Viewers.
+ * Staff members are strictly prohibited.
  */
 export function canUserAccessProjectChat(
   userRole: UserRole | string,
@@ -42,10 +42,10 @@ export function canUserAccessProjectChat(
   if (userRole === 'ADMIN') {
     return true; // Universal access for Admin
   }
-  if (userRole === 'CLIENT_LEADER') {
+  if (userRole === 'CLIENT_LEADER' || userRole === 'CLIENT_VIEWER') {
     return userProjectIds.includes(targetProjectId);
   }
-  // STAFF and CLIENT_VIEWER are strictly blocked
+  // STAFF is strictly blocked from client chat
   return false;
 }
 

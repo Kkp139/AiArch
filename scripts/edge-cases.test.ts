@@ -227,9 +227,10 @@ describe('Comprehensive Architecture Edge-Cases, Boundary & Negative Tests', () 
       expect(reject.error).toContain('10MB');
     });
 
-    it('Negative: Chat access rejected for Staff and Client Viewers', () => {
+    it('Negative: Chat access rejected for Staff and unassigned Client Viewers/Leaders', () => {
       expect(canUserAccessProjectChat('STAFF', ['proj-1'], 'proj-1')).toBe(false);
-      expect(canUserAccessProjectChat('CLIENT_VIEWER', ['proj-1'], 'proj-1')).toBe(false);
+      expect(canUserAccessProjectChat('CLIENT_VIEWER', ['proj-2'], 'proj-1')).toBe(false); // Unassigned
+      expect(canUserAccessProjectChat('CLIENT_VIEWER', ['proj-1'], 'proj-1')).toBe(true); // Assigned
       expect(canUserAccessProjectChat('CLIENT_LEADER', ['proj-2'], 'proj-1')).toBe(false); // Unassigned
       expect(canUserAccessProjectChat('CLIENT_LEADER', ['proj-1'], 'proj-1')).toBe(true); // Assigned
       expect(canUserAccessProjectChat('ADMIN', [], 'proj-1')).toBe(true); // Universal

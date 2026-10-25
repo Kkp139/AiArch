@@ -28,10 +28,24 @@ const STANDARD_FOLDERS = [
   { categoryCode: '16_OTHER', folderName: '03 Other / Miscellaneous Reference', phaseGroup: 'OTHER', displayOrder: 16 },
 ];
 
+import { resolveUserFromRequest, userHasProjectAccess } from '../../lib/auth-guard';
+
 export async function projectRoutes(app: FastifyInstance) {
-  // Get All Projects (with role-based access filtering and progress calculation)
+  // Get All Projects (with strict authentication and role-based access filtering)
   app.get('/api/projects', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required. Please sign in to view projects.' });
+    }
+
+    const where: any = {};
+    if (user.role !== 'ADMIN') {
+      const assignedIds = user.assignedProjects.map(ap => ap.projectId);
+      where.id = { in: assignedIds };
+    }
+
     const projects = await prisma.project.findMany({
+      where,
       include: {
         folders: {
           include: {
@@ -52,6 +66,19 @@ export async function projectRoutes(app: FastifyInstance) {
       const populatedCount = p.folders.filter((f) => f._count.documents > 0).length;
       const progress = calculateProgress(populatedCount, 16);
 
+      // Financial visibility permission:
+      // ADMIN: always visible
+      // STAFF: NEVER visible (Strict Staff Isolation)
+      // CLIENT_LEADER: only if p.showPricingClientLeader === true
+      // CLIENT_VIEWER: only if p.showPricingClientViewer === true
+      const canSeePricing = user.role === 'ADMIN'
+        ? true
+        : user.role === 'STAFF'
+        ? false
+        : user.role === 'CLIENT_LEADER'
+        ? p.showPricingClientLeader
+        : p.showPricingClientViewer;
+
       return {
         id: p.id,
         projectCode: p.projectCode,
@@ -59,8 +86,8 @@ export async function projectRoutes(app: FastifyInstance) {
         category: p.category,
         siteLocation: p.siteLocation,
         status: p.status,
-        totalAgreedFee: Number(p.totalAgreedFee),
-        advancePaymentReceived: Number(p.advancePaymentReceived),
+        totalAgreedFee: canSeePricing ? Number(p.totalAgreedFee) : 0,
+        advancePaymentReceived: canSeePricing ? Number(p.advancePaymentReceived) : 0,
         allowClientDownloads: p.allowClientDownloads,
         showPricingClientLeader: p.showPricingClientLeader,
         showPricingClientViewer: p.showPricingClientViewer,
@@ -77,7 +104,15 @@ export async function projectRoutes(app: FastifyInstance) {
 
   // Get Single Project by ID or Code (with all 16 folders & documents)
   app.get('/api/projects/:idOrCode', async (request: FastifyRequest<{ Params: { idOrCode: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required. Please sign in to view this project.' });
+    }
+
     const { idOrCode } = request.params;
+    if (!userHasProjectAccess(user, idOrCode)) {
+      return reply.status(403).send({ error: 'Access denied: You are not assigned to this project.' });
+    }
 
     const project = await prisma.project.findFirst({
       where: {
@@ -115,10 +150,18 @@ export async function projectRoutes(app: FastifyInstance) {
     const populatedCount = project.folders.filter((f) => f.documents.length > 0).length;
     const progress = calculateProgress(populatedCount, 16);
 
+    const canSeePricing = user.role === 'ADMIN'
+      ? true
+      : user.role === 'STAFF'
+      ? false
+      : user.role === 'CLIENT_LEADER'
+      ? project.showPricingClientLeader
+      : project.showPricingClientViewer;
+
     return {
       ...project,
-      totalAgreedFee: Number(project.totalAgreedFee),
-      advancePaymentReceived: Number(project.advancePaymentReceived),
+      totalAgreedFee: canSeePricing ? Number(project.totalAgreedFee) : 0,
+      advancePaymentReceived: canSeePricing ? Number(project.advancePaymentReceived) : 0,
       completionPercentage: progress.percentage,
       populatedFolders: populatedCount,
     };
@@ -126,6 +169,14 @@ export async function projectRoutes(app: FastifyInstance) {
 
   // Create Project (Admin only - Automatically generates all 16 standard folders)
   app.post('/api/projects', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only studio Admins can create projects.' });
+    }
+
     const schema = z.object({
       projectCode: z.string().min(2).max(32),
       name: z.string().min(1),
@@ -190,6 +241,14 @@ export async function projectRoutes(app: FastifyInstance) {
 
   // Get Progress
   app.get('/api/projects/:id/progress', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (!userHasProjectAccess(user, request.params.id)) {
+      return reply.status(403).send({ error: 'Access denied: You are not assigned to this project.' });
+    }
+
     const folders = await prisma.projectFolder.findMany({
       where: { projectId: request.params.id },
       include: {
@@ -203,8 +262,16 @@ export async function projectRoutes(app: FastifyInstance) {
     return calculateProgress(populatedCount, 16);
   });
 
-  // Toggle Active / Inactive Status (No Project Deletion Allowed)
+  // Toggle Active / Inactive Status (Admin only - No Project Deletion Allowed)
   app.patch('/api/projects/:id/status', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only Admins can modify project status.' });
+    }
+
     const schema = z.object({
       status: z.enum(['ACTIVE', 'INACTIVE']),
     });
@@ -238,8 +305,15 @@ export async function projectRoutes(app: FastifyInstance) {
     };
   });
 
-  // Update Project Settings (Pricing visibility, Meetings toggle, Client downloads)
+  // Update Project Settings (Admin only: Pricing visibility, Meetings toggle, Client downloads)
   app.patch('/api/projects/:id/settings', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only Admins can update project settings.' });
+    }
     const schema = z.object({
       showPricingClientLeader: z.boolean().optional(),
       showPricingClientViewer: z.boolean().optional(),

@@ -12,6 +12,7 @@ import {
   verifySetupToken,
 } from './auth.service';
 import { sendInvitationEmail } from '../../lib/email.service';
+import { resolveUserFromRequest, generateSessionToken } from '../../lib/auth-guard';
 
 export async function authRoutes(app: FastifyInstance) {
   // Step 1: Login endpoint (Universal WhatsApp OTP for ALL roles, including ADMIN)
@@ -167,8 +168,8 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'User account not found.' });
     }
 
-    // Generate authenticated JWT session token with embedded role identifier
-    const token = `jwt_session_${dbUser.role.toLowerCase()}_${dbUser.id}_${Date.now()}`;
+    // Generate cryptographically signed session token
+    const token = generateSessionToken({ id: dbUser.id, role: dbUser.role });
 
     // Pricing visibility rule: Staff is NEVER allowed; Clients depend on project toggle
     const canSeePricing = dbUser.role === 'ADMIN'
@@ -209,42 +210,9 @@ export async function authRoutes(app: FastifyInstance) {
 
   // Check current session
   app.get('/api/auth/me', async (request: FastifyRequest, reply: FastifyReply) => {
-    const authHeader = request.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return reply.status(401).send({ error: 'Unauthorized' });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    // Extract user ID from token
-    const parts = token.split('_');
-    const userId = parts[2]; // jwt_session_<userId>_<timestamp>
-
-    let user = null;
-    if (userId) {
-      user = await prisma.user.findUnique({
-        where: { id: userId },
-        include: {
-          assignedProjects: {
-            include: { project: true },
-          },
-        },
-      });
-    }
-
-    // Fallback if not found (e.g. initial admin)
+    const user = await resolveUserFromRequest(request);
     if (!user) {
-      user = await prisma.user.findFirst({
-        where: { role: 'ADMIN' },
-        include: {
-          assignedProjects: {
-            include: { project: true },
-          },
-        },
-      });
-    }
-
-    if (!user) {
-      return reply.status(401).send({ error: 'Session invalid or user removed.' });
+      return reply.status(401).send({ error: 'Session invalid or expired. Please sign in.' });
     }
 
     const canSeePricing = user.role === 'ADMIN'
@@ -285,11 +253,14 @@ export async function authRoutes(app: FastifyInstance) {
     return { success: true };
   });
 
-  // Admin user management: List all users from database
+  // Admin user management: List all users from database (Admin Only)
   app.get('/api/auth/users', async (request: FastifyRequest, reply: FastifyReply) => {
-    const authHeader = request.headers.authorization;
-    if (!authHeader) {
-      return reply.status(401).send({ error: 'Authorization header required.' });
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only Admins can manage users.' });
     }
 
     const users = await prisma.user.findMany({
@@ -324,10 +295,46 @@ export async function authRoutes(app: FastifyInstance) {
     };
   });
 
-  // Admin user management: Onboard new user (NO PERMANENT PASSWORD - Single-use Setup Link)
+  // Alias for mobile user management: /api/admin/users (Admin Only)
+  app.get('/api/admin/users', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only Admins can manage users.' });
+    }
+
+    const users = await prisma.user.findMany({
+      include: {
+        assignedProjects: {
+          include: {
+            project: {
+              select: { id: true, projectCode: true, name: true },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return users.map(u => ({
+      id: u.id,
+      fullName: u.fullName,
+      role: u.role === 'ADMIN' ? 'Admin' : u.role === 'STAFF' ? 'Staff' : u.role === 'CLIENT_LEADER' ? 'Client Leader' : 'Client Viewer',
+      status: u.status === 'ACTIVE' ? 'Active' : 'Inactive',
+      avatarBg: u.role === 'ADMIN' ? '#4A3B32' : u.role === 'STAFF' ? '#1F3A52' : '#2D4A3E',
+      avatarColor: u.role === 'ADMIN' ? '#E0A96D' : u.role === 'STAFF' ? '#58A6FF' : '#7EE787',
+    }));
+  });
+
+  // Admin user management: Onboard new user (Admin Only - Single-use Setup Link)
   app.post('/api/auth/users', async (request: FastifyRequest, reply: FastifyReply) => {
-    const authHeader = request.headers.authorization || '';
-    if (!authHeader.includes('admin') && !authHeader.includes('ADMIN')) {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
       return reply.status(403).send({ error: 'Access denied: Only Admins can onboard new users.' });
     }
 

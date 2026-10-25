@@ -21,15 +21,33 @@ export const REVERSE_SLOT_MAP: Record<TimeSlot, string> = {
   [TimeSlot.SLOT_18_00_19_30]: '18:00–19:30',
 };
 
+import { resolveUserFromRequest, userHasProjectAccess } from '../../lib/auth-guard';
+
 export async function meetingRoutes(app: FastifyInstance) {
-  // Get all meetings (optional project filter)
+  // Get all meetings (Requires authentication; non-admin users only see meetings for assigned projects or requested by them)
   app.get('/api/meetings', async (request: FastifyRequest<{ Querystring: { projectCode?: string; date?: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required. Please sign in to access consultations.' });
+    }
+
     const { projectCode, date } = request.query;
 
     const where: any = {};
     if (projectCode) {
       const proj = await prisma.project.findFirst({ where: { projectCode } });
-      if (proj) where.projectId = proj.id;
+      if (proj) {
+        if (!userHasProjectAccess(user, proj.id)) {
+          return reply.status(403).send({ error: 'Access denied: You are not assigned to this project.' });
+        }
+        where.projectId = proj.id;
+      }
+    } else if (user.role !== 'ADMIN') {
+      const assignedIds = user.assignedProjects.map(ap => ap.projectId);
+      where.OR = [
+        { requesterId: user.id },
+        { projectId: { in: assignedIds } },
+      ];
     }
 
     if (date) {
@@ -68,15 +86,23 @@ export async function meetingRoutes(app: FastifyInstance) {
     }));
   });
 
-  // Request a Meeting Slot (Client Leader or Admin)
+  // Request a Meeting Slot (Client Leader, Client Viewer, or Admin)
   app.post('/api/meetings/request', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required. Please sign in to request a consultation.' });
+    }
+
+    if (user.role === 'STAFF') {
+      return reply.status(403).send({ error: 'Access denied: Staff accounts cannot request client consultation slots.' });
+    }
+
     const schema = z.object({
       projectCode: z.string().optional(),
       bookingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date format must be YYYY-MM-DD'),
       slot: z.string(),
       type: z.enum(['OFFICE_MEETING', 'SITE_VISIT']).optional().default('OFFICE_MEETING'),
       notes: z.string().optional(),
-      requestedById: z.string().optional(),
     });
 
     const body = schema.safeParse(request.body);
@@ -94,16 +120,14 @@ export async function meetingRoutes(app: FastifyInstance) {
     let project = null;
     if (projectCode) {
       project = await prisma.project.findFirst({ where: { projectCode } });
-      if (project && !project.allowClientMeetings) {
-        return reply.status(403).send({ error: 'Consultation bookings are disabled for this project by the studio administrator.' });
+      if (project) {
+        if (!userHasProjectAccess(user, project.id)) {
+          return reply.status(403).send({ error: 'Access denied: You are not assigned to this project.' });
+        }
+        if (user.role !== 'ADMIN' && !project.allowClientMeetings) {
+          return reply.status(403).send({ error: 'Consultation bookings are disabled for this project by the studio administrator.' });
+        }
       }
-    }
-
-    // Resolve requester
-    let requesterId = body.data.requestedById;
-    if (!requesterId) {
-      const defaultClient = await prisma.user.findFirst({ where: { role: 'CLIENT_LEADER' } });
-      requesterId = defaultClient?.id || 'usr-client-1';
     }
 
     const parsedDate = new Date(bookingDate);
@@ -131,7 +155,7 @@ export async function meetingRoutes(app: FastifyInstance) {
         type: type as MeetingType,
         status: MeetingStatus.REQUESTED,
         notes,
-        requestedBy: requesterId,
+        requestedBy: user.id,
       },
       include: {
         project: true,
@@ -156,13 +180,19 @@ export async function meetingRoutes(app: FastifyInstance) {
 
   // Approve Meeting Slot (Admin only)
   app.post('/api/meetings/:id/approve', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    const defaultAdmin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only studio Admins can confirm consultations.' });
+    }
 
     const updated = await prisma.meeting.update({
       where: { id: request.params.id },
       data: {
         status: MeetingStatus.CONFIRMED,
-        approvedBy: defaultAdmin?.id,
+        approvedBy: user.id,
       },
       include: {
         project: true,
@@ -187,7 +217,7 @@ export async function meetingRoutes(app: FastifyInstance) {
         bookingDate: updated.bookingDate.toISOString().split('T')[0],
         slotTime: REVERSE_SLOT_MAP[updated.slot],
         status: updated.status,
-        approvedBy: defaultAdmin?.fullName,
+        approvedBy: user.fullName,
       },
     };
   });

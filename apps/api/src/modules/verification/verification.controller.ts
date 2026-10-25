@@ -1,18 +1,19 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
-import { canRoleAccessVerification } from './verification.service';
+import { resolveUserFromRequest } from '../../lib/auth-guard';
 
 export async function verificationRoutes(app: FastifyInstance) {
   // Get All Submissions (Admin and Staff can access; Revision Counter is visible to both!)
+  // Client Leader and Client Viewer are strictly forbidden (403)!
   app.get('/api/verification/list', async (request: FastifyRequest, reply: FastifyReply) => {
-    const authHeader = request.headers.authorization || '';
-    // Role resolution
-    const isAdmin = authHeader.includes('admin') || authHeader.includes('usr-admin');
-    const isStaff = authHeader.includes('staff') || authHeader.includes('usr-staff');
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required. Please sign in to access Design Verification.' });
+    }
 
     // Only Admin and Staff have access to Design Verification module
-    if (!isAdmin && !isStaff && authHeader) {
+    if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
       return reply.status(403).send({ error: 'Access denied: Design Verification is restricted to Admin and Staff.' });
     }
 
@@ -57,6 +58,15 @@ export async function verificationRoutes(app: FastifyInstance) {
 
   // Submit Drawing for Review (Staff & Admin)
   app.post('/api/verification/submit', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+
+    if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
+      return reply.status(403).send({ error: 'Access denied: Only Admin and Staff can submit drawings for verification.' });
+    }
+
     const schema = z.object({
       projectId: z.string().min(1),
       folderId: z.string().min(1),
@@ -74,11 +84,7 @@ export async function verificationRoutes(app: FastifyInstance) {
     const { projectId, folderId, drawingTitle, fileKey, previewKey } = body.data;
 
     // Resolve submitter user
-    let submitterId = body.data.submittedBy;
-    if (!submitterId) {
-      const defaultStaff = await prisma.user.findFirst({ where: { role: 'STAFF' } });
-      submitterId = defaultStaff?.id || 'usr-staff-1';
-    }
+    const submitterId = user.id;
 
     // Check if drawing already exists for this folder/title to increment revision
     const existing = await prisma.designVerification.findFirst({
@@ -130,13 +136,19 @@ export async function verificationRoutes(app: FastifyInstance) {
 
   // Approve Drawing (Admin only)
   app.post('/api/verification/:id/approve', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    const defaultAdmin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only studio Admins can approve drawings.' });
+    }
 
     const updated = await prisma.designVerification.update({
       where: { id: request.params.id },
       data: {
         status: 'APPROVED',
-        reviewedBy: defaultAdmin?.id,
+        reviewedBy: user.id,
         reviewedAt: new Date(),
       },
     });
@@ -171,7 +183,7 @@ export async function verificationRoutes(app: FastifyInstance) {
           mimeType: 'image/vnd.dwg',
           isDwg: true,
           isApprovedDrawing: true,
-          uploadedBy: defaultAdmin?.id,
+          uploadedBy: user.id,
         },
       });
     }
@@ -187,6 +199,14 @@ export async function verificationRoutes(app: FastifyInstance) {
 
   // Request Revision with Feedback Note (Admin only)
   app.post('/api/verification/:id/revision', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only studio Admins can request revisions.' });
+    }
+
     const schema = z.object({
       feedbackNote: z.string().min(1, 'Feedback note is required'),
     });
@@ -196,14 +216,12 @@ export async function verificationRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'Feedback note is required' });
     }
 
-    const defaultAdmin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
-
     const updated = await prisma.designVerification.update({
       where: { id: request.params.id },
       data: {
         status: 'REVISION_REQUIRED',
         feedbackNote: body.data.feedbackNote,
-        reviewedBy: defaultAdmin?.id,
+        reviewedBy: user.id,
         reviewedAt: new Date(),
       },
     });

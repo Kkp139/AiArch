@@ -66,10 +66,11 @@ describe('ProNex-ArchAI Turnkey End-to-End Baseline Suite', () => {
     expect(otpPush).not.toContain('882910');
   });
 
-  it('E2E Baseline 7: verifies Project Chat Access strictly restricted to Admin and Client Leader', () => {
+  it('E2E Baseline 7: verifies Project Chat Access dynamically restricted to Admin, Client Leader, and assigned Client Viewer', () => {
     expect(canUserAccessProjectChat('ADMIN', [], 'LAP')).toBe(true);
     expect(canUserAccessProjectChat('CLIENT_LEADER', ['LAP'], 'LAP')).toBe(true);
+    expect(canUserAccessProjectChat('CLIENT_VIEWER', ['LAP'], 'LAP')).toBe(true);
     expect(canUserAccessProjectChat('STAFF', ['LAP'], 'LAP')).toBe(false);
-    expect(canUserAccessProjectChat('CLIENT_VIEWER', ['LAP'], 'LAP')).toBe(false);
+    expect(canUserAccessProjectChat('CLIENT_VIEWER', ['OTHER'], 'LAP')).toBe(false);
   });
 });

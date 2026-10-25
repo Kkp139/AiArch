@@ -3,18 +3,16 @@ import { canUserAccessProjectChat, validateChatAttachment, ChatService } from '.
 import { buildApp } from '../src/server';
 
 describe('Project Chat Access Control & Gateway', () => {
-  it('allows Admin and assigned Client Leader to access chat', () => {
+  it('allows Admin, assigned Client Leader, and assigned Client Viewer to access chat dynamically', () => {
     expect(canUserAccessProjectChat('ADMIN', ['proj-1'], 'proj-1')).toBe(true);
     expect(canUserAccessProjectChat('ADMIN', [], 'proj-1')).toBe(true); // Universal access
     expect(canUserAccessProjectChat('CLIENT_LEADER', ['proj-1', 'proj-2'], 'proj-1')).toBe(true);
+    expect(canUserAccessProjectChat('CLIENT_VIEWER', ['proj-1', 'proj-2'], 'proj-1')).toBe(true);
   });
 
-  it('rejects Staff and Client Viewer from chat', () => {
+  it('rejects Staff unconditionally and rejects unassigned Client Viewer and Leader', () => {
     expect(canUserAccessProjectChat('STAFF', ['proj-1'], 'proj-1')).toBe(false);
-    expect(canUserAccessProjectChat('CLIENT_VIEWER', ['proj-1'], 'proj-1')).toBe(false);
-  });
-
-  it('rejects Client Leader not assigned to the project', () => {
+    expect(canUserAccessProjectChat('CLIENT_VIEWER', ['proj-2'], 'proj-1')).toBe(false);
     expect(canUserAccessProjectChat('CLIENT_LEADER', ['proj-2'], 'proj-1')).toBe(false);
   });
 
