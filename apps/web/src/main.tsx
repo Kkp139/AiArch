@@ -4,17 +4,14 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 
+import { registerServiceWorker } from './pwa/registerServiceWorker';
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
 );
 
-// Register PWA service worker in production environments
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/service-worker.ts')
-      .catch((err) => console.log('SW registration error:', err));
-  });
-}
+// Initialize PWA Service Worker
+registerServiceWorker();
+

@@ -83,26 +83,16 @@ export function Shell({ user, studioName = 'A&F Design', children, activeTab = '
   });
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }}>
-      {/* Desktop Architectural Sidebar */}
-      <aside
-        style={{
-          width: '260px',
-          borderRight: '1px solid var(--border-subtle)',
-          backgroundColor: 'var(--bg-secondary)',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          padding: '24px 16px',
-        }}
-      >
+    <div className="shell-root">
+      {/* Architectural Sidebar (Adaptive Tablet Rail & Desktop Panel) */}
+      <aside className="shell-sidebar">
         <div>
           {/* Studio Brand Header */}
-          <div style={{ paddingBottom: '28px', borderBottom: '1px solid var(--border-subtle)', marginBottom: '20px' }}>
-            <div style={{ fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--accent-gold)', fontWeight: 700 }}>
+          <div className="sidebar-brand-box" style={{ paddingBottom: '24px', borderBottom: '1px solid var(--border-subtle)', marginBottom: '20px' }}>
+            <div className="sidebar-brand-sub" style={{ fontSize: '10px', letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--accent-gold)', fontWeight: 700 }}>
               Architecture Studio
             </div>
-            <div style={{ fontSize: '18px', fontWeight: 600, letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
+            <div className="sidebar-brand-title" style={{ fontSize: '18px', fontWeight: 600, letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
               {studioName}
             </div>
           </div>
@@ -116,6 +106,8 @@ export function Shell({ user, studioName = 'A&F Design', children, activeTab = '
                 <button
                   key={item.id}
                   onClick={() => onTabChange && onTabChange(item.id)}
+                  title={item.label}
+                  aria-label={item.label}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -130,10 +122,11 @@ export function Shell({ user, studioName = 'A&F Design', children, activeTab = '
                     transition: 'all 0.15s ease',
                     textAlign: 'left',
                     width: '100%',
+                    minHeight: '44px',
                   }}
                 >
-                  <Icon size={18} />
-                  <span>{item.label}</span>
+                  <Icon size={18} style={{ flexShrink: 0 }} />
+                  <span className="nav-label">{item.label}</span>
                 </button>
               );
             })}
@@ -144,6 +137,8 @@ export function Shell({ user, studioName = 'A&F Design', children, activeTab = '
         <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <button
             onClick={toggleTheme}
+            title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            aria-label="Toggle theme"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -152,15 +147,18 @@ export function Shell({ user, studioName = 'A&F Design', children, activeTab = '
               borderRadius: 'var(--radius-md)',
               fontSize: '13px',
               color: 'var(--text-secondary)',
+              minHeight: '44px',
             }}
           >
-            {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
-            <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+            {isDarkMode ? <Sun size={16} style={{ flexShrink: 0 }} /> : <Moon size={16} style={{ flexShrink: 0 }} />}
+            <span className="sidebar-footer-label">{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
           </button>
 
           {onLogout && (
             <button
               onClick={onLogout}
+              title="Sign Out"
+              aria-label="Sign Out"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -169,19 +167,21 @@ export function Shell({ user, studioName = 'A&F Design', children, activeTab = '
                 borderRadius: 'var(--radius-md)',
                 fontSize: '13px',
                 color: 'var(--accent-rose)',
+                minHeight: '44px',
               }}
             >
-              <LogOut size={16} />
-              <span>Sign Out</span>
+              <LogOut size={16} style={{ flexShrink: 0 }} />
+              <span className="sidebar-footer-label">Sign Out</span>
             </button>
           )}
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div className="shell-main-area">
         {/* Global Architectural Top Bar */}
         <header
+          className="shell-header"
           style={{
             height: '64px',
             borderBottom: '1px solid var(--border-subtle)',
@@ -189,7 +189,6 @@ export function Shell({ user, studioName = 'A&F Design', children, activeTab = '
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 32px',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -244,7 +243,7 @@ export function Shell({ user, studioName = 'A&F Design', children, activeTab = '
         </header>
 
         {/* Page View Body */}
-        <main style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
+        <main className="shell-content">
           {children}
         </main>
       </div>

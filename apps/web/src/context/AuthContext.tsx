@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { purgePwaSessionCache } from '../pwa/registerServiceWorker';
 
 export type UserRole = 'ADMIN' | 'STAFF' | 'CLIENT_LEADER' | 'CLIENT_VIEWER';
 
@@ -69,6 +70,8 @@ export function AuthProvider({ children, initialUser = null }: { children: React
       localStorage.removeItem('pronex_auth_token');
       localStorage.removeItem('pronex_auth_user');
     } catch {}
+    // Clear session cache in Service Worker to avoid cross-user data exposure
+    purgePwaSessionCache();
     // Call backend logout
     fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
   };

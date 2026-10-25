@@ -20,6 +20,8 @@ import { MobileCreateProjectModal } from './components/mobile/MobileCreateProjec
 import { MobileNotificationsSheet } from './components/mobile/MobileNotificationsSheet';
 import { MobileMoreMenu } from './components/mobile/MobileMoreMenu';
 import { MobileUserManagementView } from './components/mobile/MobileUserManagementView';
+import { PwaInstallPrompt } from './components/pwa/PwaInstallPrompt';
+import { PwaOfflineBanner } from './components/pwa/PwaOfflineBanner';
 
 
 export interface ProjectSummary {
@@ -47,7 +49,7 @@ function MainApp() {
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // View mode switcher: Responsive (default), Mobile Phone (Figma), or Desktop Studio
+  // View mode switcher: Responsive (default), Mobile Phone (Figma <= 640px), or Desktop/Tablet Studio (> 640px)
   const [deviceView, setDeviceView] = useState<'responsive' | 'mobile' | 'desktop'>('responsive');
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
 
@@ -57,7 +59,7 @@ function MainApp() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const isMobile = deviceView === 'mobile' || (deviceView === 'responsive' && windowWidth <= 768);
+  const isMobile = deviceView === 'mobile' || (deviceView === 'responsive' && windowWidth <= 640);
 
   // Mobile Navigation States (Figma: 5:2)
   const [mobileTab, setMobileTab] = useState<'home' | 'projects' | 'meetings' | 'more'>('home');
@@ -1014,6 +1016,8 @@ function MainApp() {
 export function App() {
   return (
     <AuthProvider>
+      <PwaOfflineBanner />
+      <PwaInstallPrompt />
       <MainApp />
     </AuthProvider>
   );
