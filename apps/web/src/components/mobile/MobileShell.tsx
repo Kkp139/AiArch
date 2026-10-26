@@ -3,7 +3,10 @@ import { UserRole } from '../../context/AuthContext';
 import {
   Bell,
   ChevronDown,
-  Check,
+  ChevronRight,
+  User,
+  Lock,
+  LogOut,
   Home,
   FolderKanban,
   CalendarDays,
@@ -22,6 +25,9 @@ export interface MobileShellProps {
   onTabChange: (tab: string) => void;
   onRoleSwitch?: (role: UserRole) => void;
   onOpenNotifications: () => void;
+  onOpenProfile?: () => void;
+  onChangePassword?: () => void;
+  onLogout?: () => void;
   children: React.ReactNode;
 }
 
@@ -29,18 +35,29 @@ export const MobileShell: React.FC<MobileShellProps> = ({
   user,
   activeTab,
   onTabChange,
-  onRoleSwitch,
   onOpenNotifications,
+  onOpenProfile,
+  onChangePassword,
+  onLogout,
   children,
 }) => {
-  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
 
-  const roles: { role: UserRole; label: string }[] = [
-    { role: 'ADMIN', label: 'Admin' },
-    { role: 'CLIENT_LEADER', label: 'Client Leader' },
-    { role: 'CLIENT_VIEWER', label: 'Client Viewer' },
-    { role: 'STAFF', label: 'Staff' },
-  ];
+  const formatRole = (role?: string) => {
+    if (!role) return '';
+    switch (role.toUpperCase()) {
+      case 'ADMIN':
+        return 'Admin';
+      case 'CLIENT_LEADER':
+        return 'Client Leader';
+      case 'CLIENT_VIEWER':
+        return 'Client Viewer';
+      case 'STAFF':
+        return 'Staff';
+      default:
+        return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
+    }
+  };
 
   return (
     <div className="figma-mobile-viewport">
@@ -65,11 +82,12 @@ export const MobileShell: React.FC<MobileShellProps> = ({
             <span className="figma-notif-badge">4</span>
           </button>
 
-          {/* User Profile Avatar Pill with Role Dropdown */}
+          {/* User Profile Avatar Pill with Dropdown (Figma: 224:4851) */}
           <div style={{ position: 'relative' }}>
             <div
               className="figma-profile-pill"
-              onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
+              onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+              style={{ cursor: 'pointer' }}
             >
               <div className="figma-profile-avatar">
                 {user.fullName ? user.fullName.charAt(0) : 'U'}
@@ -77,56 +95,75 @@ export const MobileShell: React.FC<MobileShellProps> = ({
               <ChevronDown size={14} color="#4A4A4C" />
             </div>
 
-            {/* Instant Role Switcher Dropdown (Figma: 67:8997) */}
-            {roleDropdownOpen && (
+            {/* Figma 224:4851 Profile Dropdown */}
+            {profileDropdownOpen && (
               <>
                 <div
                   style={{ position: 'fixed', inset: 0, zIndex: 90 }}
-                  onClick={() => setRoleDropdownOpen(false)}
+                  onClick={() => setProfileDropdownOpen(false)}
                 />
-                <div className="figma-role-dropdown">
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#979798', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px', paddingLeft: '8px' }}>
-                    Switch Active Role
+                <div className="figma-profile-dropdown">
+                  {/* User Profile Header Row */}
+                  <div className="figma-dropdown-user-row">
+                    <div className="figma-dropdown-avatar">
+                      {user.fullName ? user.fullName.charAt(0) : 'U'}
+                    </div>
+                    <div className="figma-dropdown-user-info">
+                      <span className="figma-dropdown-user-name">{user.fullName || 'User'}</span>
+                      <span className="figma-dropdown-user-role">{formatRole(user.role)}</span>
+                    </div>
                   </div>
-                  {roles.map((r) => {
-                    const isCurrent = user.role === r.role;
-                    return (
-                      <div
-                        key={r.role}
-                        className={`figma-role-item ${isCurrent ? 'active' : ''}`}
-                        onClick={() => {
-                          if (onRoleSwitch) {
-                            onRoleSwitch(r.role);
-                          }
-                          setRoleDropdownOpen(false);
-                        }}
-                      >
-                        <div className="figma-role-info">
-                          <div
-                            style={{
-                              width: '28px',
-                              height: '28px',
-                              borderRadius: '50%',
-                              background: '#2E2216',
-                              color: '#BF935A',
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            {r.label.charAt(0)}
-                          </div>
-                          <span className="figma-role-name">{r.label}</span>
-                        </div>
 
-                        <div className={`figma-role-check ${isCurrent ? 'checked' : 'unchecked'}`}>
-                          {isCurrent && <Check size={12} />}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <div className="figma-dropdown-divider" />
+
+                  {/* 1. My Profile */}
+                  <button
+                    type="button"
+                    className="figma-dropdown-item"
+                    onClick={() => {
+                      setProfileDropdownOpen(false);
+                      if (onOpenProfile) onOpenProfile();
+                    }}
+                  >
+                    <div className="figma-dropdown-item-left">
+                      <span className="figma-dropdown-item-icon"><User size={18} /></span>
+                      <span className="figma-dropdown-item-label">My Profile</span>
+                    </div>
+                    <ChevronRight size={16} color="#979798" />
+                  </button>
+
+                  {/* 2. Change password */}
+                  <button
+                    type="button"
+                    className="figma-dropdown-item"
+                    onClick={() => {
+                      setProfileDropdownOpen(false);
+                      if (onChangePassword) onChangePassword();
+                    }}
+                  >
+                    <div className="figma-dropdown-item-left">
+                      <span className="figma-dropdown-item-icon"><Lock size={18} /></span>
+                      <span className="figma-dropdown-item-label">Change password</span>
+                    </div>
+                    <ChevronRight size={16} color="#979798" />
+                  </button>
+
+                  <div className="figma-dropdown-divider" />
+
+                  {/* 3. Logout */}
+                  <button
+                    type="button"
+                    className="figma-dropdown-item figma-dropdown-item-logout"
+                    onClick={() => {
+                      setProfileDropdownOpen(false);
+                      if (onLogout) onLogout();
+                    }}
+                  >
+                    <div className="figma-dropdown-item-left">
+                      <span className="figma-dropdown-item-icon"><LogOut size={18} /></span>
+                      <span className="figma-dropdown-item-label">Logout</span>
+                    </div>
+                  </button>
                 </div>
               </>
             )}

@@ -18,6 +18,7 @@ import { MobileDrawingFolderView, DrawingItem } from './components/mobile/Mobile
 import { MobileDrawingSheetModal } from './components/mobile/MobileDrawingSheetModal';
 import { MobileCreateProjectModal } from './components/mobile/MobileCreateProjectModal';
 import { MobileNotificationsSheet } from './components/mobile/MobileNotificationsSheet';
+import { MobileChangePasswordModal } from './components/mobile/MobileChangePasswordModal';
 import { MobileMoreMenu } from './components/mobile/MobileMoreMenu';
 import { MobileUserManagementView } from './components/mobile/MobileUserManagementView';
 import { PwaInstallPrompt } from './components/pwa/PwaInstallPrompt';
@@ -70,6 +71,7 @@ function MainApp() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
   const [isMobileUserMgmtOpen, setIsMobileUserMgmtOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [mobileSubModule, setMobileSubModule] = useState<string | null>(null);
 
 
@@ -485,6 +487,12 @@ function MainApp() {
           }}
           onRoleSwitch={(role) => switchRole(role)}
           onOpenNotifications={() => setIsNotificationsOpen(true)}
+          onOpenProfile={() => {
+            setMobileTab('more');
+            setMobileSubModule(null);
+          }}
+          onChangePassword={() => setIsChangePasswordOpen(true)}
+          onLogout={logout}
         >
           {/* If a sub-module is opened from the action grid */}
           {mobileSubModule ? (
@@ -665,6 +673,13 @@ function MainApp() {
         <MobileNotificationsSheet
           isOpen={isNotificationsOpen}
           onClose={() => setIsNotificationsOpen(false)}
+        />
+
+        <MobileChangePasswordModal
+          isOpen={isChangePasswordOpen}
+          onClose={() => setIsChangePasswordOpen(false)}
+          userName={currentUser.fullName}
+          userRole={currentUser.role}
         />
 
         <MobileCreateProjectModal

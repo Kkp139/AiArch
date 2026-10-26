@@ -153,67 +153,133 @@
   justify-content: center;
 }
 
-/* Role Switcher Dropdown Modal */
-.figma-role-dropdown {
+/* Figma 224:4851 Profile Dropdown Modal */
+.figma-profile-dropdown {
   position: absolute;
-  top: 96px;
-  right: 20px;
-  width: 250px;
+  top: 52px;
+  right: 0;
+  width: 248px;
   background: #FFFFFF;
-  border-radius: 20px;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.15);
-  border: 1px solid var(--figma-border);
-  padding: 12px;
+  border-radius: 24px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid #EAEAED;
+  padding: 16px 14px;
   z-index: 100;
-  animation: figmaFadeIn 0.2s ease-out;
+  animation: figmaFadeIn 0.18s ease-out;
 }
 
-.figma-role-item {
+.figma-dropdown-user-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 2px 4px 6px 4px;
+}
+
+.figma-dropdown-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #F4E8DB;
+  color: #352618;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+.figma-dropdown-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.figma-dropdown-user-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.figma-dropdown-user-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #4A4A4C;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.figma-dropdown-user-role {
+  font-size: 13px;
+  font-weight: 400;
+  color: #636372;
+  margin-top: 2px;
+}
+
+.figma-dropdown-divider {
+  height: 1px;
+  background: #EAEAED;
+  margin: 12px 0;
+  border: none;
+}
+
+.figma-dropdown-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 10px 10px;
   border-radius: 12px;
   cursor: pointer;
-  border: 1px solid transparent;
-  transition: all 0.15s ease;
-  margin-bottom: 6px;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  transition: background-color 0.15s ease;
+  font-family: inherit;
 }
 
-.figma-role-item:hover,
-.figma-role-item.active {
-  background: #F8F6F3;
-  border-color: #EBDDCF;
+.figma-dropdown-item:hover {
+  background: #F7F7F8;
 }
 
-.figma-role-info {
+.figma-dropdown-item-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
-.figma-role-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--figma-text-900);
-}
-
-.figma-role-check {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
+.figma-dropdown-item-icon {
+  color: #4A4A4C;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.figma-role-check.checked {
-  background: var(--figma-primary-gold);
-  color: #FFFFFF;
+.figma-dropdown-item-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #4A4A4C;
 }
 
-.figma-role-check.unchecked {
-  border: 2px solid #C4C4C6;
+.figma-dropdown-item-logout {
+  color: #DF3344;
+}
+
+.figma-dropdown-item-logout .figma-dropdown-item-icon {
+  color: #DF3344;
+}
+
+.figma-dropdown-item-logout .figma-dropdown-item-label {
+  color: #DF3344;
+  font-weight: 600;
+}
+
+.figma-dropdown-item-logout:hover {
+  background: #FFF1F2;
 }
 
 /* Welcome Section */
