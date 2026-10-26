@@ -5,7 +5,7 @@ import { SignInForm } from './SignInForm';
 import { ConfirmDetailsForm } from './ConfirmDetailsForm';
 import { OtpVerificationForm } from './OtpVerificationForm';
 import { useAuth } from '../../context/AuthContext';
-import { ArrowRight, Smartphone, Monitor, Signal, Wifi, Battery } from 'lucide-react';
+import { ArrowRight, Smartphone, Monitor } from 'lucide-react';
 
 type AuthStep = 'SIGN_IN' | 'CONFIRM_DETAILS' | 'VERIFY_OTP';
 
@@ -65,73 +65,118 @@ export const LoginPage: React.FC = () => {
   };
 
   // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
   // FIGMA MOBILE PHONE LOGIN SCREEN (Matching Figma Node 17:102, 21:3621)
+  // Non-scrollable single-screen layout with native safe-area and no fake status bar
   // -------------------------------------------------------------------------
   if (isPhoneView) {
+    const isRealMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
     return (
-      <div style={{ backgroundColor: '#1A1D20', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 0 32px 0' }}>
-        {/* View Switcher Pill */}
-        <div
-          style={{
-            position: 'fixed',
-            top: '8px',
-            right: '8px',
-            zIndex: 1000,
-            background: 'rgba(20, 24, 29, 0.9)',
-            border: '1px solid #30363d',
-            borderRadius: '20px',
-            padding: '3px 8px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontSize: '11px',
-            color: '#c9d1d9',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-          }}
-        >
-          <span style={{ color: '#BF935A', fontWeight: 700 }}>Figma Phone Login</span>
-          <button
-            onClick={() => setIsPhoneView(false)}
+      <div
+        style={
+          isRealMobile
+            ? {
+                backgroundColor: '#0C0C0D',
+                width: '100%',
+                height: '100dvh',
+                minHeight: '100dvh',
+                maxHeight: '100dvh',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                margin: 0,
+                padding: 0,
+              }
+            : {
+                backgroundColor: '#1A1D20',
+                minHeight: '100vh',
+                height: '100vh',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '16px',
+                boxSizing: 'border-box',
+                overflow: 'hidden',
+              }
+        }
+      >
+        {/* View Switcher Pill (Desktop testing only) */}
+        {!isRealMobile && (
+          <div
             style={{
-              background: '#21262d',
-              color: '#8b949e',
-              border: 'none',
-              borderRadius: '12px',
-              padding: '2px 8px',
-              fontSize: '10px',
-              fontWeight: 600,
-              cursor: 'pointer',
+              position: 'fixed',
+              top: '12px',
+              right: '12px',
+              zIndex: 1000,
+              background: 'rgba(20, 24, 29, 0.95)',
+              border: '1px solid #30363d',
+              borderRadius: '20px',
+              padding: '4px 10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '11px',
+              color: '#c9d1d9',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
             }}
           >
-            Desktop View
-          </button>
-        </div>
+            <span style={{ color: '#BF935A', fontWeight: 700 }}>📱 Phone Preview</span>
+            <button
+              onClick={() => setIsPhoneView(false)}
+              style={{
+                background: '#21262d',
+                color: '#8b949e',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '3px 10px',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Desktop View
+            </button>
+          </div>
+        )}
 
-        {/* 390x844 Mobile Device Viewport (Figma: 17:102) */}
+        {/* Mobile Device Viewport (Figma Spec - Pure Content, No Fake Status Bar) */}
         <div
           className="figma-mobile-viewport"
-          style={{
-            borderRadius: '36px',
-            overflow: 'hidden',
-            backgroundColor: '#0C0C0D',
-            minHeight: '844px',
-            height: 'auto',
-          }}
+          style={
+            isRealMobile
+              ? {
+                  width: '100%',
+                  maxWidth: '100%',
+                  height: '100dvh',
+                  minHeight: '100dvh',
+                  maxHeight: '100dvh',
+                  borderRadius: 0,
+                  boxShadow: 'none',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  backgroundColor: '#0C0C0D',
+                }
+              : {
+                  width: '100%',
+                  maxWidth: '400px',
+                  height: '100%',
+                  maxHeight: '844px',
+                  borderRadius: '32px',
+                  overflow: 'hidden',
+                  backgroundColor: '#0C0C0D',
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }
+          }
         >
-          {/* Top Status Bar (Figma: 17:106) */}
-          <div className="figma-status-bar on-dark">
-            <span>9:41</span>
-            <div className="figma-status-icons">
-              <Signal size={14} />
-              <Wifi size={14} />
-              <Battery size={16} />
-            </div>
-          </div>
-
           {/* Top Architectural Photo Banner with Editorial Text */}
           <div
             style={{
-              height: '350px',
+              flex: '0 0 clamp(160px, 28vh, 220px)',
               position: 'relative',
               backgroundImage: 'url(/assets/auth/editorial_courtyard_clean.png)',
               backgroundSize: 'cover',
@@ -139,7 +184,8 @@ export const LoginPage: React.FC = () => {
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              padding: '16px 20px 32px 20px',
+              padding: 'max(14px, env(safe-area-inset-top, 14px)) 20px 20px 20px',
+              boxSizing: 'border-box',
             }}
           >
             <div
@@ -152,7 +198,7 @@ export const LoginPage: React.FC = () => {
 
             {/* Logo & Discipline */}
             <div style={{ position: 'relative', zIndex: 2 }}>
-              <img src="/assets/auth/asf_logo.svg" alt="asf design" style={{ height: '36px', width: 'auto' }} />
+              <img src="/assets/auth/asf_logo.svg" alt="asf design" style={{ height: '34px', width: 'auto' }} />
               <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.7)', marginTop: '4px' }}>
                 ARCHITECTURE & INTERIORS
               </div>
@@ -160,25 +206,31 @@ export const LoginPage: React.FC = () => {
 
             {/* Editorial Quote (Figma: 17:138) */}
             <div style={{ position: 'relative', zIndex: 2 }}>
-              <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#FFFFFF', lineHeight: 1.15, margin: '0 0 6px 0' }}>
+              <h2 style={{ fontSize: 'clamp(19px, 3vh, 22px)', fontWeight: 800, color: '#FFFFFF', lineHeight: 1.15, margin: '0 0 3px 0' }}>
                 Great spaces.<br />Built together.
               </h2>
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.85)', margin: 0, lineHeight: 1.35 }}>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.85)', margin: 0, lineHeight: 1.3 }}>
                 A considered place for every drawing, decision and conversation.
               </p>
             </div>
           </div>
 
-          {/* Curved Bottom Sheet (Figma: 17:123) */}
+          {/* Curved Bottom Sheet (Figma: 17:123) - Fits 100% in viewport without scrolling */}
           <div
             style={{
               backgroundColor: '#FFFFFF',
-              borderRadius: '28px 28px 0 0',
-              marginTop: '-24px',
+              borderRadius: '26px 26px 0 0',
+              marginTop: '-18px',
               position: 'relative',
               zIndex: 10,
-              padding: '24px 20px 32px 20px',
+              padding: '20px 20px max(16px, env(safe-area-inset-bottom, 16px)) 20px',
               flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'flex-start',
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              boxSizing: 'border-box',
             }}
           >
             {step === 'SIGN_IN' && (

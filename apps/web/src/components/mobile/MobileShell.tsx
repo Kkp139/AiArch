@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { UserRole } from '../../context/AuthContext';
 import {
   Bell,
@@ -8,9 +8,6 @@ import {
   FolderKanban,
   CalendarDays,
   MoreHorizontal,
-  Wifi,
-  Battery,
-  Signal,
 } from 'lucide-react';
 import './mobile.css';
 
@@ -37,19 +34,6 @@ export const MobileShell: React.FC<MobileShellProps> = ({
   children,
 }) => {
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
-  const [currentTime, setCurrentTime] = useState('9:41');
-
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      const hours = now.getHours().toString().padStart(2, '0');
-      const minutes = now.getMinutes().toString().padStart(2, '0');
-      setCurrentTime(`${hours}:${minutes}`);
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 60000);
-    return () => clearInterval(interval);
-  }, []);
 
   const roles: { role: UserRole; label: string }[] = [
     { role: 'ADMIN', label: 'Admin' },
@@ -60,17 +44,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
 
   return (
     <div className="figma-mobile-viewport">
-      {/* 1. Status Bar (Figma: 17:106, 71:9394) */}
-      <div className="figma-status-bar">
-        <span>{currentTime}</span>
-        <div className="figma-status-icons">
-          <Signal size={14} />
-          <Wifi size={14} />
-          <Battery size={16} />
-        </div>
-      </div>
-
-      {/* 2. Top App Bar Header (Figma: 71:9393) */}
+      {/* Top App Bar Header (Figma: 71:9393) */}
       <header className="figma-mobile-header">
         <div className="figma-header-brand" onClick={() => onTabChange('home')} style={{ cursor: 'pointer' }}>
           <img
@@ -160,8 +134,8 @@ export const MobileShell: React.FC<MobileShellProps> = ({
         </div>
       </header>
 
-      {/* Main View Area */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      {/* Main View Area (Scrollable within viewport) */}
+      <main style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {children}
       </main>
 

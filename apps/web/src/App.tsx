@@ -407,44 +407,71 @@ function MainApp() {
       populatedFolders: 16,
     };
 
+    const isRealMobile = windowWidth <= 768;
+
     return (
-      <div style={{ backgroundColor: '#1A1D20', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        {/* Device Mode Switcher Floating Pill */}
-        <div
-          style={{
-            position: 'fixed',
-            top: '8px',
-            right: '8px',
-            zIndex: 1000,
-            background: 'rgba(20, 24, 29, 0.9)',
-            border: '1px solid #30363d',
-            borderRadius: '20px',
-            padding: '3px 8px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontSize: '11px',
-            color: '#c9d1d9',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-          }}
-        >
-          <span style={{ color: '#BF935A', fontWeight: 700 }}>Figma Phone Screen</span>
-          <button
-            onClick={() => setDeviceView('desktop')}
+      <div
+        style={
+          isRealMobile
+            ? {
+                backgroundColor: 'var(--figma-bg-mobile)',
+                width: '100%',
+                height: '100dvh',
+                minHeight: '100dvh',
+                maxHeight: '100dvh',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+              }
+            : {
+                backgroundColor: '#1A1D20',
+                minHeight: '100vh',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '16px 0',
+                boxSizing: 'border-box',
+              }
+        }
+      >
+        {/* Device Mode Switcher Floating Pill (Desktop preview testing only) */}
+        {!isRealMobile && (
+          <div
             style={{
-              background: '#21262d',
-              color: '#8b949e',
-              border: 'none',
-              borderRadius: '12px',
-              padding: '2px 8px',
-              fontSize: '10px',
-              fontWeight: 600,
-              cursor: 'pointer',
+              position: 'fixed',
+              top: '12px',
+              right: '12px',
+              zIndex: 1000,
+              background: 'rgba(20, 24, 29, 0.95)',
+              border: '1px solid #30363d',
+              borderRadius: '20px',
+              padding: '4px 10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '11px',
+              color: '#c9d1d9',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
             }}
           >
-            Desktop Mode
-          </button>
-        </div>
+            <span style={{ color: '#BF935A', fontWeight: 700 }}>📱 Phone Preview</span>
+            <button
+              onClick={() => setDeviceView('desktop')}
+              style={{
+                background: '#21262d',
+                color: '#8b949e',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '3px 10px',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Desktop Mode
+            </button>
+          </div>
+        )}
 
         <MobileShell
           user={currentUser}
