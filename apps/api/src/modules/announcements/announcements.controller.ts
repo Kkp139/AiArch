@@ -5,8 +5,10 @@ import { AnnouncementAudience, UserRole } from '@prisma/client';
 import { resolveUserFromRequest } from '../../lib/auth-guard';
 import { recordAuditLog } from '../../lib/audit.service';
 import { getAudiencesForRole } from './announcements.service';
+import { notificationQueueService } from '../../lib/queue.service';
 
 export async function announcementRoutes(app: FastifyInstance) {
+
   // 1. List Announcements for authenticated user based on audience
   app.get('/api/announcements', async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await resolveUserFromRequest(request);
@@ -106,6 +108,17 @@ export async function announcementRoutes(app: FastifyInstance) {
             deepLink: '/announcements',
           })),
         });
+
+        // Enqueue Web Push notification jobs into BullMQ push-retry-queue
+        await notificationQueueService.enqueueBatchPushNotifications(
+          recipients.map(r => ({
+            recipientId: r.id,
+            title: `Announcement: ${announcement.title}`,
+            rawBody: announcement.body || `New circular published for ${audience.toLowerCase()}`,
+            projectCode: 'GENERAL',
+            attempt: 0,
+          }))
+        );
       }
     } catch (notifErr) {
       console.error('[Announcements] Failed to create notifications:', notifErr);
@@ -271,6 +284,17 @@ export async function announcementRoutes(app: FastifyInstance) {
             deepLink: '/policies',
           })),
         });
+
+        // Enqueue Web Push notification jobs into BullMQ push-retry-queue
+        await notificationQueueService.enqueueBatchPushNotifications(
+          activeUsers.map(u => ({
+            recipientId: u.id,
+            title: `Studio Policy: ${policy.title}`,
+            rawBody: `A new policy document has been published. Please review and acknowledge.`,
+            projectCode: 'STUDIO',
+            attempt: 0,
+          }))
+        );
       }
     } catch (notifErr) {
       console.error('[Policies] Failed to create notifications:', notifErr);

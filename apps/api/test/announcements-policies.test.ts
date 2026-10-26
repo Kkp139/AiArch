@@ -108,4 +108,57 @@ describe('Announcements & Studio Policies System (Master Spec Section 9)', () =>
       await app.close();
     });
   });
+
+  describe('Web Push Notification Queue Integration (BullMQ & Resilient Fallback)', () => {
+    it('enqueues push notification jobs with privacy sanitization', async () => {
+      const { notificationQueueService, sanitizePushText } = await import('../src/lib/queue.service');
+      notificationQueueService.clearEnqueuedPushJobs();
+
+      // Test privacy sanitizer directly
+      const paymentMsg = 'Payment of Rs 1,50,000 received for Project A';
+      expect(sanitizePushText(paymentMsg, 'PROJ-A')).toBe('A payment update has been recorded for Project PROJ-A. Log in to view details.');
+
+      const normalMsg = 'Studio meeting scheduled at 4:00 PM';
+      expect(sanitizePushText(normalMsg, 'PROJ-A')).toBe(normalMsg);
+
+      // Enqueue push notification
+      const result = await notificationQueueService.enqueuePushNotification({
+        recipientId: 'user-staff-1',
+        title: 'New Studio Policy Published',
+        rawBody: 'Payment of Rs 25,000 allowance policy update',
+        projectCode: 'STUDIO',
+      });
+
+      expect(result.success).toBe(true);
+      const enqueued = notificationQueueService.getEnqueuedPushJobs();
+      expect(enqueued.length).toBeGreaterThan(0);
+      expect(enqueued[0].recipientId).toBe('user-staff-1');
+      expect(enqueued[0].rawBody).toBe('A payment update has been recorded for Project STUDIO. Log in to view details.');
+    });
+
+    it('enqueues batch push notifications for multiple recipients', async () => {
+      const { notificationQueueService } = await import('../src/lib/queue.service');
+      notificationQueueService.clearEnqueuedPushJobs();
+
+      const batchResult = await notificationQueueService.enqueueBatchPushNotifications([
+        {
+          recipientId: 'user-1',
+          title: 'Office Circular',
+          rawBody: 'Diwali studio holiday schedule announced',
+          projectCode: 'GENERAL',
+        },
+        {
+          recipientId: 'user-2',
+          title: 'Office Circular',
+          rawBody: 'Diwali studio holiday schedule announced',
+          projectCode: 'GENERAL',
+        },
+      ]);
+
+      expect(batchResult.success).toBe(true);
+      expect(batchResult.count).toBe(2);
+      expect(notificationQueueService.getEnqueuedPushJobs()).toHaveLength(2);
+    });
+  });
 });
+
