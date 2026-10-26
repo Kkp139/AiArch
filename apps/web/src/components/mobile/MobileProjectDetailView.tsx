@@ -80,21 +80,23 @@ export const MobileProjectDetailView: React.FC<MobileProjectDetailViewProps> = (
     <div style={{ flex: 1, paddingBottom: '120px' }}>
       {/* Subpage Header & Breadcrumb (Figma: 180:3845 / 28:1226 / 39:1002 / 40:1199) */}
       <div className="figma-subpage-header">
-        <div className="figma-breadcrumbs" style={{ overflowX: 'auto', whiteSpace: 'nowrap' }}>
-          <span onClick={onBack} style={{ cursor: 'pointer' }}>Projects</span>
-          <span>&gt;</span>
+        <div className="figma-breadcrumbs" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <span className="figma-breadcrumb-link" onClick={onBack} title="Projects">
+            Projects
+          </span>
+          <span className="figma-breadcrumb-sep">&gt;</span>
           <span
             onClick={() => {
               if (selectedPhaseGrid) setSelectedPhaseGrid(null);
             }}
-            style={{ cursor: selectedPhaseGrid ? 'pointer' : 'default' }}
-            className={selectedPhaseGrid ? '' : 'active'}
+            className={selectedPhaseGrid ? 'figma-breadcrumb-link' : 'active'}
+            title={project.name}
           >
             {project.name}
           </span>
           {selectedPhaseGrid && (
             <>
-              <span>&gt;</span>
+              <span className="figma-breadcrumb-sep">&gt;</span>
               <span className="active">
                 {selectedPhaseGrid === 'concept' ? 'Concept Design' : 'Construction'}
               </span>

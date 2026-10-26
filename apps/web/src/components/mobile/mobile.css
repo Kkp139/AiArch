@@ -448,12 +448,40 @@
 }
 
 .figma-breadcrumbs {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--figma-text-300);
   display: flex;
   align-items: center;
   gap: 6px;
   margin-bottom: 12px;
+  white-space: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE/Edge */
+}
+
+.figma-breadcrumbs::-webkit-scrollbar {
+  display: none !important; /* Chrome, Safari, Opera */
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.figma-breadcrumb-link {
+  color: var(--figma-text-300);
+  cursor: pointer;
+  transition: color 0.15s ease;
+  user-select: none;
+}
+
+.figma-breadcrumb-link:hover {
+  color: var(--figma-primary-gold);
+}
+
+.figma-breadcrumb-sep {
+  color: #A0A0A3;
+  font-size: 11px;
+  user-select: none;
 }
 
 .figma-breadcrumbs span.active {

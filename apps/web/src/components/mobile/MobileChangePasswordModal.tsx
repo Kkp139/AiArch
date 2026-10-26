@@ -6,12 +6,14 @@ export interface MobileChangePasswordModalProps {
   onClose: () => void;
   userRole?: string;
   userName?: string;
+  authHeaders?: Record<string, string>;
 }
 
 export const MobileChangePasswordModal: React.FC<MobileChangePasswordModalProps> = ({
   isOpen,
   onClose,
   userName,
+  authHeaders,
 }) => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -55,9 +57,25 @@ export const MobileChangePasswordModal: React.FC<MobileChangePasswordModalProps>
     }
 
     setIsLoading(true);
-    // Simulate updating password
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authHeaders || {}),
+        },
+        body: JSON.stringify({
+          currentPassword: currentPassword.trim(),
+          newPassword: newPassword.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMessage(data.error || 'Failed to update password. Please check your credentials.');
+        return;
+      }
+
       setSuccessMessage('Password updated successfully!');
       setTimeout(() => {
         onClose();
@@ -66,7 +84,11 @@ export const MobileChangePasswordModal: React.FC<MobileChangePasswordModalProps>
         setConfirmPassword('');
         setSuccessMessage(null);
       }, 1200);
-    }, 700);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Network error while updating password.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

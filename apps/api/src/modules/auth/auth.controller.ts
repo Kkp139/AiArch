@@ -497,4 +497,54 @@ export async function authRoutes(app: FastifyInstance) {
       message: 'Your password has been successfully configured. You may now log in.',
     };
   });
+
+  // Change Password for authenticated user
+  app.post('/api/auth/change-password', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required. Please sign in.' });
+    }
+
+    const schema = z.object({
+      currentPassword: z.string().optional(),
+      newPassword: z.string().min(6, 'Password must be at least 6 characters long'),
+    });
+
+    const body = schema.safeParse(request.body);
+    if (!body.success) {
+      return reply.status(400).send({ error: body.error.errors[0]?.message || 'Invalid parameters' });
+    }
+
+    const { currentPassword, newPassword } = body.data;
+
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+    });
+
+    if (!dbUser) {
+      return reply.status(404).send({ error: 'User not found' });
+    }
+
+    if (currentPassword && dbUser.passwordHash) {
+      const isMatch = await verifyPassword(currentPassword, dbUser.passwordHash);
+      if (!isMatch) {
+        return reply.status(400).send({ error: 'Current password does not match.' });
+      }
+    }
+
+    const newHash = await hashPassword(newPassword);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: newHash,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Password changed successfully',
+    };
+  });
 }
+

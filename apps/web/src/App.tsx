@@ -624,9 +624,14 @@ function MainApp() {
                   {mobileProjectStep === 'folder' && (
                     <MobileDrawingFolderView
                       projectName={selectedProject.name}
+                      projectCode={selectedProject.projectCode}
                       phaseName={activePhase === 'concept' ? 'Concept Design' : 'Construction'}
                       folderName={activeFolderName}
+                      authHeaders={getAuthHeaders()}
+                      userRole={currentUser?.role}
                       onBack={() => setMobileProjectStep('detail')}
+                      onNavigateProjects={() => setMobileProjectStep('list')}
+                      onNavigateDetail={() => setMobileProjectStep('detail')}
                       onSelectDrawing={(drawing) => setActiveDrawing(drawing)}
                       viewMode={mobileProjectViewMode}
                       onViewModeChange={setMobileProjectViewMode}
@@ -680,6 +685,7 @@ function MainApp() {
         <MobileNotificationsSheet
           isOpen={isNotificationsOpen}
           onClose={() => setIsNotificationsOpen(false)}
+          authHeaders={getAuthHeaders()}
         />
 
         <MobileChangePasswordModal
@@ -687,6 +693,7 @@ function MainApp() {
           onClose={() => setIsChangePasswordOpen(false)}
           userName={currentUser.fullName}
           userRole={currentUser.role}
+          authHeaders={getAuthHeaders()}
         />
 
         <MobileCreateProjectModal
