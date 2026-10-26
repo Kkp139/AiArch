@@ -24,3 +24,6 @@ private/
 !.env.example
 
 scratch/
+
+.vercel
+.env*
