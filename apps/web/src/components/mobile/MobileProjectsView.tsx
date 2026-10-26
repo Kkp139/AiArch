@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ProjectSummary } from '../../App';
-import { Search, LayoutGrid, List, Plus, ChevronRight, Building2 } from 'lucide-react';
+import { Search, Plus, Building2, CalendarDays } from 'lucide-react';
+import { MobileViewToggle } from './MobileViewToggle';
 
 export interface MobileProjectsViewProps {
   projects: ProjectSummary[];
@@ -9,6 +10,8 @@ export interface MobileProjectsViewProps {
   onOpenProjectDetail: (code: string) => void;
   onCreateProjectClick?: () => void;
   canCreateProject?: boolean;
+  viewMode?: 'grid' | 'list';
+  onViewModeChange?: (mode: 'grid' | 'list') => void;
 }
 
 export const MobileProjectsView: React.FC<MobileProjectsViewProps> = ({
@@ -18,9 +21,14 @@ export const MobileProjectsView: React.FC<MobileProjectsViewProps> = ({
   onOpenProjectDetail,
   onCreateProjectClick,
   canCreateProject = true,
+  viewMode: propViewMode,
+  onViewModeChange: propOnViewModeChange,
 }) => {
+  const [internalViewMode, setInternalViewMode] = useState<'list' | 'grid'>('list');
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+
+  const viewMode = propViewMode ?? internalViewMode;
+  const setViewMode = propOnViewModeChange ?? setInternalViewMode;
 
   const filteredProjects = projects.filter(
     (p) =>
@@ -31,10 +39,10 @@ export const MobileProjectsView: React.FC<MobileProjectsViewProps> = ({
 
   return (
     <div style={{ flex: 1 }}>
-      {/* Subpage Header (Figma: 170:3265) */}
+      {/* Subpage Header (Figma: 170:3265 / 170:3515) */}
       <div className="figma-subpage-header">
         <div className="figma-header-nav-row">
-          <h2 style={{ fontSize: '22px', fontWeight: 700, margin: 0 }}>Projects</h2>
+          <h2 style={{ fontSize: '22px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>Projects</h2>
           {canCreateProject && onCreateProjectClick && (
             <button className="figma-btn-gold" onClick={onCreateProjectClick}>
               <Plus size={16} />
@@ -43,7 +51,7 @@ export const MobileProjectsView: React.FC<MobileProjectsViewProps> = ({
           )}
         </div>
 
-        {/* Search & Toggle Bar */}
+        {/* Search & Toggle Bar (Figma: 170:3292) */}
         <div className="figma-search-row">
           <div className="figma-search-input-wrap">
             <Search size={18} />
@@ -56,33 +64,45 @@ export const MobileProjectsView: React.FC<MobileProjectsViewProps> = ({
             />
           </div>
 
-          <div className="figma-view-toggle">
-            <button
-              className={`figma-toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
-              onClick={() => setViewMode('grid')}
-              title="Grid View"
-            >
-              <LayoutGrid size={18} />
-            </button>
-            <button
-              className={`figma-toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
-              onClick={() => setViewMode('list')}
-              title="List View"
-            >
-              <List size={18} />
-            </button>
-          </div>
+          <MobileViewToggle viewMode={viewMode} onViewModeChange={setViewMode} />
         </div>
       </div>
 
-      {/* Projects List Container */}
-      <div className="figma-list-container">
-        {filteredProjects.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 20px', color: '#686869' }}>
-            No architectural projects found matching "{searchQuery}".
-          </div>
-        ) : (
-          filteredProjects.map((project) => {
+      {filteredProjects.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: '#686869' }}>
+          No architectural projects found matching "{searchQuery}".
+        </div>
+      ) : viewMode === 'grid' ? (
+        /* Figma 170:3515: 3-Column Grid View */
+        <div className="figma-project-grid-container">
+          {filteredProjects.map((project) => {
+            const isSelected = project.projectCode === selectedProjectCode;
+            return (
+              <div
+                key={project.id}
+                className="figma-project-grid-card"
+                onClick={() => {
+                  onSelectProject(project.projectCode);
+                  onOpenProjectDetail(project.projectCode);
+                }}
+                style={{
+                  border: isSelected ? '1.5px solid #BF935A' : '1px solid #EAEAED',
+                }}
+              >
+                <div className="figma-project-grid-icon-wrap">
+                  <CalendarDays size={20} />
+                </div>
+                <div className="figma-project-grid-title" title={project.name}>
+                  {project.name}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Figma 170:3265: List View */
+        <div className="figma-list-container">
+          {filteredProjects.map((project) => {
             const isSelected = project.projectCode === selectedProjectCode;
             return (
               <div
@@ -142,9 +162,10 @@ export const MobileProjectsView: React.FC<MobileProjectsViewProps> = ({
                 </div>
               </div>
             );
-          })
-        )}
-      </div>
+          })}
+        </div>
+      )}
     </div>
   );
 };
+

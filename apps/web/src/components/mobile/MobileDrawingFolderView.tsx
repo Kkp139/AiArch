@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronLeft, Search, FileText, ChevronRight } from 'lucide-react';
+import { MobileViewToggle } from './MobileViewToggle';
 
 export interface DrawingItem {
   id: string;
@@ -18,6 +19,8 @@ export interface MobileDrawingFolderViewProps {
   folderName: string;
   onBack: () => void;
   onSelectDrawing: (drawing: DrawingItem) => void;
+  viewMode?: 'grid' | 'list';
+  onViewModeChange?: (mode: 'grid' | 'list') => void;
 }
 
 const SAMPLE_DRAWINGS: DrawingItem[] = [
@@ -89,8 +92,14 @@ export const MobileDrawingFolderView: React.FC<MobileDrawingFolderViewProps> = (
   folderName,
   onBack,
   onSelectDrawing,
+  viewMode: propViewMode,
+  onViewModeChange: propOnViewModeChange,
 }) => {
+  const [internalViewMode, setInternalViewMode] = useState<'list' | 'grid'>('list');
   const [searchQuery, setSearchQuery] = useState('');
+
+  const viewMode = propViewMode ?? internalViewMode;
+  const setViewMode = propOnViewModeChange ?? setInternalViewMode;
 
   const filtered = SAMPLE_DRAWINGS.filter(
     (d) =>
@@ -119,80 +128,129 @@ export const MobileDrawingFolderView: React.FC<MobileDrawingFolderViewProps> = (
           </h2>
         </div>
 
-        {/* Search Drawing Bar */}
-        <div className="figma-search-input-wrap">
-          <Search size={18} />
-          <input
-            type="text"
-            className="figma-search-input"
-            placeholder="Search Drawing..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        {/* Search & Toggle Bar (Figma: 170:3292) */}
+        <div className="figma-search-row">
+          <div className="figma-search-input-wrap">
+            <Search size={18} />
+            <input
+              type="text"
+              className="figma-search-input"
+              placeholder="Search Drawing..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <MobileViewToggle viewMode={viewMode} onViewModeChange={setViewMode} />
         </div>
       </div>
 
-      {/* Drawings List (Figma: 29:1034) */}
-      <div className="figma-list-container">
-        {filtered.map((drawing) => {
-          const isApproved = drawing.status === 'Approved';
-          const isPending = drawing.status === 'Pending';
-          const statusClass = isApproved
-            ? 'figma-badge-active'
-            : isPending
-            ? 'figma-badge-pending'
-            : 'figma-badge-review';
+      {filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: '#686869' }}>
+          No drawings found matching "{searchQuery}".
+        </div>
+      ) : viewMode === 'grid' ? (
+        /* GRID VIEW FOR DRAWINGS */
+        <div className="figma-drawings-grid-container">
+          {filtered.map((drawing) => {
+            const isApproved = drawing.status === 'Approved';
+            const isPending = drawing.status === 'Pending';
+            const dotColor = isApproved ? '#12B76A' : isPending ? '#F79009' : '#175CD3';
 
-          const dotColor = isApproved ? '#12B76A' : isPending ? '#F79009' : '#175CD3';
-
-          return (
-            <div
-              key={drawing.id}
-              className="figma-item-card"
-              onClick={() => onSelectDrawing(drawing)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            return (
+              <div
+                key={drawing.id}
+                className="figma-drawing-grid-card"
+                onClick={() => onSelectDrawing(drawing)}
+              >
                 <div
                   style={{
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '12px',
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '10px',
                     background: '#352618',
                     color: '#FFFFFF',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    marginBottom: '10px',
                   }}
                 >
-                  <FileText size={20} />
+                  <FileText size={18} />
                 </div>
-
-                <div>
-                  <h4 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 3px 0', color: '#0C0C0D' }}>
-                    {drawing.title}
-                  </h4>
-                  <div style={{ fontSize: '13px', color: '#686869', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>{drawing.code}</span>
-                    <span>•</span>
-                    <span style={{ fontWeight: 600, color: '#BF935A' }}>{drawing.version}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', fontSize: '12px', fontWeight: 600 }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: dotColor }} />
-                    <span style={{ color: dotColor }}>{drawing.status}</span>
-                  </div>
+                <h4 style={{ fontSize: '13px', fontWeight: 700, margin: '0 0 4px 0', color: '#0C0C0D', lineHeight: 1.25 }}>
+                  {drawing.title}
+                </h4>
+                <div style={{ fontSize: '11px', color: '#686869', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px' }}>
+                  <span>{drawing.code}</span>
+                  <span>•</span>
+                  <span style={{ fontWeight: 600, color: '#BF935A' }}>{drawing.version}</span>
+                </div>
+                <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: 600 }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: dotColor }} />
+                  <span style={{ color: dotColor }}>{drawing.status}</span>
                 </div>
               </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* LIST VIEW FOR DRAWINGS (Figma: 29:1034) */
+        <div className="figma-list-container">
+          {filtered.map((drawing) => {
+            const isApproved = drawing.status === 'Approved';
+            const isPending = drawing.status === 'Pending';
+            const dotColor = isApproved ? '#12B76A' : isPending ? '#F79009' : '#175CD3';
 
-              <ChevronRight size={20} color="#979798" />
-            </div>
-          );
-        })}
-      </div>
+            return (
+              <div
+                key={drawing.id}
+                className="figma-item-card"
+                onClick={() => onSelectDrawing(drawing)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <div
+                    style={{
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '12px',
+                      background: '#352618',
+                      color: '#FFFFFF',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <FileText size={20} />
+                  </div>
+
+                  <div>
+                    <h4 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 3px 0', color: '#0C0C0D' }}>
+                      {drawing.title}
+                    </h4>
+                    <div style={{ fontSize: '13px', color: '#686869', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>{drawing.code}</span>
+                      <span>•</span>
+                      <span style={{ fontWeight: 600, color: '#BF935A' }}>{drawing.version}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', fontSize: '12px', fontWeight: 600 }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: dotColor }} />
+                      <span style={{ color: dotColor }}>{drawing.status}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <ChevronRight size={20} color="#979798" />
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

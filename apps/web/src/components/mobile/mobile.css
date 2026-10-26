@@ -494,30 +494,230 @@
   outline: none;
 }
 
+/* Figma Group Button Toggle (Figma: 170:3292) */
+.figma-group-toggle,
 .figma-view-toggle {
-  display: flex;
+  display: inline-flex;
+  align-items: center;
   background: #FFFFFF;
-  border-radius: 22px;
+  border-radius: 12px;
   padding: 3px;
-  border: 1px solid var(--figma-border);
+  border: 1px solid #EAEAED;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
 }
 
+.figma-group-toggle-btn,
 .figma-toggle-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: 19px;
+  width: 42px;
+  height: 34px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--figma-text-300);
+  color: #979798;
   background: transparent;
   border: none;
   cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.figma-group-toggle-btn.active,
 .figma-toggle-btn.active {
-  background: var(--figma-card-badge-bg);
+  background: #352618;
   color: #FFFFFF;
+  box-shadow: 0 2px 6px rgba(53, 38, 24, 0.25);
+}
+
+/* 3-Column Grid Layout for Projects (Figma: 170:3515) */
+.figma-project-grid-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 0 20px 120px 20px;
+}
+
+.figma-project-grid-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  padding: 16px 8px 14px 8px;
+  border: 1px solid #EAEAED;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+  min-height: 104px;
+}
+
+.figma-project-grid-card:hover {
+  transform: translateY(-2px);
+  border-color: #BF935A;
+  box-shadow: 0 4px 12px rgba(191, 147, 90, 0.15);
+}
+
+.figma-project-grid-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #352618;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.figma-project-grid-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1D1D1F;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Phase Hero Cards Grid (Figma: 28:1226) */
+.figma-phase-cards-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 0 20px;
+}
+
+.figma-phase-hero-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid #EAEAED;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  padding: 8px 8px 16px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.figma-phase-hero-card:hover {
+  transform: translateY(-2px);
+  border-color: #BF935A;
+  box-shadow: 0 6px 16px rgba(191, 147, 90, 0.18);
+}
+
+.figma-phase-hero-img-wrap {
+  width: 100%;
+  height: 106px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #F4EFEA;
+  margin-bottom: 12px;
+}
+
+.figma-phase-hero-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.figma-phase-hero-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1D1D1F;
+  margin: 0 0 4px 0;
+  text-align: center;
+}
+
+.figma-phase-hero-count {
+  font-size: 12px;
+  color: #686869;
+  text-align: center;
+  margin: 0;
+}
+
+/* 3-Column Category Grid (Figma: 39:1002, 40:1199) */
+.figma-category-grid-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 0 20px 120px 20px;
+}
+
+.figma-category-grid-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  padding: 14px 8px;
+  border: 1px solid #EAEAED;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  text-align: center;
+  min-height: 106px;
+  transition: all 0.15s ease;
+}
+
+.figma-category-grid-card:hover {
+  transform: translateY(-2px);
+  border-color: #BF935A;
+  box-shadow: 0 4px 12px rgba(191, 147, 90, 0.15);
+}
+
+.figma-category-grid-icon-wrap {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #352618;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.figma-category-grid-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1D1D1F;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Drawing Sheets Grid */
+.figma-drawings-grid-container {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 0 20px 120px 20px;
+}
+
+.figma-drawing-grid-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  padding: 14px 12px;
+  border: 1px solid #EAEAED;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.figma-drawing-grid-card:hover {
+  transform: translateY(-2px);
+  border-color: #BF935A;
 }
 
 /* Cards List */

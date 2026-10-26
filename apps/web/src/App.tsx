@@ -65,6 +65,7 @@ function MainApp() {
   // Mobile Navigation States (Figma: 5:2)
   const [mobileTab, setMobileTab] = useState<'home' | 'projects' | 'meetings' | 'more'>('home');
   const [mobileProjectStep, setMobileProjectStep] = useState<'list' | 'detail' | 'folder'>('list');
+  const [mobileProjectViewMode, setMobileProjectViewMode] = useState<'grid' | 'list'>('list');
   const [activePhase, setActivePhase] = useState<'concept' | 'construction'>('concept');
   const [activeFolderName, setActiveFolderName] = useState<string>('Site Drawing');
   const [activeDrawing, setActiveDrawing] = useState<DrawingItem | null>(null);
@@ -601,6 +602,8 @@ function MainApp() {
                       }}
                       canCreateProject={currentUser.role === 'ADMIN'}
                       onCreateProjectClick={() => setIsCreateProjectOpen(true)}
+                      viewMode={mobileProjectViewMode}
+                      onViewModeChange={setMobileProjectViewMode}
                     />
                   )}
 
@@ -613,6 +616,8 @@ function MainApp() {
                         setActiveFolderName(folderName);
                         setMobileProjectStep('folder');
                       }}
+                      viewMode={mobileProjectViewMode}
+                      onViewModeChange={setMobileProjectViewMode}
                     />
                   )}
 
@@ -623,6 +628,8 @@ function MainApp() {
                       folderName={activeFolderName}
                       onBack={() => setMobileProjectStep('detail')}
                       onSelectDrawing={(drawing) => setActiveDrawing(drawing)}
+                      viewMode={mobileProjectViewMode}
+                      onViewModeChange={setMobileProjectViewMode}
                     />
                   )}
                 </>
