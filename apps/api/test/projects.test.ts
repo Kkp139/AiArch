@@ -40,4 +40,27 @@ describe('Project Lifecycle & Inactive Safeguards', () => {
     expect(validateProjectStatusTransition('ACTIVE', 'INACTIVE')).toBe(true);
     expect(validateProjectStatusTransition('INACTIVE', 'ACTIVE')).toBe(true);
   });
+
+  it('HTTP 401 & 403: protects PATCH /api/projects/:id/settings with Admin-only authorization', async () => {
+    const { buildApp } = await import('../src/server');
+    const app = await buildApp();
+
+    const unauth = await app.inject({
+      method: 'PATCH',
+      url: '/api/projects/proj-123/settings',
+      payload: { allowClientMeetings: true },
+    });
+    expect(unauth.statusCode).toBe(401);
+
+    const forbiddenStaff = await app.inject({
+      method: 'PATCH',
+      url: '/api/projects/proj-123/settings',
+      headers: { authorization: 'Bearer mock-staff-token' },
+      payload: { allowClientMeetings: true },
+    });
+    expect(forbiddenStaff.statusCode).toBe(403);
+    expect(JSON.parse(forbiddenStaff.body).error).toContain('Only Admins can update project settings');
+
+    await app.close();
+  });
 });

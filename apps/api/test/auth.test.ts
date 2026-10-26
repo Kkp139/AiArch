@@ -253,4 +253,45 @@ describe('Full-Stack Auth Controller API Routes', () => {
 
     expect(response.statusCode).toBe(401);
   });
+
+  it('enforces RBAC on project reassignments (401 unauth, 403 non-admin)', async () => {
+    const { buildApp } = await import('../src/server');
+    const app = await buildApp();
+
+    const unauthRes = await app.inject({
+      method: 'PUT',
+      url: '/api/auth/users/user-123/assignments',
+      payload: { projectIds: ['proj-1'] },
+    });
+    expect(unauthRes.statusCode).toBe(401);
+
+    const staffRes = await app.inject({
+      method: 'PUT',
+      url: '/api/auth/users/user-123/assignments',
+      headers: { authorization: 'Bearer mock-staff-token' },
+      payload: { projectIds: ['proj-1'] },
+    });
+    expect(staffRes.statusCode).toBe(403);
+  });
+
+  it('enforces RBAC on user role updates (401 unauth, 403 non-admin)', async () => {
+    const { buildApp } = await import('../src/server');
+    const app = await buildApp();
+
+    const unauthRes = await app.inject({
+      method: 'PATCH',
+      url: '/api/auth/users/user-123/role',
+      payload: { role: 'CLIENT_LEADER' },
+    });
+    expect(unauthRes.statusCode).toBe(401);
+
+    const staffRes = await app.inject({
+      method: 'PATCH',
+      url: '/api/auth/users/user-123/role',
+      headers: { authorization: 'Bearer mock-staff-token' },
+      payload: { role: 'CLIENT_LEADER' },
+    });
+    expect(staffRes.statusCode).toBe(403);
+  });
 });
+

@@ -103,7 +103,7 @@ export const ConfirmDetailsForm: React.FC<ConfirmDetailsFormProps> = ({
           </div>
         </div>
 
-        <div className="form-group" style={{ marginBottom: '32px' }}>
+        <div className="form-group" style={{ marginBottom: '18px' }}>
           <label className="form-label" htmlFor="confirm-phone-number">
             Phone Number
           </label>

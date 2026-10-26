@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { calculateProgress } from './progress.service';
 import { validateProjectStatusTransition } from './projects.service';
+import { recordAuditLog } from '../../lib/audit.service';
 
 const STANDARD_FOLDERS = [
   // Phase 1: Concept Design (6)
@@ -228,6 +229,16 @@ export async function projectRoutes(app: FastifyInstance) {
       },
     });
 
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'CREATE_PROJECT',
+      entityType: 'PROJECT',
+      entityId: project.id,
+      newData: { projectCode: project.projectCode, name: project.name },
+    });
+
     return {
       success: true,
       project: {
@@ -298,6 +309,17 @@ export async function projectRoutes(app: FastifyInstance) {
       data: { status: body.data.status },
     });
 
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'UPDATE_PROJECT_STATUS',
+      entityType: 'PROJECT',
+      entityId: updated.id,
+      oldData: { status: currentProject.status },
+      newData: { status: updated.status },
+    });
+
     return {
       success: true,
       projectId: updated.id,
@@ -326,9 +348,41 @@ export async function projectRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'Invalid settings payload' });
     }
 
+    const currentProject = await prisma.project.findUnique({
+      where: { id: request.params.id },
+      select: {
+        id: true,
+        projectCode: true,
+        showPricingClientLeader: true,
+        showPricingClientViewer: true,
+        allowClientMeetings: true,
+        allowClientDownloads: true,
+      },
+    });
+
+    if (!currentProject) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
+
     const updated = await prisma.project.update({
       where: { id: request.params.id },
       data: body.data,
+    });
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'UPDATE_PROJECT_SETTINGS',
+      entityType: 'PROJECT',
+      entityId: updated.id,
+      oldData: currentProject,
+      newData: {
+        showPricingClientLeader: updated.showPricingClientLeader,
+        showPricingClientViewer: updated.showPricingClientViewer,
+        allowClientMeetings: updated.allowClientMeetings,
+        allowClientDownloads: updated.allowClientDownloads,
+      },
     });
 
     return {

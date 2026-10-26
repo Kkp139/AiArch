@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { PaymentMode, PaymentStatus } from '@prisma/client';
 import { resolveUserFromRequest, userHasProjectAccess } from '../../lib/auth-guard';
+import { recordAuditLog } from '../../lib/audit.service';
 
 export async function paymentRoutes(app: FastifyInstance) {
   // Get Payments for Project (Strict Staff Block + Client Project Toggle Check)
@@ -125,6 +126,21 @@ export async function paymentRoutes(app: FastifyInstance) {
       });
     }
 
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'RECORD_PAYMENT',
+      entityType: 'PAYMENT',
+      entityId: payment.id,
+      newData: {
+        projectCode: project.projectCode,
+        amount: Number(payment.amount),
+        paymentMode: payment.paymentMode,
+        status: payment.status,
+      },
+    });
+
     return {
       id: payment.id,
       amount: Number(payment.amount),
@@ -173,6 +189,17 @@ export async function paymentRoutes(app: FastifyInstance) {
         status: PaymentStatus.REVISION_REQUESTED,
         discrepancyNote: body.data.discrepancyNote,
       },
+    });
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'REQUEST_PAYMENT_DISCREPANCY',
+      entityType: 'PAYMENT',
+      entityId: updated.id,
+      oldData: { status: payment.status },
+      newData: { status: updated.status, discrepancyNote: updated.discrepancyNote },
     });
 
     return {

@@ -13,6 +13,7 @@ import {
 } from './auth.service';
 import { sendInvitationEmail } from '../../lib/email.service';
 import { resolveUserFromRequest, generateSessionToken } from '../../lib/auth-guard';
+import { recordAuditLog } from '../../lib/audit.service';
 
 export async function authRoutes(app: FastifyInstance) {
   // Step 1: Login endpoint (Universal WhatsApp OTP for ALL roles, including ADMIN)
@@ -432,6 +433,22 @@ export async function authRoutes(app: FastifyInstance) {
       }
     }
 
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'CREATE_USER',
+      entityType: 'USER',
+      entityId: newUser.id,
+      newData: {
+        username: newUser.username,
+        fullName: newUser.fullName,
+        role: newUser.role,
+        mobile: newUser.mobile,
+        assignedProjectIds: assignedProjectIds || [],
+      },
+    });
+
     return {
       success: true,
       setupToken,
@@ -492,6 +509,16 @@ export async function authRoutes(app: FastifyInstance) {
       },
     });
 
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'SETUP_PASSWORD',
+      entityType: 'USER',
+      entityId: user.id,
+      newData: { passwordConfigured: true },
+    });
+
     return {
       success: true,
       message: 'Your password has been successfully configured. You may now log in.',
@@ -541,9 +568,172 @@ export async function authRoutes(app: FastifyInstance) {
       },
     });
 
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'CHANGE_PASSWORD',
+      entityType: 'USER',
+      entityId: user.id,
+      newData: { passwordChanged: true },
+    });
+
     return {
       success: true,
       message: 'Password changed successfully',
+    };
+  });
+
+  // Toggle user status (Admin Only)
+  app.patch('/api/auth/users/:id/status', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only Admins can modify user status.' });
+    }
+
+    const schema = z.object({
+      status: z.enum(['ACTIVE', 'DEACTIVATED']),
+    });
+
+    const body = schema.safeParse(request.body);
+    if (!body.success) {
+      return reply.status(400).send({ error: 'Status must be ACTIVE or DEACTIVATED' });
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: request.params.id } });
+    if (!targetUser) {
+      return reply.status(404).send({ error: 'User not found' });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: targetUser.id },
+      data: { status: body.data.status },
+    });
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'UPDATE_USER_STATUS',
+      entityType: 'USER',
+      entityId: updated.id,
+      oldData: { status: targetUser.status },
+      newData: { status: updated.status },
+    });
+
+    return {
+      success: true,
+      userId: updated.id,
+      status: updated.status,
+    };
+  });
+
+  // Reassign user projects (Admin Only)
+  app.put('/api/auth/users/:id/assignments', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only Admins can modify project assignments.' });
+    }
+
+    const schema = z.object({
+      projectIds: z.array(z.string()),
+    });
+
+    const body = schema.safeParse(request.body);
+    if (!body.success) {
+      return reply.status(400).send({ error: 'projectIds array is required' });
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id: request.params.id },
+      include: { assignedProjects: true },
+    });
+    if (!targetUser) {
+      return reply.status(404).send({ error: 'User not found' });
+    }
+
+    const oldProjectIds = targetUser.assignedProjects.map(ap => ap.projectId);
+
+    // Atomically replace project assignments
+    await prisma.$transaction([
+      prisma.projectAssignment.deleteMany({ where: { userId: targetUser.id } }),
+      prisma.projectAssignment.createMany({
+        data: body.data.projectIds.map(projectId => ({
+          userId: targetUser.id,
+          projectId,
+        })),
+        skipDuplicates: true,
+      }),
+    ]);
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'REASSIGN_USER_PROJECTS',
+      entityType: 'USER',
+      entityId: targetUser.id,
+      oldData: { assignedProjectIds: oldProjectIds },
+      newData: { assignedProjectIds: body.data.projectIds },
+    });
+
+    return {
+      success: true,
+      message: 'Project assignments updated successfully',
+      assignedProjectIds: body.data.projectIds,
+    };
+  });
+
+  // Update user role (Admin Only)
+  app.patch('/api/auth/users/:id/role', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only Admins can modify user roles.' });
+    }
+
+    const schema = z.object({
+      role: z.enum(['ADMIN', 'STAFF', 'CLIENT_LEADER', 'CLIENT_VIEWER']),
+    });
+
+    const body = schema.safeParse(request.body);
+    if (!body.success) {
+      return reply.status(400).send({ error: 'Valid role is required' });
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: request.params.id } });
+    if (!targetUser) {
+      return reply.status(404).send({ error: 'User not found' });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: targetUser.id },
+      data: { role: body.data.role },
+    });
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'UPDATE_USER_ROLE',
+      entityType: 'USER',
+      entityId: updated.id,
+      oldData: { role: targetUser.role },
+      newData: { role: updated.role },
+    });
+
+    return {
+      success: true,
+      userId: updated.id,
+      role: updated.role,
     };
   });
 }

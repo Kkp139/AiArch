@@ -3,6 +3,7 @@ import {
   MeetingReservationEngine,
   isValidSlot,
   isFutureDate,
+  isRoleAllowedToRequestMeeting,
 } from '../src/modules/meetings/meetings.service';
 
 describe('Meeting Management & Atomic Slot Concurrency', () => {
@@ -77,5 +78,88 @@ describe('Meeting Management & Atomic Slot Concurrency', () => {
 
     const newMeetingAfter = engine.getMeeting(reschedule.replacementMeeting!.id);
     expect(newMeetingAfter?.status).toBe('CONFIRMED');
+  });
+
+  it('RBAC AUTHORIZATION: allows Client Leader and Admin, strictly forbids Client Viewer and Staff', () => {
+    // Permitted roles
+    expect(isRoleAllowedToRequestMeeting('ADMIN')).toBe(true);
+    expect(isRoleAllowedToRequestMeeting('CLIENT_LEADER')).toBe(true);
+
+    // Strictly forbidden roles
+    expect(isRoleAllowedToRequestMeeting('CLIENT_VIEWER')).toBe(false);
+    expect(isRoleAllowedToRequestMeeting('STAFF')).toBe(false);
+  });
+
+  describe('HTTP Fastify Route RBAC Enforcement', () => {
+    it('HTTP 401: rejects unauthenticated meeting requests', async () => {
+      const { buildApp } = await import('../src/server');
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/meetings/request',
+        payload: {
+          bookingDate: '2026-11-20',
+          slot: '12:00–13:30',
+        },
+      });
+      expect(res.statusCode).toBe(401);
+      await app.close();
+    });
+
+    it('HTTP 403 FORBIDDEN: strictly blocks Client Viewer from requesting meetings', async () => {
+      const { buildApp } = await import('../src/server');
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/meetings/request',
+        headers: {
+          authorization: 'Bearer mock-viewer-token',
+        },
+        payload: {
+          bookingDate: '2026-11-20',
+          slot: '12:00–13:30',
+        },
+      });
+      expect(res.statusCode).toBe(403);
+      expect(JSON.parse(res.body).error).toContain('Client Viewer and Staff accounts are not authorized');
+      await app.close();
+    });
+
+    it('HTTP 403 FORBIDDEN: strictly blocks Staff from requesting meetings', async () => {
+      const { buildApp } = await import('../src/server');
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/meetings/request',
+        headers: {
+          authorization: 'Bearer mock-staff-token',
+        },
+        payload: {
+          bookingDate: '2026-11-20',
+          slot: '12:00–13:30',
+        },
+      });
+      expect(res.statusCode).toBe(403);
+      expect(JSON.parse(res.body).error).toContain('Client Viewer and Staff accounts are not authorized');
+      await app.close();
+    });
+
+    it('HTTP 403 FORBIDDEN: blocks Client Viewer from rescheduling meetings', async () => {
+      const { buildApp } = await import('../src/server');
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/meetings/meet-123/reschedule',
+        headers: {
+          authorization: 'Bearer mock-viewer-token',
+        },
+        payload: {
+          bookingDate: '2026-11-25',
+          slot: '16:00–17:30',
+        },
+      });
+      expect(res.statusCode).toBe(403);
+      await app.close();
+    });
   });
 });

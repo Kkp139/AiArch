@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { resolveUserFromRequest } from '../../lib/auth-guard';
+import { recordAuditLog } from '../../lib/audit.service';
 
 export async function verificationRoutes(app: FastifyInstance) {
   // Get All Submissions (Admin and Staff can access; Revision Counter is visible to both!)
@@ -125,6 +126,17 @@ export async function verificationRoutes(app: FastifyInstance) {
       });
     }
 
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: existing ? 'RESUBMIT_VERIFICATION' : 'SUBMIT_VERIFICATION',
+      entityType: 'DESIGN_VERIFICATION',
+      entityId: item.id,
+      oldData: existing ? { revisionNumber: existing.revisionNumber, status: existing.status } : undefined,
+      newData: { revisionNumber: item.revisionNumber, drawingTitle: item.drawingTitle, status: item.status },
+    });
+
     return {
       success: true,
       item: {
@@ -188,6 +200,17 @@ export async function verificationRoutes(app: FastifyInstance) {
       });
     }
 
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'APPROVE_DRAWING',
+      entityType: 'DESIGN_VERIFICATION',
+      entityId: updated.id,
+      oldData: { status: 'PENDING_REVIEW' },
+      newData: { status: 'APPROVED', drawingTitle: updated.drawingTitle, revisionNumber: updated.revisionNumber },
+    });
+
     return {
       success: true,
       status: 'APPROVED',
@@ -224,6 +247,17 @@ export async function verificationRoutes(app: FastifyInstance) {
         reviewedBy: user.id,
         reviewedAt: new Date(),
       },
+    });
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'REQUEST_DRAWING_REVISION',
+      entityType: 'DESIGN_VERIFICATION',
+      entityId: updated.id,
+      oldData: { status: 'PENDING_REVIEW' },
+      newData: { status: 'REVISION_REQUIRED', feedbackNote: updated.feedbackNote },
     });
 
     return {

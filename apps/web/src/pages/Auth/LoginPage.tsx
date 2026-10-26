@@ -176,7 +176,8 @@ export const LoginPage: React.FC = () => {
           {/* Top Architectural Photo Banner with Editorial Text (Figma: 17:102, 21:3621) */}
           <div
             style={{
-              flex: step === 'SIGN_IN' ? '0 0 clamp(280px, 38vh, 340px)' : '0 0 clamp(320px, 44vh, 400px)',
+              flex: '1 1 auto',
+              minHeight: '240px',
               position: 'relative',
               backgroundImage: 'url(/assets/auth/editorial_courtyard_clean.png)',
               backgroundSize: 'cover',
@@ -184,7 +185,7 @@ export const LoginPage: React.FC = () => {
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              padding: 'max(16px, env(safe-area-inset-top, 16px)) 20px 48px 20px',
+              padding: 'max(16px, env(safe-area-inset-top, 16px)) 20px 42px 20px',
               boxSizing: 'border-box',
             }}
           >
@@ -216,24 +217,24 @@ export const LoginPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Curved Bottom Sheet (Figma: 21:3645, 17:123) - #E8E8E8, 32px top corners, 2px white top border */}
+          {/* Curved Bottom Sheet (Figma: 21:3645, 17:123) - #E8E8E8, 28px top corners, 2px white top border */}
           <div
             style={{
               backgroundColor: '#E8E8E8',
               borderTop: '2px solid #FFFFFF',
-              borderRadius: '32px 32px 0 0',
-              marginTop: '-32px',
+              borderRadius: '28px 28px 0 0',
+              marginTop: '-28px',
               position: 'relative',
               zIndex: 10,
-              padding: '32px 20px max(24px, env(safe-area-inset-bottom, 24px)) 20px',
-              flex: 1,
+              padding: '26px 20px max(24px, env(safe-area-inset-bottom, 24px)) 20px',
+              flex: '0 0 auto',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between',
+              maxHeight: '80dvh',
               overflowY: 'auto',
               WebkitOverflowScrolling: 'touch',
               boxSizing: 'border-box',
-              boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.2)',
+              boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.25)',
             }}
           >
             {step === 'SIGN_IN' && (

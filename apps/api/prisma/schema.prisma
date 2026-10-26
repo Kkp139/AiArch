@@ -94,6 +94,12 @@ model User {
   chatMessages        ChatMessage[]
   notifications       Notification[]
   auditLogs           AuditLog[]
+  publishedAnnouncements Announcement[]
+  publishedPolicies      StudioPolicy[]
+  policyAcknowledgments  PolicyAcknowledgment[]
+  createdTargets         StaffTarget[]          @relation("TargetCreator")
+  approvedTargets        StaffTarget[]          @relation("TargetApprover")
+  assignedTargets        TargetStaffAssignment[]
 }
 
 model Project {
@@ -122,6 +128,7 @@ model Project {
   assignments              ProjectAssignment[]
   folderPermissions        ProjectFolderPermission[]
   notifications            Notification[]
+  assignedTargets          TargetProjectAssignment[]
 }
 
 model ProjectAssignment {
@@ -322,3 +329,106 @@ model AuditLog {
 
   actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
 }
+
+enum AnnouncementAudience {
+  ALL
+  STAFF
+  CLIENT_LEADERS
+  CLIENT_VIEWERS
+}
+
+enum TargetStatus {
+  PENDING
+  IN_PROGRESS
+  SUBMITTED
+  COMPLETED
+  OVERDUE
+}
+
+model Announcement {
+  id            String               @id @default(uuid())
+  title         String
+  body          String?
+  audience      AnnouncementAudience @default(ALL)
+  attachments   Json?
+  publisherId   String
+  publisherName String
+  publisherRole UserRole
+  isWithdrawn   Boolean              @default(false)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  publisher     User                 @relation(fields: [publisherId], references: [id], onDelete: Cascade)
+}
+
+model StudioPolicy {
+  id              String                 @id @default(uuid())
+  title           String
+  content         String?
+  attachments     Json?
+  publisherId     String
+  publisherName   String
+  isWithdrawn     Boolean                @default(false)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  publisher       User                   @relation(fields: [publisherId], references: [id], onDelete: Cascade)
+  acknowledgments PolicyAcknowledgment[]
+}
+
+model PolicyAcknowledgment {
+  id             String       @id @default(uuid())
+  policyId       String
+  userId         String
+  acknowledgedAt DateTime     @default(now())
+
+  policy         StudioPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, userId])
+}
+
+model StaffTarget {
+  id              String                    @id @default(uuid())
+  title           String
+  description     String?
+  dueDate         DateTime                  @db.Date
+  status          TargetStatus              @default(PENDING)
+  createdById     String
+  approvedById    String?
+  submissionNotes String?
+  submittedAt     DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  creator         User                      @relation("TargetCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  approver        User?                     @relation("TargetApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  assignedStaff   TargetStaffAssignment[]
+  assignedProjects TargetProjectAssignment[]
+}
+
+model TargetStaffAssignment {
+  id        String      @id @default(uuid())
+  targetId  String
+  staffId   String
+  createdAt DateTime    @default(now())
+
+  target    StaffTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  staff     User        @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([targetId, staffId])
+}
+
+model TargetProjectAssignment {
+  id        String      @id @default(uuid())
+  targetId  String
+  projectId String
+  createdAt DateTime    @default(now())
+
+  target    StaffTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([targetId, projectId])
+}
+

@@ -22,6 +22,8 @@ export const REVERSE_SLOT_MAP: Record<TimeSlot, string> = {
 };
 
 import { resolveUserFromRequest, userHasProjectAccess } from '../../lib/auth-guard';
+import { recordAuditLog } from '../../lib/audit.service';
+import { isRoleAllowedToRequestMeeting } from './meetings.service';
 
 export async function meetingRoutes(app: FastifyInstance) {
   // Get all meetings (Requires authentication; non-admin users only see meetings for assigned projects or requested by them)
@@ -93,8 +95,8 @@ export async function meetingRoutes(app: FastifyInstance) {
       return reply.status(401).send({ error: 'Authentication required. Please sign in to request a consultation.' });
     }
 
-    if (user.role === 'STAFF') {
-      return reply.status(403).send({ error: 'Access denied: Staff accounts cannot request client consultation slots.' });
+    if (!isRoleAllowedToRequestMeeting(user.role)) {
+      return reply.status(403).send({ error: 'Access denied: Client Viewer and Staff accounts are not authorized to request consultation slots.' });
     }
 
     const schema = z.object({
@@ -163,6 +165,21 @@ export async function meetingRoutes(app: FastifyInstance) {
       },
     });
 
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'REQUEST_MEETING',
+      entityType: 'MEETING',
+      entityId: meeting.id,
+      newData: {
+        bookingDate,
+        slot: enumSlot,
+        type: meeting.type,
+        projectCode: meeting.project?.projectCode || 'GENERAL',
+      },
+    });
+
     return {
       success: true,
       meeting: {
@@ -200,6 +217,25 @@ export async function meetingRoutes(app: FastifyInstance) {
       },
     });
 
+    // If this confirmed meeting replaced an earlier booking, cancel the original booking now
+    if (updated.replacesMeetingId) {
+      await prisma.meeting.update({
+        where: { id: updated.replacesMeetingId },
+        data: { status: MeetingStatus.CANCELLED },
+      });
+    }
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'APPROVE_MEETING',
+      entityType: 'MEETING',
+      entityId: updated.id,
+      oldData: { status: 'REQUESTED' },
+      newData: { status: updated.status, approvedBy: user.id, replacesMeetingId: updated.replacesMeetingId },
+    });
+
     if (updated.requester.email) {
       sendMeetingConfirmationEmail(updated.requester.email, {
         fullName: updated.requester.fullName,
@@ -219,6 +255,164 @@ export async function meetingRoutes(app: FastifyInstance) {
         status: updated.status,
         approvedBy: user.fullName,
       },
+    };
+  });
+
+  // Request Meeting Reschedule (Client Leader or Admin only)
+  app.post('/api/meetings/:id/reschedule', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+
+    if (!isRoleAllowedToRequestMeeting(user.role)) {
+      return reply.status(403).send({ error: 'Access denied: Client Viewer and Staff accounts are not authorized to reschedule consultations.' });
+    }
+
+    const original = await prisma.meeting.findUnique({
+      where: { id: request.params.id },
+      include: { project: true, requester: true },
+    });
+
+    if (!original) {
+      return reply.status(404).send({ error: 'Original meeting not found' });
+    }
+
+    // Client Leader can only reschedule their own or assigned project meetings
+    if (user.role === 'CLIENT_LEADER' && original.requestedBy !== user.id) {
+      if (original.projectId && !userHasProjectAccess(user, original.projectId)) {
+        return reply.status(403).send({ error: 'Access denied: You can only reschedule meetings requested by your account.' });
+      }
+    }
+
+    if (original.status === 'CANCELLED' || original.status === 'REJECTED') {
+      return reply.status(400).send({ error: `Cannot reschedule a meeting that is already ${original.status.toLowerCase()}.` });
+    }
+
+    const schema = z.object({
+      bookingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date format must be YYYY-MM-DD'),
+      slot: z.string(),
+      notes: z.string().optional(),
+    });
+
+    const body = schema.safeParse(request.body);
+    if (!body.success) {
+      return reply.status(400).send({ error: body.error.errors[0]?.message || 'Invalid parameters' });
+    }
+
+    const { bookingDate, slot, notes } = body.data;
+    const enumSlot = SLOT_MAP[slot];
+    if (!enumSlot) {
+      return reply.status(400).send({ error: 'Invalid slot. Must be 12:00–13:30, 16:00–17:30, or 18:00–19:30' });
+    }
+
+    const parsedDate = new Date(bookingDate);
+
+    // Slot collision check
+    const existing = await prisma.meeting.findFirst({
+      where: {
+        bookingDate: parsedDate,
+        slot: enumSlot,
+        status: { in: ['REQUESTED', 'CONFIRMED', 'RESCHEDULE_PENDING'] },
+      },
+    });
+
+    if (existing) {
+      return reply.status(409).send({
+        error: `Slot ${REVERSE_SLOT_MAP[enumSlot]} on ${bookingDate} is already reserved by another consultation booking.`,
+      });
+    }
+
+    const replacement = await prisma.meeting.create({
+      data: {
+        projectId: original.projectId,
+        bookingDate: parsedDate,
+        slot: enumSlot,
+        type: original.type,
+        status: MeetingStatus.RESCHEDULE_PENDING,
+        notes: notes || `Reschedule of meeting ${original.id}`,
+        requestedBy: user.id,
+        replacesMeetingId: original.id,
+      },
+      include: {
+        project: true,
+        requester: true,
+      },
+    });
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'REQUEST_MEETING_RESCHEDULE',
+      entityType: 'MEETING',
+      entityId: replacement.id,
+      oldData: {
+        originalMeetingId: original.id,
+        originalDate: original.bookingDate.toISOString().split('T')[0],
+        originalSlot: original.slot,
+      },
+      newData: {
+        replacementMeetingId: replacement.id,
+        newBookingDate: bookingDate,
+        newSlot: enumSlot,
+      },
+    });
+
+    return {
+      success: true,
+      meeting: {
+        id: replacement.id,
+        bookingDate,
+        slotTime: REVERSE_SLOT_MAP[replacement.slot],
+        status: replacement.status,
+        type: replacement.type,
+        replacesMeetingId: original.id,
+      },
+      message: 'Reschedule request submitted. Original booking remains active until studio confirmation.',
+    };
+  });
+
+  // Cancel Meeting (Client Leader can cancel own; Admin can cancel any)
+  app.post('/api/meetings/:id/cancel', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+
+    const meeting = await prisma.meeting.findUnique({
+      where: { id: request.params.id },
+    });
+
+    if (!meeting) {
+      return reply.status(404).send({ error: 'Meeting not found' });
+    }
+
+    if (user.role !== 'ADMIN' && meeting.requestedBy !== user.id) {
+      return reply.status(403).send({ error: 'Access denied: You can only cancel meetings booked by your account.' });
+    }
+
+    const updated = await prisma.meeting.update({
+      where: { id: meeting.id },
+      data: { status: MeetingStatus.CANCELLED },
+    });
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'CANCEL_MEETING',
+      entityType: 'MEETING',
+      entityId: updated.id,
+      oldData: { status: meeting.status },
+      newData: { status: updated.status },
+    });
+
+    return {
+      success: true,
+      message: 'Meeting has been successfully cancelled.',
+      meetingId: updated.id,
+      status: updated.status,
     };
   });
 }

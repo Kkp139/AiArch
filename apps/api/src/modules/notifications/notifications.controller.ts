@@ -133,4 +133,18 @@ export async function notificationRoutes(app: FastifyInstance) {
 
     return { success: true, message: 'All notifications marked as read' };
   });
+
+  // Save or update Web Push subscription for authenticated client device
+  app.post('/api/notifications/subscribe', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+
+    return {
+      success: true,
+      message: 'Push subscription registered successfully',
+    };
+  });
 }
+

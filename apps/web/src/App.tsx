@@ -8,6 +8,8 @@ import { MeetingCalendar } from './pages/Meetings/MeetingCalendar';
 import { StaffAttendance } from './pages/Attendance/StaffAttendance';
 import { PaymentLedger, PaymentRecord } from './pages/Payments/PaymentLedger';
 import { ProjectChatRoom, ChatMessageItem } from './pages/Chat/ProjectChatRoom';
+import { AnnouncementsPolicies } from './pages/Announcements/AnnouncementsPolicies';
+import { StaffTargets } from './pages/Targets/StaffTargets';
 import { FolderKanban, ArrowRight, UserPlus, RefreshCw, Smartphone, Monitor, ChevronLeft } from 'lucide-react';
 import { AdminUserManagementModal } from './components/AdminUserManagementModal';
 import { MobileShell } from './components/mobile/MobileShell';
@@ -23,6 +25,7 @@ import { MobileMoreMenu } from './components/mobile/MobileMoreMenu';
 import { MobileUserManagementView } from './components/mobile/MobileUserManagementView';
 import { PwaInstallPrompt } from './components/pwa/PwaInstallPrompt';
 import { PwaOfflineBanner } from './components/pwa/PwaOfflineBanner';
+import { subscribeUserToPush } from './pwa/registerServiceWorker';
 
 
 export interface ProjectSummary {
@@ -197,12 +200,16 @@ function MainApp() {
     setIsRefreshing(false);
   }, [fetchProjects, fetchVerifications, fetchPayments, fetchMeetings, fetchAttendance, fetchChat]);
 
-  // Fetch initial data on mount
+  // Fetch initial data on mount & register Web Push subscription
   useEffect(() => {
     if (user) {
       refreshAllData();
+      const vapidKey = (import.meta as any).env?.VITE_VAPID_PUBLIC_KEY;
+      if (vapidKey) {
+        subscribeUserToPush(vapidKey, getAuthHeaders());
+      }
     }
-  }, [user, refreshAllData]);
+  }, [user, refreshAllData, getAuthHeaders]);
 
   // Refetch when switching project
   useEffect(() => {
@@ -566,6 +573,21 @@ function MainApp() {
                   userEmail={currentUser.email || 'client@studio.com'}
                 />
               )}
+
+              {mobileSubModule === 'targets' && (
+                <StaffTargets
+                  userRole={currentUser.role}
+                  authHeaders={getAuthHeaders()}
+                  projects={projects.map(p => ({ id: p.id, projectCode: p.projectCode, name: p.name }))}
+                />
+              )}
+
+              {(mobileSubModule === 'announcement' || mobileSubModule === 'policies' || mobileSubModule === 'announcements') && (
+                <AnnouncementsPolicies
+                  userRole={currentUser.role}
+                  authHeaders={getAuthHeaders()}
+                />
+              )}
             </div>
           ) : (
             <>
@@ -579,7 +601,7 @@ function MainApp() {
                       setMobileProjectStep('list');
                     } else if (viewId === 'meetings') {
                       setMobileTab('meetings');
-                    } else if (['verification', 'payments', 'attendance', 'chat', 'vault'].includes(viewId)) {
+                    } else if (['verification', 'payments', 'attendance', 'chat', 'vault', 'targets', 'announcement', 'policies'].includes(viewId)) {
                       setMobileSubModule(viewId);
                     } else {
                       alert(`Studio Module: ${viewId} selected.`);
@@ -1062,6 +1084,23 @@ function MainApp() {
             userName={currentUser.fullName}
             messages={chatMessages}
             onSendMessage={handleSendMessage}
+          />
+        )}
+
+        {/* TAB 8: STAFF TARGETS & PRODUCTIVITY TRACKING */}
+        {activeTab === 'targets' && (
+          <StaffTargets
+            userRole={currentUser.role}
+            authHeaders={getAuthHeaders()}
+            projects={projects.map(p => ({ id: p.id, projectCode: p.projectCode, name: p.name }))}
+          />
+        )}
+
+        {/* TAB 9: ANNOUNCEMENTS & STUDIO POLICIES */}
+        {activeTab === 'announcements' && (
+          <AnnouncementsPolicies
+            userRole={currentUser.role}
+            authHeaders={getAuthHeaders()}
           />
         )}
       </Shell>

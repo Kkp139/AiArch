@@ -13,6 +13,8 @@ import {
   Menu,
   X,
   LogOut,
+  Target,
+  Bell,
 } from 'lucide-react';
 
 export interface ShellProps {
@@ -44,7 +46,9 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'meetings', label: 'Meetings', icon: CalendarDays, roles: ['ADMIN', 'CLIENT_LEADER', 'CLIENT_VIEWER'] },
   { id: 'payments', label: 'Payments', icon: CreditCard, roles: ['ADMIN', 'CLIENT_LEADER', 'CLIENT_VIEWER'], requiresPricingToggle: true },
   { id: 'attendance', label: 'Attendance', icon: Clock, roles: ['ADMIN', 'STAFF'] },
-  { id: 'chat', label: 'Project Chat', icon: MessageSquare, roles: ['ADMIN', 'CLIENT_LEADER'] },
+  { id: 'targets', label: 'Staff Targets', icon: Target, roles: ['ADMIN', 'STAFF'] },
+  { id: 'announcements', label: 'Announcements & Policies', icon: Bell, roles: ['ADMIN', 'STAFF', 'CLIENT_LEADER', 'CLIENT_VIEWER'] },
+  { id: 'chat', label: 'Project Chat', icon: MessageSquare, roles: ['ADMIN', 'CLIENT_LEADER', 'CLIENT_VIEWER'] },
 ];
 
 export function Shell({ user, studioName = 'A&F Design', children, activeTab = 'projects', onTabChange, onLogout }: ShellProps) {

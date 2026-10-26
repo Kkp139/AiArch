@@ -13,6 +13,8 @@ import { attendanceRoutes } from './modules/attendance/attendance.controller';
 import { paymentRoutes } from './modules/payments/payments.controller';
 import { verificationRoutes } from './modules/verification/verification.controller';
 import { notificationRoutes } from './modules/notifications/notifications.controller';
+import { announcementRoutes } from './modules/announcements/announcements.controller';
+import { targetRoutes } from './modules/targets/targets.controller';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
@@ -81,6 +83,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(paymentRoutes);
   await app.register(verificationRoutes);
   await app.register(notificationRoutes);
+  await app.register(announcementRoutes);
+  await app.register(targetRoutes);
 
   // Health check endpoint
   app.get('/api/health', {
