@@ -172,6 +172,7 @@ export const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
               inputMode="numeric"
               maxLength={1}
               className={`otp-box-input ${hasError ? 'has-error' : ''}`}
+              placeholder="—"
               value={digit}
               onChange={(e) => handleChange(idx, e.target.value)}
               onKeyDown={(e) => handleKeyDown(idx, e)}

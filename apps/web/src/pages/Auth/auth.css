@@ -499,77 +499,175 @@
   }
 }
 
-/* Real Mobile Phones (<= 768px): Fit 100% within 1 screen height without vertical scrolling */
+/* Real Mobile Phones (<= 768px): Exact Figma Design Specification (Nodes 17:102 & 21:3621) */
 @media (max-width: 768px) {
+  .form-body-wrapper {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+  }
+
   .form-heading {
-    font-size: 21px !important;
-    line-height: 1.2 !important;
-    margin-bottom: 4px !important;
+    font-size: clamp(23px, 3.2vh, 28px) !important;
+    font-weight: 800 !important;
+    line-height: 1.25 !important;
+    letter-spacing: -0.015em !important;
+    color: #0C0C0D !important;
+    margin: 0 0 6px 0 !important;
   }
 
   .form-description {
-    font-size: 13px !important;
-    line-height: 1.35 !important;
-    margin-bottom: 14px !important;
+    font-size: clamp(13px, 1.8vh, 14px) !important;
+    font-weight: 400 !important;
+    line-height: 1.45 !important;
+    color: #4A4A4C !important;
+    margin: 0 0 16px 0 !important;
   }
 
   .form-group {
-    gap: 4px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
     margin-bottom: 12px !important;
   }
 
   .form-label {
-    font-size: 12px !important;
+    font-size: 13.5px !important;
+    font-weight: 500 !important;
+    color: #686869 !important;
   }
 
   .form-input {
-    height: 44px !important;
-    padding: 0 14px !important;
-    font-size: 14px !important;
-    border-radius: 10px !important;
+    width: 100% !important;
+    height: 48px !important;
+    padding: 0 16px !important;
+    font-size: 15px !important;
+    color: #0C0C0D !important;
+    background-color: #FFFFFF !important;
+    border: 1px solid #DBDBDF !important;
+    border-radius: 12px !important;
+    box-sizing: border-box !important;
+    transition: all 0.2s ease !important;
+  }
+
+  .form-input:focus {
+    border-color: #BF935A !important;
+    box-shadow: 0 0 0 3px rgba(191, 147, 90, 0.25) !important;
   }
 
   .form-forgot-row {
+    display: flex !important;
+    justify-content: flex-end !important;
     margin-top: -4px !important;
-    margin-bottom: 14px !important;
+    margin-bottom: 16px !important;
   }
 
   .form-text-link {
-    font-size: 12px !important;
+    font-size: 13.5px !important;
+    font-weight: 500 !important;
+    color: #BF935A !important;
+    text-decoration: none !important;
   }
 
   .form-primary-btn {
-    height: 46px !important;
-    font-size: 14px !important;
-    border-radius: 10px !important;
+    width: 100% !important;
+    height: 48px !important;
+    background-color: #BF935A !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.4px !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    transition: background-color 0.15s ease, transform 0.1s ease !important;
+  }
+
+  .form-primary-btn:hover:not(:disabled) {
+    background-color: #A67C46 !important;
+  }
+
+  .form-primary-btn:active:not(:disabled) {
+    transform: scale(0.99) !important;
   }
 
   .form-back-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    background: none !important;
+    border: none !important;
+    color: #686869 !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
     margin-bottom: 10px !important;
-    font-size: 12px !important;
+    padding: 0 !important;
   }
 
+  .form-back-btn:hover {
+    color: #BF935A !important;
+  }
+
+  /* OTP Boxes: Exact Figma 21:3672 token dimensions (46px x 44px, rounded-8px, border #DBDBDF, bg #FFFFFF) */
   .otp-boxes-grid {
+    display: flex !important;
+    justify-content: space-between !important;
     gap: 8px !important;
-    margin: 14px 0 !important;
+    margin: 18px 0 !important;
   }
 
   .otp-box-input {
-    width: 42px !important;
-    height: 48px !important;
-    font-size: 18px !important;
-    border-radius: 10px !important;
+    width: 46px !important;
+    height: 44px !important;
+    text-align: center !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    color: #0C0C0D !important;
+    background-color: #FFFFFF !important;
+    border: 1px solid #DBDBDF !important;
+    border-radius: 8px !important;
+    outline: none !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    transition: all 0.2s ease !important;
+  }
+
+  .otp-box-input::placeholder {
+    color: #4A4A4C !important;
+    font-weight: 400 !important;
+    font-size: 16px !important;
+  }
+
+  .otp-box-input:focus {
+    border-color: #BF935A !important;
+    box-shadow: 0 0 0 3px rgba(191, 147, 90, 0.25) !important;
+  }
+
+  .otp-box-input.has-error {
+    border-color: #D32F2F !important;
+    background-color: #FFF9F9 !important;
   }
 
   .otp-resend-row {
-    margin-top: 10px !important;
-    font-size: 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    margin-top: 16px !important;
+    font-size: 13.5px !important;
+    color: #4A4A4C !important;
   }
 
   .form-alert-error {
     padding: 8px 12px !important;
-    font-size: 12px !important;
+    border-radius: 8px !important;
+    font-size: 12.5px !important;
     margin-bottom: 12px !important;
   }
 }
+
 

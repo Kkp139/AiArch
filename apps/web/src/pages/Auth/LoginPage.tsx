@@ -173,10 +173,10 @@ export const LoginPage: React.FC = () => {
                 }
           }
         >
-          {/* Top Architectural Photo Banner with Editorial Text */}
+          {/* Top Architectural Photo Banner with Editorial Text (Figma: 17:102, 21:3621) */}
           <div
             style={{
-              flex: '0 0 clamp(160px, 28vh, 220px)',
+              flex: step === 'SIGN_IN' ? '0 0 clamp(280px, 38vh, 340px)' : '0 0 clamp(320px, 44vh, 400px)',
               position: 'relative',
               backgroundImage: 'url(/assets/auth/editorial_courtyard_clean.png)',
               backgroundSize: 'cover',
@@ -184,53 +184,56 @@ export const LoginPage: React.FC = () => {
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              padding: 'max(14px, env(safe-area-inset-top, 14px)) 20px 20px 20px',
+              padding: 'max(16px, env(safe-area-inset-top, 16px)) 20px 48px 20px',
               boxSizing: 'border-box',
             }}
           >
+            {/* Figma exact architectural luxury gradient: amber-brown to dark */}
             <div
               style={{
                 position: 'absolute',
                 inset: 0,
-                background: 'linear-gradient(180deg, rgba(12,12,13,0.3) 0%, rgba(12,12,13,0.7) 70%, rgba(12,12,13,0.95) 100%)',
+                background: 'linear-gradient(180deg, rgba(25, 17, 2, 0.44) 0%, rgba(46, 32, 3, 0.05) 42%, #191102 100%)',
               }}
             />
 
-            {/* Logo & Discipline */}
+            {/* Logo & Discipline (Figma: 21:3653, 17:132) */}
             <div style={{ position: 'relative', zIndex: 2 }}>
-              <img src="/assets/auth/asf_logo.svg" alt="asf design" style={{ height: '34px', width: 'auto' }} />
-              <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.7)', marginTop: '4px' }}>
-                ARCHITECTURE & INTERIORS
+              <img src="/assets/auth/asf_logo.svg" alt="asf design" style={{ height: '38px', width: 'auto' }} />
+              <div style={{ fontSize: '12px', fontWeight: 500, letterSpacing: '0.08em', color: '#B9B9BA', marginTop: '6px' }}>
+                ARCHITECTURE &amp; INTERIORS
               </div>
             </div>
 
-            {/* Editorial Quote (Figma: 17:138) */}
+            {/* Editorial Quote (Figma: 21:3625, 17:137) */}
             <div style={{ position: 'relative', zIndex: 2 }}>
-              <h2 style={{ fontSize: 'clamp(19px, 3vh, 22px)', fontWeight: 800, color: '#FFFFFF', lineHeight: 1.15, margin: '0 0 3px 0' }}>
+              <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#E8E8E9', lineHeight: '36px', margin: '0 0 4px 0' }}>
                 Great spaces.<br />Built together.
               </h2>
-              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.85)', margin: 0, lineHeight: 1.3 }}>
+              <p style={{ fontSize: '12px', color: '#F4F4F4', margin: 0, lineHeight: '18px' }}>
                 A considered place for every drawing, decision and conversation.
               </p>
             </div>
           </div>
 
-          {/* Curved Bottom Sheet (Figma: 17:123) - Fits 100% in viewport without scrolling */}
+          {/* Curved Bottom Sheet (Figma: 21:3645, 17:123) - #E8E8E8, 32px top corners, 2px white top border */}
           <div
             style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '26px 26px 0 0',
-              marginTop: '-18px',
+              backgroundColor: '#E8E8E8',
+              borderTop: '2px solid #FFFFFF',
+              borderRadius: '32px 32px 0 0',
+              marginTop: '-32px',
               position: 'relative',
               zIndex: 10,
-              padding: '20px 20px max(16px, env(safe-area-inset-bottom, 16px)) 20px',
+              padding: '32px 20px max(24px, env(safe-area-inset-bottom, 24px)) 20px',
               flex: 1,
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'flex-start',
+              justifyContent: 'space-between',
               overflowY: 'auto',
               WebkitOverflowScrolling: 'touch',
               boxSizing: 'border-box',
+              boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.2)',
             }}
           >
             {step === 'SIGN_IN' && (
