@@ -11,6 +11,9 @@ import {
   FolderKanban,
   CalendarDays,
   MoreHorizontal,
+  Shield,
+  Briefcase,
+  Users,
 } from 'lucide-react';
 import './mobile.css';
 
@@ -35,6 +38,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
   user,
   activeTab,
   onTabChange,
+  onRoleSwitch,
   onOpenNotifications,
   onOpenProfile,
   onChangePassword,
@@ -82,7 +86,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
             <span className="figma-notif-badge">4</span>
           </button>
 
-          {/* User Profile Avatar Pill with Dropdown (Figma: 224:4851) */}
+          {/* User Profile Avatar Pill with Dropdown (Figma: 224:4851 & 67:8997) */}
           <div style={{ position: 'relative' }}>
             <div
               className="figma-profile-pill"
@@ -95,14 +99,14 @@ export const MobileShell: React.FC<MobileShellProps> = ({
               <ChevronDown size={14} color="#4A4A4C" />
             </div>
 
-            {/* Figma 224:4851 Profile Dropdown */}
+            {/* Figma 224:4851 & 67:8997 Profile Dropdown with Role Switcher */}
             {profileDropdownOpen && (
               <>
                 <div
                   style={{ position: 'fixed', inset: 0, zIndex: 90 }}
                   onClick={() => setProfileDropdownOpen(false)}
                 />
-                <div className="figma-profile-dropdown">
+                <div className="figma-profile-dropdown" style={{ minWidth: '220px' }}>
                   {/* User Profile Header Row */}
                   <div className="figma-dropdown-user-row">
                     <div className="figma-dropdown-avatar">
@@ -148,9 +152,54 @@ export const MobileShell: React.FC<MobileShellProps> = ({
                     <ChevronRight size={16} color="#979798" />
                   </button>
 
+                  {/* 3. Role Switcher (Figma: 67:8997) */}
+                  {onRoleSwitch && (
+                    <>
+                      <div className="figma-dropdown-divider" />
+                      <div style={{ padding: '4px 12px 2px', fontSize: '11px', fontWeight: 700, color: '#979798', textTransform: 'uppercase' }}>
+                        Switch Role
+                      </div>
+                      <div style={{ display: 'flex', gap: '4px', padding: '4px 10px 8px' }}>
+                        <button
+                          type="button"
+                          className={`figma-btn-sm ${user.role === 'ADMIN' ? 'figma-btn-gold' : ''}`}
+                          style={{ flex: 1, padding: '4px', fontSize: '11px', background: user.role === 'ADMIN' ? '#BF935A' : '#F5F5F7', color: user.role === 'ADMIN' ? '#FFFFFF' : '#4A4A4C' }}
+                          onClick={() => {
+                            onRoleSwitch('ADMIN');
+                            setProfileDropdownOpen(false);
+                          }}
+                        >
+                          Admin
+                        </button>
+                        <button
+                          type="button"
+                          className={`figma-btn-sm ${user.role === 'STAFF' ? 'figma-btn-gold' : ''}`}
+                          style={{ flex: 1, padding: '4px', fontSize: '11px', background: user.role === 'STAFF' ? '#BF935A' : '#F5F5F7', color: user.role === 'STAFF' ? '#FFFFFF' : '#4A4A4C' }}
+                          onClick={() => {
+                            onRoleSwitch('STAFF');
+                            setProfileDropdownOpen(false);
+                          }}
+                        >
+                          Staff
+                        </button>
+                        <button
+                          type="button"
+                          className={`figma-btn-sm ${user.role === 'CLIENT_LEADER' ? 'figma-btn-gold' : ''}`}
+                          style={{ flex: 1, padding: '4px', fontSize: '11px', background: user.role === 'CLIENT_LEADER' ? '#BF935A' : '#F5F5F7', color: user.role === 'CLIENT_LEADER' ? '#FFFFFF' : '#4A4A4C' }}
+                          onClick={() => {
+                            onRoleSwitch('CLIENT_LEADER');
+                            setProfileDropdownOpen(false);
+                          }}
+                        >
+                          Client
+                        </button>
+                      </div>
+                    </>
+                  )}
+
                   <div className="figma-dropdown-divider" />
 
-                  {/* 3. Logout */}
+                  {/* 4. Logout */}
                   <button
                     type="button"
                     className="figma-dropdown-item figma-dropdown-item-logout"

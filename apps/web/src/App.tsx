@@ -23,6 +23,14 @@ import { MobileNotificationsSheet } from './components/mobile/MobileNotification
 import { MobileChangePasswordModal } from './components/mobile/MobileChangePasswordModal';
 import { MobileMoreMenu } from './components/mobile/MobileMoreMenu';
 import { MobileUserManagementView } from './components/mobile/MobileUserManagementView';
+import { MobilePaymentView } from './components/mobile/MobilePaymentView';
+import { MobileAnnouncementsView } from './components/mobile/MobileAnnouncementsView';
+import { MobileRemindersView } from './components/mobile/MobileRemindersView';
+import { MobileAttendanceView } from './components/mobile/MobileAttendanceView';
+import { MobileTargetsView } from './components/mobile/MobileTargetsView';
+import { MobileMeetingsView } from './components/mobile/MobileMeetingsView';
+import { MobileDrawingVerificationView } from './components/mobile/MobileDrawingVerificationView';
+import { MobileChatView } from './components/mobile/MobileChatView';
 import { PwaInstallPrompt } from './components/pwa/PwaInstallPrompt';
 import { PwaOfflineBanner } from './components/pwa/PwaOfflineBanner';
 import { subscribeUserToPush } from './pwa/registerServiceWorker';
@@ -502,53 +510,49 @@ function MainApp() {
           onChangePassword={() => setIsChangePasswordOpen(true)}
           onLogout={logout}
         >
-          {/* If a sub-module is opened from the action grid */}
+          {/* Full Admin Flow Mobile Modules (Figma: 5:2) */}
           {mobileSubModule ? (
-            <div style={{ flex: 1, padding: '16px 20px 120px 20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                <button
-                  onClick={() => setMobileSubModule(null)}
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    background: '#FFFFFF',
-                    border: '1px solid #E8E8E9',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <ChevronLeft size={20} color="#0C0C0D" />
-                </button>
-                <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, textTransform: 'capitalize', color: '#0C0C0D' }}>
-                  {mobileSubModule === 'verification' ? 'Design Verification' : mobileSubModule}
-                </h3>
-              </div>
-
+            <>
               {mobileSubModule === 'verification' && (
-                <VerificationList
+                <MobileDrawingVerificationView
                   userRole={currentUser.role}
                   items={verifications}
+                  onBack={() => setMobileSubModule(null)}
                   onApprove={handleApproveVerification}
                   onRequestRevision={handleRequestRevision}
                 />
               )}
 
               {mobileSubModule === 'payments' && (
-                <PaymentLedger
+                <MobilePaymentView
                   userRole={currentUser.role}
                   showPricing={currentUser.showPricing ?? true}
                   payments={payments}
+                  onBack={() => setMobileSubModule(null)}
                   onSubmitDiscrepancy={handleDiscrepancySubmit}
+                  onRecordPayment={(rec) =>
+                    setPayments((prev) => [
+                      {
+                        id: 'p-' + Date.now(),
+                        milestoneTitle: rec.milestoneTitle || 'Milestone',
+                        amount: rec.amount || 0,
+                        paymentMode: rec.paymentMode || 'NEFT_RTGS',
+                        status: 'PENDING_CLEARANCE',
+                        referenceNumber: rec.referenceNumber,
+                        createdAt: new Date().toISOString(),
+                      },
+                      ...prev,
+                    ])
+                  }
                 />
               )}
 
-              {mobileSubModule === 'attendance' && (
-                <StaffAttendance
+              {(mobileSubModule === 'attendance' || mobileSubModule === 'updates') && (
+                <MobileAttendanceView
+                  userRole={currentUser.role}
                   isClockedIn={isClockedIn}
                   pendingUpdates={pendingUpdates}
+                  onBack={() => setMobileSubModule(null)}
                   onClockIn={handleClockIn}
                   onClockOut={handleClockOut}
                   onSubmitUpdate={handleDailyUpdate}
@@ -556,39 +560,59 @@ function MainApp() {
               )}
 
               {mobileSubModule === 'chat' && (
-                <ProjectChatRoom
+                <MobileChatView
                   projectCode={selectedProjectCode}
                   userRole={currentUser.role}
                   userName={currentUser.fullName}
                   messages={chatMessages}
+                  onBack={() => setMobileSubModule(null)}
                   onSendMessage={handleSendMessage}
                 />
               )}
 
               {mobileSubModule === 'vault' && (
-                <DocumentExplorer
-                  projectCode={selectedProjectCode}
-                  userRole={currentUser.role}
-                  clientName={currentUser.fullName}
-                  userEmail={currentUser.email || 'client@studio.com'}
-                />
+                <div style={{ flex: 1, padding: '0 0 120px 0' }}>
+                  <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button className="figma-subpage-back" onClick={() => setMobileSubModule(null)}>
+                      <ChevronLeft size={20} color="#0C0C0D" />
+                    </button>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0C0C0D' }}>Document Vault</h3>
+                  </div>
+                  <DocumentExplorer
+                    projectCode={selectedProjectCode}
+                    userRole={currentUser.role}
+                    clientName={currentUser.fullName}
+                    userEmail={currentUser.email || 'client@studio.com'}
+                  />
+                </div>
               )}
 
               {mobileSubModule === 'targets' && (
-                <StaffTargets
+                <MobileTargetsView
                   userRole={currentUser.role}
                   authHeaders={getAuthHeaders()}
-                  projects={projects.map(p => ({ id: p.id, projectCode: p.projectCode, name: p.name }))}
+                  projects={projects.map((p) => ({ id: p.id, projectCode: p.projectCode, name: p.name }))}
+                  onBack={() => setMobileSubModule(null)}
                 />
               )}
 
-              {(mobileSubModule === 'announcement' || mobileSubModule === 'policies' || mobileSubModule === 'announcements') && (
-                <AnnouncementsPolicies
+              {(mobileSubModule === 'announcement' ||
+                mobileSubModule === 'policies' ||
+                mobileSubModule === 'announcements') && (
+                <MobileAnnouncementsView
                   userRole={currentUser.role}
                   authHeaders={getAuthHeaders()}
+                  onBack={() => setMobileSubModule(null)}
                 />
               )}
-            </div>
+
+              {mobileSubModule === 'reminders' && (
+                <MobileRemindersView
+                  userRole={currentUser.role}
+                  onBack={() => setMobileSubModule(null)}
+                />
+              )}
+            </>
           ) : (
             <>
               {/* TAB 1: HOME (Figma: 71:9393, 20:2884, 21:3239) */}
@@ -601,7 +625,7 @@ function MainApp() {
                       setMobileProjectStep('list');
                     } else if (viewId === 'meetings') {
                       setMobileTab('meetings');
-                    } else if (['verification', 'payments', 'attendance', 'chat', 'vault', 'targets', 'announcement', 'policies'].includes(viewId)) {
+                    } else if (['verification', 'payments', 'attendance', 'chat', 'vault', 'targets', 'announcement', 'policies', 'reminders', 'updates'].includes(viewId)) {
                       setMobileSubModule(viewId);
                     } else {
                       alert(`Studio Module: ${viewId} selected.`);
@@ -662,22 +686,12 @@ function MainApp() {
                 </>
               )}
 
-              {/* TAB 3: MEETINGS */}
+              {/* TAB 3: MEETINGS (Figma: 646:5911) */}
               {mobileTab === 'meetings' && (
-                <div style={{ padding: '0 16px 120px 16px' }}>
-                  <MeetingCalendar
-                    projectCode={selectedProjectCode}
-                    bookedSlots={bookedSlots}
-                    onBookSlot={handleBookSlot}
-                    activeMeeting={activeMeeting ? {
-                      id: activeMeeting.id,
-                      slotTime: activeMeeting.slotTime || activeMeeting.slot,
-                      date: activeMeeting.bookingDate,
-                      agenda: activeMeeting.agenda || 'Design Review',
-                      status: activeMeeting.status === 'RESCHEDULE_PENDING' ? 'RESCHEDULE_PENDING' : 'CONFIRMED',
-                    } : undefined}
-                  />
-                </div>
+                <MobileMeetingsView
+                  userRole={currentUser.role}
+                  onBack={() => setMobileTab('home')}
+                />
               )}
 
               {/* TAB 4: MORE MENU (Figma: 55:2381) */}
@@ -693,7 +707,8 @@ function MainApp() {
                     <MobileMoreMenu
                       userRole={currentUser.role}
                       onOpenUserManagement={() => setIsMobileUserMgmtOpen(true)}
-                      onOpenProfile={() => alert(`Profile: ${currentUser.fullName} (${currentUser.role})`)}
+                      user={currentUser}
+                      onChangePassword={() => setIsChangePasswordOpen(true)}
                       onLogout={logout}
                     />
                   )}

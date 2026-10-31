@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   User,
   Users,
@@ -10,25 +10,105 @@ import {
   Info,
   ChevronRight,
   LogOut,
+  ShieldCheck,
 } from 'lucide-react';
 import { UserRole } from '../../context/AuthContext';
+import { MobileProfileView } from './MobileProfileView';
+import { MobileDeviceApprovalsView } from './MobileDeviceApprovalsView';
+import { MobileActivityLogView } from './MobileActivityLogView';
+import { MobileSettingsView } from './MobileSettingsView';
+import { MobileAboutAppView } from './MobileAboutAppView';
+import { MobileHelpSupportView } from './MobileHelpSupportView';
+import './mobile.css';
 
 export interface MobileMoreMenuProps {
   userRole: UserRole;
+  user?: {
+    fullName: string;
+    role: UserRole;
+    email?: string;
+    username?: string;
+  };
+  theme?: 'dark' | 'light';
+  onToggleTheme?: () => void;
   onOpenUserManagement: () => void;
-  onOpenProfile: () => void;
+  onChangePassword?: () => void;
   onLogout: () => void;
 }
 
+type SubViewType =
+  | 'menu'
+  | 'profile'
+  | 'device_approvals'
+  | 'activity_log'
+  | 'settings'
+  | 'about_app'
+  | 'help_support';
+
 export const MobileMoreMenu: React.FC<MobileMoreMenuProps> = ({
   userRole,
+  user = { fullName: 'Farhan Admani', role: userRole },
+  theme = 'light',
+  onToggleTheme = () => {},
   onOpenUserManagement,
-  onOpenProfile,
+  onChangePassword = () => {},
   onLogout,
 }) => {
+  const [subView, setSubView] = useState<SubViewType>('menu');
+
+  // Sub-view renders
+  if (subView === 'profile') {
+    return (
+      <MobileProfileView
+        user={user}
+        onBack={() => setSubView('menu')}
+        onChangePassword={onChangePassword}
+        onLogout={onLogout}
+      />
+    );
+  }
+
+  if (subView === 'device_approvals') {
+    return (
+      <MobileDeviceApprovalsView
+        userRole={userRole}
+        onBack={() => setSubView('menu')}
+      />
+    );
+  }
+
+  if (subView === 'activity_log') {
+    return (
+      <MobileActivityLogView
+        userRole={userRole}
+        onBack={() => setSubView('menu')}
+      />
+    );
+  }
+
+  if (subView === 'settings') {
+    return (
+      <MobileSettingsView
+        userRole={userRole}
+        theme={theme}
+        onToggleTheme={onToggleTheme}
+        onBack={() => setSubView('menu')}
+      />
+    );
+  }
+
+  if (subView === 'about_app') {
+    return <MobileAboutAppView onBack={() => setSubView('menu')} />;
+  }
+
+  if (subView === 'help_support') {
+    return <MobileHelpSupportView onBack={() => setSubView('menu')} />;
+  }
+
+  // Root Menu Screen (Figma: 55:2381)
   return (
     <div style={{ flex: 1, paddingBottom: '120px' }}>
-      {/* Header (Figma: 55:2381) */}
+      {/* Header */}
       <div className="figma-subpage-header">
         <h2 style={{ fontSize: '24px', fontWeight: 800, margin: '8px 0 0 0', color: '#0C0C0D' }}>
           More
@@ -36,14 +116,14 @@ export const MobileMoreMenu: React.FC<MobileMoreMenuProps> = ({
       </div>
 
       <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        {/* GROUP 1: ACCOUNT */}
+        {/* GROUP 1: ACCOUNT (Figma: Profile Flow) */}
         <div>
           <div style={{ fontSize: '13px', fontWeight: 700, color: '#686869', marginBottom: '8px' }}>
             Account
           </div>
           <div style={{ background: '#FFFFFF', borderRadius: '18px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.04)', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
             <div
-              onClick={onOpenProfile}
+              onClick={() => setSubView('profile')}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -59,7 +139,7 @@ export const MobileMoreMenu: React.FC<MobileMoreMenuProps> = ({
                 </div>
                 <div>
                   <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>Profile</h4>
-                  <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>Set up your profile</p>
+                  <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>View & edit profile details</p>
                 </div>
               </div>
               <ChevronRight size={18} color="#979798" />
@@ -80,8 +160,8 @@ export const MobileMoreMenu: React.FC<MobileMoreMenuProps> = ({
                   <Users size={20} />
                 </div>
                 <div>
-                  <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>Team member</h4>
-                  <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>Manage team and role</p>
+                  <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>Team Members</h4>
+                  <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>Manage studio team and project roles</p>
                 </div>
               </div>
               <ChevronRight size={18} color="#979798" />
@@ -89,15 +169,16 @@ export const MobileMoreMenu: React.FC<MobileMoreMenuProps> = ({
           </div>
         </div>
 
-        {/* GROUP 2: MANAGEMENT (Admin & Staff) */}
+        {/* GROUP 2: MANAGEMENT (Figma: Management & Device Flow) */}
         {userRole === 'ADMIN' && (
           <div>
             <div style={{ fontSize: '13px', fontWeight: 700, color: '#686869', marginBottom: '8px' }}>
-              Management
+              Management & Security
             </div>
             <div style={{ background: '#FFFFFF', borderRadius: '18px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.04)', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+              {/* Device Approvals Flow */}
               <div
-                onClick={() => alert('Device Approvals: All mobile & tablet hardware tokens verified under strict biometric binding.')}
+                onClick={() => setSubView('device_approvals')}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -112,13 +193,17 @@ export const MobileMoreMenu: React.FC<MobileMoreMenuProps> = ({
                     <Smartphone size={20} />
                   </div>
                   <div>
-                    <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>Device Approvals</h4>
-                    <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>Manage device requests</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>Device Approvals</h4>
+                      <span className="figma-status-badge pending" style={{ padding: '1px 6px', fontSize: '10px' }}>2 Pending</span>
+                    </div>
+                    <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>Authorize trusted mobile sessions</p>
                   </div>
                 </div>
                 <ChevronRight size={18} color="#979798" />
               </div>
 
+              {/* User Management Flow */}
               <div
                 onClick={onOpenUserManagement}
                 style={{
@@ -136,14 +221,15 @@ export const MobileMoreMenu: React.FC<MobileMoreMenuProps> = ({
                   </div>
                   <div>
                     <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>User Management</h4>
-                    <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>Add or remove users (Single-use link)</p>
+                    <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>Single-use registration links & permissions</p>
                   </div>
                 </div>
                 <ChevronRight size={18} color="#979798" />
               </div>
 
+              {/* Activity Log Flow */}
               <div
-                onClick={() => alert('Activity Log: 48 recent studio actions logged with immutable timestamps.')}
+                onClick={() => setSubView('activity_log')}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -158,7 +244,7 @@ export const MobileMoreMenu: React.FC<MobileMoreMenuProps> = ({
                   </div>
                   <div>
                     <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>Activity Log</h4>
-                    <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>View recent activities</p>
+                    <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>View immutable studio audit trail</p>
                   </div>
                 </div>
                 <ChevronRight size={18} color="#979798" />
@@ -167,14 +253,15 @@ export const MobileMoreMenu: React.FC<MobileMoreMenuProps> = ({
           </div>
         )}
 
-        {/* GROUP 3: SETTING & SUPPORT */}
+        {/* GROUP 3: SETTING & SUPPORT (Figma: Settings, Help support, About app) */}
         <div>
           <div style={{ fontSize: '13px', fontWeight: 700, color: '#686869', marginBottom: '8px' }}>
-            Setting & support
+            Setting & Support
           </div>
           <div style={{ background: '#FFFFFF', borderRadius: '18px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.04)', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+            {/* Settings */}
             <div
-              onClick={() => alert('Studio Settings: Notifications, dark mode toggle, WhatsApp gateway.')}
+              onClick={() => setSubView('settings')}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -190,14 +277,15 @@ export const MobileMoreMenu: React.FC<MobileMoreMenuProps> = ({
                 </div>
                 <div>
                   <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>Settings</h4>
-                  <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>App preferences</p>
+                  <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>Notifications, theme, biometric lock</p>
                 </div>
               </div>
               <ChevronRight size={18} color="#979798" />
             </div>
 
+            {/* Help & Support (Guides & FAQs) */}
             <div
-              onClick={() => alert('Help & Support: Direct studio hotline +91 98251 99887 or support@asfdesign.in')}
+              onClick={() => setSubView('help_support')}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -213,14 +301,15 @@ export const MobileMoreMenu: React.FC<MobileMoreMenuProps> = ({
                 </div>
                 <div>
                   <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>Help & Support</h4>
-                  <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>Get help & contact us</p>
+                  <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>How-to guides, FAQs & contact desk</p>
                 </div>
               </div>
               <ChevronRight size={18} color="#979798" />
             </div>
 
+            {/* About App */}
             <div
-              onClick={() => alert('A&F Design Portal v2.4.0 — Architecture & Interior Studio Edition')}
+              onClick={() => setSubView('about_app')}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -235,7 +324,7 @@ export const MobileMoreMenu: React.FC<MobileMoreMenuProps> = ({
                 </div>
                 <div>
                   <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>About App</h4>
-                  <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>Version privacy and terms</p>
+                  <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>Version 2.4.0, Terms & Privacy policy</p>
                 </div>
               </div>
               <ChevronRight size={18} color="#979798" />
