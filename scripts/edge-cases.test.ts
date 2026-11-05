@@ -193,8 +193,9 @@ describe('Comprehensive Architecture Edge-Cases, Boundary & Negative Tests', () 
 
     it('Concurrency Edge Case: blocks double booking of an already reserved slot', async () => {
       const engine = new MeetingReservationEngine();
+      const futureDate = new Date(Date.now() + 86400000 * 10).toISOString().split('T')[0];
       const first = await engine.bookSlot({
-        bookingDate: '2026-11-01',
+        bookingDate: futureDate,
         slot: 'SLOT_12_00_13_30',
         type: 'OFFICE_MEETING',
         requestedBy: 'client-1',
@@ -203,7 +204,7 @@ describe('Comprehensive Architecture Edge-Cases, Boundary & Negative Tests', () 
 
       // Second booking on the exact same date & slot is rejected atomically
       const second = await engine.bookSlot({
-        bookingDate: '2026-11-01',
+        bookingDate: futureDate,
         slot: 'SLOT_12_00_13_30',
         type: 'SITE_VISIT',
         requestedBy: 'client-2',

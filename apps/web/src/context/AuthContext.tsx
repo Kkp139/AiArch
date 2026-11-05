@@ -83,10 +83,10 @@ export function AuthProvider({ children, initialUser = null }: { children: React
 
     if (!user) return;
     const roleProfiles: Record<UserRole, { fullName: string; showPricing: boolean; allowMeetings: boolean }> = {
-      ADMIN: { fullName: 'Farhaz Patel (Admin)', showPricing: true, allowMeetings: true },
-      STAFF: { fullName: 'Priya Mehta (Staff)', showPricing: false, allowMeetings: false },
-      CLIENT_LEADER: { fullName: 'Aakash Mehta (Client Leader)', showPricing: true, allowMeetings: true },
-      CLIENT_VIEWER: { fullName: 'Sneha Kapoor (Client Viewer)', showPricing: false, allowMeetings: true },
+      ADMIN: { fullName: 'Farhaz Patel', showPricing: true, allowMeetings: true },
+      STAFF: { fullName: 'Priya Mehta', showPricing: false, allowMeetings: false },
+      CLIENT_LEADER: { fullName: 'Aakash Mehta', showPricing: true, allowMeetings: true },
+      CLIENT_VIEWER: { fullName: 'Sneha Kapoor', showPricing: false, allowMeetings: true },
     };
 
     const profile = roleProfiles[newRole];
