@@ -274,4 +274,50 @@ describe('Admin Mobile Flow Screen Implementation (Figma Node 5:2)', () => {
     fireEvent.click(backBtn);
     expect(screen.getByText('More')).toBeInTheDocument();
   });
+
+  it('enforces Staff role permissions and submission actions', () => {
+    // 1. Staff is blocked from Meetings
+    const { unmount } = render(
+      <MobileMeetingsView
+        userRole="STAFF"
+        onBack={() => {}}
+      />
+    );
+    expect(screen.getByText(/Access Restricted/i)).toBeInTheDocument();
+    unmount();
+
+    // 2. Staff can access Design Verification and submit drawings
+    render(
+      <MobileDrawingVerificationView
+        userRole="STAFF"
+        items={[]}
+        onBack={() => {}}
+      />
+    );
+    expect(screen.getByText('Design Verification')).toBeInTheDocument();
+    expect(screen.getByText(/Submit Drawing/i)).toBeInTheDocument();
+  });
+
+  it('enforces Client Leader role permissions and request actions', () => {
+    // 1. Client Leader is blocked from internal Drawing Verification
+    const { unmount } = render(
+      <MobileDrawingVerificationView
+        userRole="CLIENT_LEADER"
+        items={[]}
+        onBack={() => {}}
+      />
+    );
+    expect(screen.getByText(/Access Restricted/i)).toBeInTheDocument();
+    unmount();
+
+    // 2. Client Leader can request a meeting slot
+    render(
+      <MobileMeetingsView
+        userRole="CLIENT_LEADER"
+        onBack={() => {}}
+      />
+    );
+    expect(screen.getByText('Meeting Schedule')).toBeInTheDocument();
+    expect(screen.getByText(/Request Meeting/i)).toBeInTheDocument();
+  });
 });

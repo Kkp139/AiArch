@@ -147,6 +147,31 @@ export const MobileMeetingsView: React.FC<MobileMeetingsViewProps> = ({ userRole
     alert('Meeting request declined. Notification dispatched.');
   };
 
+  // Staff Isolation Gate (Chapter 14: Meetings are reserved for Admin & Client Leader)
+  if (userRole === 'STAFF') {
+    return (
+      <div className="figma-mobile-subpage">
+        <div className="figma-subpage-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button className="figma-subpage-back" onClick={onBack} aria-label="Go Back">
+              <ChevronLeft size={20} color="#0C0C0D" />
+            </button>
+            <h2 className="figma-subpage-title">Meeting Schedule</h2>
+          </div>
+        </div>
+        <div className="figma-subpage-body" style={{ textAlign: 'center', padding: '60px 20px' }}>
+          <div style={{ width: '60px', height: '60px', borderRadius: '30px', background: '#FEE4E2', color: '#D92D20', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+            <Calendar size={28} />
+          </div>
+          <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0C0C0D', margin: '0 0 8px 0' }}>Access Restricted</h3>
+          <p style={{ fontSize: '13px', color: '#686869', lineHeight: 1.5, margin: 0 }}>
+            Client consultation meetings are reserved for studio administrators and client leaders.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="figma-mobile-subpage">
       {/* Top Header matching Figma 646:5911 */}
@@ -163,7 +188,7 @@ export const MobileMeetingsView: React.FC<MobileMeetingsViewProps> = ({ userRole
           style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
         >
           <Plus size={16} />
-          <span>Schedule</span>
+          <span>{userRole === 'CLIENT_LEADER' ? 'Request Meeting' : 'Schedule'}</span>
         </button>
       </div>
 
