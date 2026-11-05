@@ -31,6 +31,17 @@ import { MobileTargetsView } from './components/mobile/MobileTargetsView';
 import { MobileMeetingsView } from './components/mobile/MobileMeetingsView';
 import { MobileDrawingVerificationView } from './components/mobile/MobileDrawingVerificationView';
 import { MobileChatView } from './components/mobile/MobileChatView';
+import { MobileSettingsView } from './components/mobile/MobileSettingsView';
+import { useResponsive } from './hooks/useResponsive';
+import { DesktopShell } from './components/desktop/DesktopShell';
+import { DesktopDashboardView } from './components/desktop/DesktopDashboardView';
+import { DesktopProjectsView } from './components/desktop/DesktopProjectsView';
+import { DesktopMeetingsView } from './components/desktop/DesktopMeetingsView';
+import { DesktopPaymentsView } from './components/desktop/DesktopPaymentsView';
+import { DesktopVerificationView } from './components/desktop/DesktopVerificationView';
+import { DesktopChatView } from './components/desktop/DesktopChatView';
+import { DesktopAttendanceView } from './components/desktop/DesktopAttendanceView';
+import { DesktopTargetsView } from './components/desktop/DesktopTargetsView';
 import { PwaInstallPrompt } from './components/pwa/PwaInstallPrompt';
 import { PwaOfflineBanner } from './components/pwa/PwaOfflineBanner';
 import { subscribeUserToPush } from './pwa/registerServiceWorker';
@@ -57,7 +68,7 @@ export interface ProjectSummary {
 
 function MainApp() {
   const { user, token, logout, switchRole } = useAuth();
-  const [activeTab, setActiveTab] = useState('projects');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -100,6 +111,7 @@ function MainApp() {
   // Real Attendance Session State
   const [isClockedIn, setIsClockedIn] = useState(false);
   const [pendingUpdates, setPendingUpdates] = useState<string[]>([]);
+  const unreadCount = 4;
 
   const getAuthHeaders = useCallback(() => {
     const roleSlug = user?.role ? user.role.toLowerCase() : 'admin';
@@ -900,225 +912,135 @@ function MainApp() {
         }}
       />
 
-      <Shell
+      <DesktopShell
         user={currentUser}
-        studioName="A&F Design"
-        activeTab={activeTab}
-        onTabChange={(tab) => setActiveTab(tab)}
+        activeModule={activeTab}
+        onSelectModule={(moduleId) => setActiveTab(moduleId)}
+        onRoleSwitch={switchRole}
         onLogout={logout}
+        onChangePassword={() => setIsChangePasswordOpen(true)}
+        unreadCount={unreadCount}
+        onOpenNotifications={() => setIsNotificationsOpen(true)}
       >
-        {/* TAB 1: PROJECTS OVERVIEW DASHBOARD (REAL SUPABASE DB) */}
+        {activeTab === 'dashboard' && (
+          <DesktopDashboardView
+            user={currentUser}
+            onNavigateTab={(tab) => setActiveTab(tab)}
+            onOpenNewProject={() => setIsCreateProjectOpen(true)}
+            onOpenUpload={() => setActiveTab('projects')}
+            onScheduleMeeting={() => setActiveTab('meetings')}
+            onPunchAttendance={() => setActiveTab('attendance')}
+          />
+        )}
+
         {activeTab === 'projects' && (
-          <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-            <div style={{ marginBottom: '24px' }}>
-              <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--accent-gold)', fontWeight: 700 }}>
-                Active Studio Portfolios
-              </span>
-              <h1 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                Architectural Projects ({projects.length})
-              </h1>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-                Manage design workflows, category milestones, and client handoffs.
-              </p>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-              {projects.map((proj) => (
-                <div
-                  key={proj.id}
-                  style={{
-                    backgroundColor: 'var(--bg-secondary)',
-                    border: selectedProjectCode === proj.projectCode ? '2px solid var(--accent-gold)' : '1px solid var(--border-subtle)',
-                    borderRadius: 'var(--radius-lg)',
-                    padding: '24px',
-                    boxShadow: 'var(--shadow-sm)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                      <span
-                        style={{
-                          fontSize: '11px',
-                          padding: '2px 8px',
-                          backgroundColor: proj.status === 'ACTIVE' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-                          color: proj.status === 'ACTIVE' ? 'var(--accent-emerald)' : 'var(--accent-blue)',
-                          borderRadius: '10px',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {proj.status}
-                      </span>
-                      <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                        {proj.projectCode}
-                      </span>
-                    </div>
-
-                    <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                      {proj.name}
-                    </h3>
-                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                      {proj.category} • Location: {proj.siteLocation}
-                    </p>
-
-                    {/* 16-Category Progress Meter */}
-                    <div style={{ marginBottom: '20px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '6px' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>Workflow Progress</span>
-                        <span style={{ color: 'var(--accent-gold)', fontWeight: 700 }}>
-                          {proj.completionPercentage}% ({proj.populatedFolders}/16 Folders)
-                        </span>
-                      </div>
-                      <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--bg-surface)', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div
-                          style={{
-                            width: `${proj.completionPercentage}%`,
-                            height: '100%',
-                            backgroundColor: 'var(--accent-gold)',
-                            borderRadius: '4px',
-                            transition: 'width 0.3s ease',
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button
-                      onClick={() => {
-                        setSelectedProjectCode(proj.projectCode);
-                        setActiveTab('vault');
-                      }}
-                      style={{
-                        flex: 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        padding: '10px',
-                        backgroundColor: 'var(--bg-tertiary)',
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: 'var(--radius-md)',
-                        color: 'var(--text-primary)',
-                        fontSize: '13px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <span>Open Vault</span>
-                      <ArrowRight size={15} />
-                    </button>
-                    {selectedProjectCode !== proj.projectCode && (
-                      <button
-                        onClick={() => setSelectedProjectCode(proj.projectCode)}
-                        style={{
-                          padding: '10px 14px',
-                          backgroundColor: '#21262d',
-                          border: '1px solid #30363d',
-                          borderRadius: 'var(--radius-md)',
-                          color: '#c9d1d9',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Set Active
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 2: DOCUMENT VAULT & 16 CATEGORIES */}
-        {activeTab === 'vault' && (
-          <DocumentExplorer
+          <DesktopProjectsView
             projectCode={selectedProjectCode}
             userRole={currentUser.role}
-            clientName={currentUser.fullName}
-            userEmail={currentUser.email || 'client@studio.com'}
+            projectName={projects.find((p) => p.projectCode === selectedProjectCode)?.name}
+            onOpenUpload={() => {}}
           />
         )}
 
-        {/* TAB 3: DESIGN VERIFICATION & APPROVALS (REVISION COUNTER) */}
-        {activeTab === 'verification' && (
-          <VerificationList
-            userRole={currentUser.role}
-            items={verifications}
-            onApprove={handleApproveVerification}
-            onRequestRevision={handleRequestRevision}
-          />
-        )}
-
-        {/* TAB 4: CONSULTATION MEETINGS (3 FIXED SLOTS) */}
         {activeTab === 'meetings' && (
-          <MeetingCalendar
+          <DesktopMeetingsView
+            userRole={currentUser.role}
             projectCode={selectedProjectCode}
-            bookedSlots={bookedSlots}
-            onBookSlot={handleBookSlot}
-            activeMeeting={activeMeeting ? {
-              id: activeMeeting.id,
-              slotTime: activeMeeting.slotTime || activeMeeting.slot,
-              date: activeMeeting.bookingDate,
-              agenda: activeMeeting.agenda || 'Design Review',
-              status: activeMeeting.status === 'RESCHEDULE_PENDING' ? 'RESCHEDULE_PENDING' : 'CONFIRMED',
-            } : undefined}
           />
         )}
 
-        {/* TAB 5: ATTENDANCE & CLOCK-OUT HARD GATE */}
-        {activeTab === 'attendance' && (
-          <StaffAttendance
-            isClockedIn={isClockedIn}
-            pendingUpdates={pendingUpdates}
-            onClockIn={handleClockIn}
-            onClockOut={handleClockOut}
-            onSubmitUpdate={handleDailyUpdate}
-          />
-        )}
-
-        {/* TAB 6: PAYMENTS LEDGER (STRICTLY HIDDEN FOR STAFF) */}
         {activeTab === 'payments' && (
-          <PaymentLedger
+          <DesktopPaymentsView
             userRole={currentUser.role}
             showPricing={currentUser.showPricing ?? true}
-            payments={payments}
+            projectCode={selectedProjectCode}
             onSubmitDiscrepancy={handleDiscrepancySubmit}
           />
         )}
 
-        {/* TAB 7: ENCRYPTED PROJECT CHAT */}
-        {activeTab === 'chat' && (
-          <ProjectChatRoom
-            projectCode={selectedProjectCode}
+        {activeTab === 'verification' && (
+          <DesktopVerificationView
             userRole={currentUser.role}
-            userName={currentUser.fullName}
+            projectCode={selectedProjectCode}
+            onApprove={(id) => handleApproveVerification(id)}
+            onRequestRevision={(id, notes) => handleRequestRevision(id, notes)}
+          />
+        )}
+
+        {activeTab === 'attendance' && (
+          <DesktopAttendanceView
+            user={currentUser}
+            isClockedIn={isClockedIn}
+            onClockIn={handleClockIn}
+            onClockOut={handleClockOut}
+            onSubmitDailyUpdate={handleDailyUpdate}
+          />
+        )}
+
+        {activeTab === 'targets' && (
+          <DesktopTargetsView
+            user={currentUser}
+          />
+        )}
+
+        {activeTab === 'updates' && (
+          <DesktopAttendanceView
+            user={currentUser}
+            isClockedIn={isClockedIn}
+            onClockIn={handleClockIn}
+            onClockOut={handleClockOut}
+            onSubmitDailyUpdate={handleDailyUpdate}
+          />
+        )}
+
+        {(activeTab === 'chats' || activeTab === 'chat') && (
+          <DesktopChatView
+            user={currentUser}
+            activeProjectCode={selectedProjectCode}
             messages={chatMessages}
+            onSelectThread={(code) => setSelectedProjectCode(code)}
             onSendMessage={handleSendMessage}
           />
         )}
 
-        {/* TAB 8: STAFF TARGETS & PRODUCTIVITY TRACKING */}
-        {activeTab === 'targets' && (
-          <StaffTargets
-            userRole={currentUser.role}
-            authHeaders={getAuthHeaders()}
-            projects={projects.map(p => ({ id: p.id, projectCode: p.projectCode, name: p.name }))}
-          />
+        {activeTab === 'announcements' && (
+          <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '24px' }}>
+            <AnnouncementsPolicies
+              userRole={currentUser.role}
+              authHeaders={getAuthHeaders()}
+            />
+          </div>
         )}
 
-        {/* TAB 9: ANNOUNCEMENTS & STUDIO POLICIES */}
-        {activeTab === 'announcements' && (
-          <AnnouncementsPolicies
-            userRole={currentUser.role}
-            authHeaders={getAuthHeaders()}
-          />
+        {activeTab === 'policies' && (
+          <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '24px' }}>
+            <AnnouncementsPolicies
+              userRole={currentUser.role}
+              authHeaders={getAuthHeaders()}
+            />
+          </div>
         )}
-      </Shell>
+
+        {activeTab === 'reminders' && (
+          <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '24px' }}>
+            <MobileRemindersView
+              userRole={currentUser.role}
+              onBack={() => setActiveTab('dashboard')}
+            />
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '24px' }}>
+            <MobileSettingsView
+              userRole={currentUser.role}
+              theme="light"
+              onToggleTheme={() => {}}
+              onBack={() => setActiveTab('dashboard')}
+            />
+          </div>
+        )}
+      </DesktopShell>
     </div>
   );
 }

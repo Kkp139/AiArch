@@ -414,7 +414,7 @@ export const MobilePaymentView: React.FC<MobilePaymentViewProps> = ({
                 <span>Download Official Receipt (PDF)</span>
               </button>
 
-              {userRole !== 'STAFF' && (
+              {(userRole as string) !== 'STAFF' && (
                 <button
                   className="figma-btn-secondary-full"
                   onClick={() => setIsDiscrepancyModalOpen(true)}
