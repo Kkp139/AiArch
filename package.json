@@ -7,9 +7,9 @@
     "apps/*"
   ],
   "scripts": {
-    "dev:api": "npm --workspace=@pronex/api run dev",
+    "dev:api": "node ./node_modules/tsx/dist/cli.mjs watch apps/api/src/server.ts",
     "dev:web": "node ./node_modules/vite/bin/vite.js apps/web",
-    "dev:worker": "npm --workspace=@pronex/worker run dev",
+    "dev:worker": "node ./node_modules/tsx/dist/cli.mjs watch apps/worker/src/worker.ts",
     "build": "node ./node_modules/typescript/bin/tsc --build",
     "build:web": "node ./node_modules/vite/bin/vite.js build apps/web && node ./scripts/sync-dist.js",
     "test": "node ./node_modules/vitest/vitest.mjs run"

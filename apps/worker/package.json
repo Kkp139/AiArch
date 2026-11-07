@@ -4,9 +4,9 @@
   "private": true,
   "main": "dist/worker.js",
   "scripts": {
-    "dev": "tsx watch src/worker.ts",
+    "dev": "node ../../node_modules/tsx/dist/cli.mjs watch src/worker.ts",
     "build": "tsc",
-    "test": "vitest run"
+    "test": "node ../../node_modules/vitest/vitest.mjs run"
   },
   "dependencies": {
     "bullmq": "^5.7.1",

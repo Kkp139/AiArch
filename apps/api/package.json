@@ -4,9 +4,9 @@
   "private": true,
   "main": "dist/server.js",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "node ../../node_modules/tsx/dist/cli.mjs watch src/server.ts",
     "build": "tsc",
-    "test": "vitest run"
+    "test": "node ../../node_modules/vitest/vitest.mjs run"
   },
   "dependencies": {
     "@fastify/cookie": "^9.3.1",
