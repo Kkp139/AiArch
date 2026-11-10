@@ -39,7 +39,7 @@ import { DesktopProjectsView } from './components/desktop/DesktopProjectsView';
 import { DesktopMeetingsView } from './components/desktop/DesktopMeetingsView';
 import { DesktopPaymentsView } from './components/desktop/DesktopPaymentsView';
 import { DesktopVerificationView } from './components/desktop/DesktopVerificationView';
-import { DesktopChatView } from './components/desktop/DesktopChatView';
+import { DesktopChatView, ProjectThread } from './components/desktop/DesktopChatView';
 import { DesktopAttendanceView } from './components/desktop/DesktopAttendanceView';
 import { DesktopTargetsView } from './components/desktop/DesktopTargetsView';
 import { PwaInstallPrompt } from './components/pwa/PwaInstallPrompt';
@@ -231,6 +231,20 @@ function MainApp() {
     }
   }, [user, refreshAllData, getAuthHeaders]);
 
+  // Dynamic Project Threads for Real-Time Consultation Chat
+  const chatThreads: ProjectThread[] = useMemo(() => {
+    if (!projects || projects.length === 0) return [];
+    return projects.map((p) => ({
+      id: p.id,
+      projectCode: p.projectCode,
+      projectName: p.name,
+      clientName: (p as any).clientName || 'Client Representative',
+      lastMessage: 'Tap to view live project channel',
+      lastMessageTime: 'Active',
+      unreadCount: 0,
+    }));
+  }, [projects]);
+
   // Refetch when switching project
   useEffect(() => {
     if (user && selectedProjectCode) {
@@ -239,6 +253,19 @@ function MainApp() {
       fetchChat();
     }
   }, [selectedProjectCode, fetchPayments, fetchMeetings, fetchChat, user]);
+
+  // Live polling for real-time consultation chat synchronization
+  useEffect(() => {
+    const isChatOpen = (activeTab === 'chats' || activeTab === 'chat' || mobileSubModule === 'chat');
+    if (!isChatOpen || !user || !selectedProjectCode) return;
+
+    fetchChat();
+    const interval = setInterval(() => {
+      fetchChat();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [activeTab, mobileSubModule, user, selectedProjectCode, fetchChat]);
 
   // Verification Approvals
   const handleApproveVerification = async (id: string) => {
@@ -298,13 +325,17 @@ function MainApp() {
     }
   };
 
-  // Send Chat Message
-  const handleSendMessage = async (text: string) => {
+  // Send Chat Message (Supports optional attachment)
+  const handleSendMessage = async (text: string, attachment?: { name: string; size: number; url: string }) => {
     try {
+      const payload: any = { messageText: text || (attachment ? `[Attachment: ${attachment.name}]` : '') };
+      if (attachment) {
+        payload.attachmentKey = attachment.name;
+      }
       const res = await fetch(`/api/chat/projects/${selectedProjectCode}/messages`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ messageText: text }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         await fetchChat();
@@ -577,6 +608,8 @@ function MainApp() {
                   userRole={currentUser.role}
                   userName={currentUser.fullName}
                   messages={chatMessages}
+                  availableProjects={projects}
+                  onSelectProject={(code) => setSelectedProjectCode(code)}
                   onBack={() => setMobileSubModule(null)}
                   onSendMessage={handleSendMessage}
                 />
@@ -996,6 +1029,7 @@ function MainApp() {
         {(activeTab === 'chats' || activeTab === 'chat') && (
           <DesktopChatView
             user={currentUser}
+            threads={chatThreads.length > 0 ? chatThreads : undefined}
             activeProjectCode={selectedProjectCode}
             messages={chatMessages}
             onSelectThread={(code) => setSelectedProjectCode(code)}

@@ -153,8 +153,10 @@ export const DesktopChatView: React.FC<DesktopChatViewProps> = ({
   useEffect(() => {
     if (controlledProjectCode) {
       setSelectedCode(controlledProjectCode);
+    } else if (threads.length > 0 && !threads.some((t) => t.projectCode === selectedCode)) {
+      setSelectedCode(threads[0].projectCode);
     }
-  }, [controlledProjectCode]);
+  }, [controlledProjectCode, threads, selectedCode]);
 
   useEffect(() => {
     if (propMessages) {
@@ -301,11 +303,27 @@ export const DesktopChatView: React.FC<DesktopChatViewProps> = ({
             <span className="desktop-chat-watermark-text">A&F DESIGN STUDIO CONSULTATION CHANNEL</span>
           </div>
 
+          {localMessages.length === 0 && (
+            <div style={{ padding: '60px 20px', textAlign: 'center', color: '#889096' }}>
+              <Building size={36} color="#BF935A" style={{ opacity: 0.6, marginBottom: '12px' }} />
+              <p style={{ margin: 0, fontSize: '14px', fontWeight: 500 }}>
+                No messages yet in this project channel.
+              </p>
+              <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#686869' }}>
+                Studio Admin and Client Leader can communicate securely here.
+              </p>
+            </div>
+          )}
+
           {localMessages.map((msg) => {
             const isMine =
               msg.senderName === user.fullName ||
               (user.role === 'ADMIN' && msg.senderRole === 'ADMIN') ||
               (user.role === 'CLIENT_LEADER' && msg.senderRole === 'CLIENT_LEADER');
+
+            const formattedTime = msg.createdAt?.includes('T')
+              ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : msg.createdAt;
 
             return (
               <div
@@ -320,10 +338,19 @@ export const DesktopChatView: React.FC<DesktopChatViewProps> = ({
                     </span>
                   </div>
                   <p className="desktop-chat-bubble-text">{msg.text}</p>
+                  {msg.attachmentUrl && (
+                    <div style={{ marginTop: '8px', marginBottom: '4px' }}>
+                      <img
+                        src={msg.attachmentUrl}
+                        alt="attachment"
+                        style={{ maxWidth: '100%', maxHeight: '220px', borderRadius: '6px', objectFit: 'contain' }}
+                      />
+                    </div>
+                  )}
                   <div className="desktop-chat-bubble-footer">
                     <span className="desktop-chat-timestamp">
                       <Clock size={11} style={{ marginRight: '4px' }} />
-                      {msg.createdAt}
+                      {formattedTime}
                     </span>
                     {isMine && <CheckCheck size={14} color="#BF935A" />}
                   </div>

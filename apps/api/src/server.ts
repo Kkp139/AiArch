@@ -15,6 +15,7 @@ import { verificationRoutes } from './modules/verification/verification.controll
 import { notificationRoutes } from './modules/notifications/notifications.controller';
 import { announcementRoutes } from './modules/announcements/announcements.controller';
 import { targetRoutes } from './modules/targets/targets.controller';
+import { initializeSocketGateway } from './gateway/socket.gateway';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
@@ -132,7 +133,8 @@ if (require.main === module) {
         console.error(err);
         process.exit(1);
       }
-      console.log(`ProNex-ArchAI API running on port ${port}`);
+      initializeSocketGateway(app.server);
+      console.log(`ProNex-ArchAI API running on port ${port} with real-time Socket.io gateway`);
     });
   });
 }

@@ -11,6 +11,12 @@ export interface AuthenticatedSocket extends Socket {
   };
 }
 
+let ioInstance: SocketIOServer | null = null;
+
+export function getSocketIO(): SocketIOServer | null {
+  return ioInstance;
+}
+
 export function initializeSocketGateway(httpServer: HttpServer): SocketIOServer {
   const io = new SocketIOServer(httpServer, {
     cors: {
@@ -19,6 +25,8 @@ export function initializeSocketGateway(httpServer: HttpServer): SocketIOServer 
     },
     maxHttpBufferSize: 10 * 1024 * 1024, // 10MB
   });
+
+  ioInstance = io;
 
   // Authentication Middleware for Socket Connections
   io.use((socket: AuthenticatedSocket, next) => {

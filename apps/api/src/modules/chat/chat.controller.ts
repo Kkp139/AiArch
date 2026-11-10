@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { resolveUserFromRequest, userHasProjectAccess } from '../../lib/auth-guard';
+import { getSocketIO } from '../../gateway/socket.gateway';
 
 export async function chatRoutes(app: FastifyInstance) {
   // Get Chat History for a Project (Strictly restricted to Admin and assigned Client Leader!)
@@ -118,14 +119,24 @@ export async function chatRoutes(app: FastifyInstance) {
       },
     });
 
-    return {
+    const formattedMessage = {
       id: message.id,
       projectId: message.projectId,
       senderId: message.senderId,
       senderName: message.sender.fullName,
       senderRole: message.sender.role,
       text: message.messageText,
+      attachmentUrl: message.attachmentKey ? `https://${process.env.S3_BUCKET_NAME || 'afdesign-vault-prod'}.r2.cloudflarestorage.com/${message.attachmentKey}` : undefined,
       createdAt: message.createdAt,
     };
+
+    // Broadcast in real-time via Socket.io if active
+    const io = getSocketIO();
+    if (io) {
+      io.to(`project:${project.id}`).emit('new_message', formattedMessage);
+      io.to(`project:${project.projectCode}`).emit('new_message', formattedMessage);
+    }
+
+    return formattedMessage;
   });
 }
