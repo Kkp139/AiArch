@@ -261,4 +261,76 @@ export async function attendanceRoutes(app: FastifyInstance) {
       message: 'Clock-Out completed successfully. All scheduled work updates verified.',
     };
   });
+
+  // Admin Overview of all staff attendance sessions and work logs
+  app.get('/api/attendance/admin/overview', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Restricted to Admin.' });
+    }
+
+    const scheduledSlots = ['Slot 12:00', 'Slot 17:30'];
+
+    const sessions = await prisma.attendance.findMany({
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            username: true,
+            role: true,
+            mobile: true,
+          },
+        },
+        dailyUpdates: {
+          include: {
+            project: {
+              select: {
+                id: true,
+                projectCode: true,
+                name: true,
+              },
+            },
+          },
+          orderBy: { submittedAt: 'asc' },
+        },
+      },
+      orderBy: { clockInAt: 'desc' },
+      take: 50,
+    });
+
+    const records = sessions.map(session => {
+      const submittedSlots = session.dailyUpdates.map(u => u.scheduledSlot);
+      const pendingUpdates = session.clockOutAt ? [] : scheduledSlots.filter(s => !submittedSlots.includes(s));
+
+      return {
+        id: session.id,
+        staffName: session.user?.fullName || 'Staff Member',
+        username: session.user?.username || 'staff',
+        mobile: session.user?.mobile || '',
+        role: session.user?.role || 'STAFF',
+        clockInAt: session.clockInAt,
+        clockInAddress: session.clockInAddress || 'Ahmedabad Studio HQ',
+        clockOutAt: session.clockOutAt,
+        clockOutAddress: session.clockOutAddress,
+        pendingUpdates,
+        dailyUpdates: session.dailyUpdates.map(u => ({
+          id: u.id,
+          slot: u.scheduledSlot,
+          workSummary: u.workSummary,
+          submittedAt: u.submittedAt,
+          projectCode: u.project?.projectCode || 'AF-VILLA',
+        })),
+      };
+    });
+
+    return {
+      records,
+      totalCount: records.length,
+      activeCount: records.filter(r => !r.clockOutAt).length,
+    };
+  });
 }

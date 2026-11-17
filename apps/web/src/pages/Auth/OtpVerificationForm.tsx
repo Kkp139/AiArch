@@ -12,11 +12,11 @@ interface OtpVerificationFormProps {
 export const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
   mobile,
   tempToken,
-  debugOtp = '123456',
+  debugOtp,
   onBack,
   onSuccess,
 }) => {
-  const [digits, setDigits] = useState<string[]>(['1', '2', '3', '4', '5', '6']);
+  const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasError, setHasError] = useState(false);
@@ -155,6 +155,32 @@ export const OtpVerificationForm: React.FC<OtpVerificationFormProps> = ({
         A 6-digit verification code has been dispatched to WhatsApp on{' '}
         <strong style={{ color: 'var(--text-primary)' }}>{mobile}</strong>.
       </p>
+
+      {debugOtp && (
+        <div style={{ marginBottom: '12px', textAlign: 'center' }}>
+          <button
+            type="button"
+            onClick={() => {
+              const codeDigits = debugOtp.split('').slice(0, 6);
+              while (codeDigits.length < 6) codeDigits.push('');
+              setDigits(codeDigits);
+              setErrorMessage(null);
+              setHasError(false);
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--accent-gold)',
+              fontSize: '11px',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              opacity: 0.85,
+            }}
+          >
+            Development Helper: Auto-fill code ({debugOtp})
+          </button>
+        </div>
+      )}
 
       {errorMessage && (
         <div className="form-alert-error">

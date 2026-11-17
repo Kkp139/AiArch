@@ -10,6 +10,7 @@ import {
   Home,
   FolderKanban,
   CalendarDays,
+  Clock,
   MoreHorizontal,
 } from 'lucide-react';
 import './mobile.css';
@@ -28,6 +29,7 @@ export interface MobileShellProps {
   onOpenProfile?: () => void;
   onChangePassword?: () => void;
   onLogout?: () => void;
+  unreadCount?: number;
   children: React.ReactNode;
 }
 
@@ -39,6 +41,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
   onOpenProfile,
   onChangePassword,
   onLogout,
+  unreadCount = 0,
   children,
 }) => {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
@@ -79,7 +82,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
             title="Notifications"
           >
             <Bell size={18} />
-            <span className="figma-notif-badge">4</span>
+            {unreadCount > 0 && <span className="figma-notif-badge">{unreadCount}</span>}
           </button>
 
           {/* User Profile Avatar Pill with Dropdown (Figma: 224:4851) */}
@@ -194,13 +197,25 @@ export const MobileShell: React.FC<MobileShellProps> = ({
           <span>Projects</span>
         </button>
 
-        <button
-          className={`figma-dock-tab ${activeTab === 'meetings' ? 'active' : ''}`}
-          onClick={() => onTabChange('meetings')}
-        >
-          <CalendarDays size={18} />
-          <span>Meetings</span>
-        </button>
+        {(user.role === 'ADMIN' || user.role === 'CLIENT_LEADER') && (
+          <button
+            className={`figma-dock-tab ${activeTab === 'meetings' ? 'active' : ''}`}
+            onClick={() => onTabChange('meetings')}
+          >
+            <CalendarDays size={18} />
+            <span>Meetings</span>
+          </button>
+        )}
+
+        {user.role === 'STAFF' && (
+          <button
+            className={`figma-dock-tab ${activeTab === 'attendance' ? 'active' : ''}`}
+            onClick={() => onTabChange('attendance')}
+          >
+            <Clock size={18} />
+            <span>Attendance</span>
+          </button>
+        )}
 
         <button
           className={`figma-dock-tab ${activeTab === 'more' ? 'active' : ''}`}

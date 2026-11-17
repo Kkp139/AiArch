@@ -10,9 +10,10 @@
     "dev:api": "npm --workspace=@pronex/api run dev",
     "dev:web": "node ./node_modules/vite/bin/vite.js apps/web",
     "dev:worker": "npm --workspace=@pronex/worker run dev",
-    "build": "node ./node_modules/typescript/bin/tsc --build",
+    "build": "npm --workspace=@pronex/api run build && npm --workspace=@pronex/web run build",
     "build:web": "node ./node_modules/vite/bin/vite.js build apps/web && node ./scripts/sync-dist.js",
-    "test": "node ./node_modules/vitest/vitest.mjs run"
+    "test": "node ./node_modules/vitest/vitest.mjs run",
+    "postinstall": "npx prisma generate --schema=apps/api/prisma/schema.prisma"
   },
   "devDependencies": {
     "typescript": "^5.4.5"

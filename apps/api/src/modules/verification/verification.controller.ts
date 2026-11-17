@@ -74,6 +74,8 @@ export async function verificationRoutes(app: FastifyInstance) {
       fileKey: z.string().min(1),
       previewKey: z.string().optional(),
       submittedBy: z.string().optional(),
+      notes: z.string().optional(),
+      feedbackNote: z.string().optional(),
     });
 
     const body = schema.safeParse(request.body);
@@ -82,6 +84,7 @@ export async function verificationRoutes(app: FastifyInstance) {
     }
 
     const { projectId, folderId, drawingTitle, fileKey, previewKey } = body.data;
+    const note = body.data.notes || body.data.feedbackNote || null;
 
     // Resolve submitter user
     const submitterId = user.id;
@@ -105,7 +108,7 @@ export async function verificationRoutes(app: FastifyInstance) {
           previewKey,
           revisionNumber: existing.revisionNumber + 1,
           status: 'PENDING_REVIEW',
-          feedbackNote: null,
+          feedbackNote: note,
           reviewedBy: null,
           reviewedAt: null,
         },
@@ -121,6 +124,7 @@ export async function verificationRoutes(app: FastifyInstance) {
           submittedBy: submitterId,
           revisionNumber: 1,
           status: 'PENDING_REVIEW',
+          feedbackNote: note,
         },
       });
     }
@@ -208,11 +212,13 @@ export async function verificationRoutes(app: FastifyInstance) {
     }
 
     const schema = z.object({
-      feedbackNote: z.string().min(1, 'Feedback note is required'),
+      feedbackNote: z.string().optional(),
+      notes: z.string().optional(),
     });
 
     const body = schema.safeParse(request.body);
-    if (!body.success) {
+    const feedbackNote = (body.success && (body.data.notes || body.data.feedbackNote)) || '';
+    if (!feedbackNote || feedbackNote.trim().length === 0) {
       return reply.status(400).send({ error: 'Feedback note is required' });
     }
 
@@ -220,7 +226,7 @@ export async function verificationRoutes(app: FastifyInstance) {
       where: { id: request.params.id },
       data: {
         status: 'REVISION_REQUIRED',
-        feedbackNote: body.data.feedbackNote,
+        feedbackNote: feedbackNote.trim(),
         reviewedBy: user.id,
         reviewedAt: new Date(),
       },

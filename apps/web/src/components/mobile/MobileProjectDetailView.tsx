@@ -28,7 +28,7 @@ export interface MobileProjectDetailViewProps {
   onViewModeChange?: (mode: 'grid' | 'list') => void;
 }
 
-// 8 Concept Folders (Figma: 39:1002)
+// 6 Official Concept Folders (Appendix A & Figma: 39:1002)
 const CONCEPT_FOLDERS = [
   { name: 'Site Drawings', count: 4, icon: Compass },
   { name: 'Zoning / Planning', count: 3, icon: Layers },
@@ -36,8 +36,6 @@ const CONCEPT_FOLDERS = [
   { name: 'Complete Set of Drawings', count: 6, icon: FolderKanban },
   { name: 'Material Selection', count: 4, icon: Palette },
   { name: '3D Images', count: 2, icon: Eye },
-  { name: 'Greenfield House', count: 3, icon: Compass },
-  { name: 'Lakeview Residence', count: 3, icon: Layers },
 ];
 
 // 9 Construction Folders (Figma: 40:1199)

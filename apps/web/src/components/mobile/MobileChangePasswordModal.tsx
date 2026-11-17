@@ -55,8 +55,29 @@ export const MobileChangePasswordModal: React.FC<MobileChangePasswordModalProps>
     }
 
     setIsLoading(true);
-    // Simulate updating password
-    setTimeout(() => {
+    setErrorMessage(null);
+
+    try {
+      const authToken = typeof window !== 'undefined' ? localStorage.getItem('pronex_auth_token') : '';
+      const response = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        setIsLoading(false);
+        setErrorMessage(data.error || 'Failed to update password.');
+        return;
+      }
+
       setIsLoading(false);
       setSuccessMessage('Password updated successfully!');
       setTimeout(() => {
@@ -66,7 +87,10 @@ export const MobileChangePasswordModal: React.FC<MobileChangePasswordModalProps>
         setConfirmPassword('');
         setSuccessMessage(null);
       }, 1200);
-    }, 700);
+    } catch (err) {
+      setIsLoading(false);
+      setErrorMessage('Network error communicating with studio API.');
+    }
   };
 
   return (

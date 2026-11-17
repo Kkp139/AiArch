@@ -117,10 +117,11 @@ export async function authRoutes(app: FastifyInstance) {
 
     generateOtp(body.data.mobile); // ensure active record in store
 
+    const isProd = process.env.NODE_ENV === 'production';
     return {
       success: true,
       message: `A 6-digit verification code has been dispatched to WhatsApp on ${body.data.mobile}.`,
-      debugOtp: otp,
+      ...(isProd ? {} : { debugOtp: otp }),
     };
   });
 
@@ -495,6 +496,48 @@ export async function authRoutes(app: FastifyInstance) {
     return {
       success: true,
       message: 'Your password has been successfully configured. You may now log in.',
+    };
+  });
+
+  // Change Password endpoint (Authenticated users)
+  app.post('/api/auth/change-password', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required. Please log in.' });
+    }
+
+    const schema = z.object({
+      currentPassword: z.string().min(1, 'Current password is required'),
+      newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+    });
+
+    const body = schema.safeParse(request.body);
+    if (!body.success) {
+      return reply.status(400).send({ error: body.error.errors[0]?.message || 'Invalid password input' });
+    }
+
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+    });
+
+    if (!dbUser) {
+      return reply.status(404).send({ error: 'User not found' });
+    }
+
+    const isCurrentValid = await verifyPassword(body.data.currentPassword, dbUser.passwordHash);
+    if (!isCurrentValid) {
+      return reply.status(400).send({ error: 'Current password does not match records.' });
+    }
+
+    const newHash = await hashPassword(body.data.newPassword);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: newHash },
+    });
+
+    return {
+      success: true,
+      message: 'Password updated successfully.',
     };
   });
 }

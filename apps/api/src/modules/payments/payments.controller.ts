@@ -43,6 +43,9 @@ export async function paymentRoutes(app: FastifyInstance) {
     const payments = await prisma.payment.findMany({
       where: { projectId: project.id },
       include: {
+        project: {
+          select: { id: true, projectCode: true, name: true },
+        },
         recorder: {
           select: { id: true, fullName: true, role: true },
         },
@@ -53,6 +56,65 @@ export async function paymentRoutes(app: FastifyInstance) {
     return payments.map(p => ({
       id: p.id,
       projectId: p.projectId,
+      projectCode: p.project?.projectCode || project.projectCode,
+      projectName: p.project?.name || project.name,
+      milestoneTitle: p.bankName || p.referenceNumber || `Milestone Release — ${p.project?.projectCode || project.projectCode}`,
+      amount: Number(p.amount),
+      paymentMode: p.paymentMode,
+      referenceNumber: p.referenceNumber,
+      bankName: p.bankName,
+      status: p.status,
+      discrepancyNote: p.discrepancyNote,
+      recordedBy: p.recorder.fullName,
+      createdAt: p.createdAt.toISOString().split('T')[0],
+    }));
+  });
+
+  // Get All Payments (Admin overview across all projects, or filtered by ?projectCode=)
+  app.get('/api/payments', async (request: FastifyRequest<{ Querystring: { projectCode?: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required. Please sign in to view payment records.' });
+    }
+
+    if (user.role === 'STAFF') {
+      return reply.status(403).send({ error: 'Access denied: Staff accounts cannot access payment records.' });
+    }
+
+    const { projectCode } = request.query;
+    const where: any = {};
+
+    if (projectCode && projectCode !== 'ALL') {
+      const project = await prisma.project.findFirst({
+        where: { OR: [{ id: projectCode }, { projectCode }] },
+      });
+      if (project) {
+        where.projectId = project.id;
+      }
+    } else if (user.role !== 'ADMIN') {
+      const assignedIds = (user.assignedProjects || []).map(ap => ap.projectId);
+      where.projectId = { in: assignedIds };
+    }
+
+    const payments = await prisma.payment.findMany({
+      where,
+      include: {
+        project: {
+          select: { id: true, projectCode: true, name: true },
+        },
+        recorder: {
+          select: { id: true, fullName: true, role: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return payments.map(p => ({
+      id: p.id,
+      projectId: p.projectId,
+      projectCode: p.project?.projectCode || 'GENERAL',
+      projectName: p.project?.name || 'Studio Project',
+      milestoneTitle: p.bankName || p.referenceNumber || `Milestone Release — ${p.project?.projectCode || 'General'}`,
       amount: Number(p.amount),
       paymentMode: p.paymentMode,
       referenceNumber: p.referenceNumber,
@@ -75,7 +137,8 @@ export async function paymentRoutes(app: FastifyInstance) {
     }
 
     const schema = z.object({
-      projectCode: z.string().min(1),
+      projectCode: z.string().min(1, 'Project code is required'),
+      milestoneTitle: z.string().optional(),
       amount: z.number().positive('Payment amount must be greater than zero'),
       paymentMode: z.enum(['CHEQUE', 'UPI', 'NEFT_RTGS', 'CASH']),
       referenceNumber: z.string().optional(),
@@ -98,17 +161,26 @@ export async function paymentRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Project not found' });
     }
 
+    const title = body.data.milestoneTitle?.trim();
+    const bankDesc = body.data.bankName?.trim();
+    const storedBankName = title
+      ? (bankDesc ? `${title} • ${bankDesc}` : title)
+      : bankDesc;
+
     const payment = await prisma.payment.create({
       data: {
         projectId: project.id,
         amount: body.data.amount,
         paymentMode: body.data.paymentMode as PaymentMode,
         referenceNumber: body.data.referenceNumber,
-        bankName: body.data.bankName,
+        bankName: storedBankName,
         status: body.data.status as PaymentStatus,
         recordedBy: user.id,
       },
       include: {
+        project: {
+          select: { id: true, projectCode: true, name: true },
+        },
         recorder: true,
       },
     });
@@ -127,6 +199,10 @@ export async function paymentRoutes(app: FastifyInstance) {
 
     return {
       id: payment.id,
+      projectId: payment.projectId,
+      projectCode: payment.project?.projectCode || project.projectCode,
+      projectName: payment.project?.name || project.name,
+      milestoneTitle: title || storedBankName || `Milestone Payment (${project.projectCode})`,
       amount: Number(payment.amount),
       paymentMode: payment.paymentMode,
       referenceNumber: payment.referenceNumber,

@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AuthProvider, useAuth, UserProfile, UserRole } from './context/AuthContext';
 import { LoginPage } from './pages/Auth/LoginPage';
-import { Shell } from './components/layout/Shell';
+import { Shell, InAppNotificationItem } from './components/layout/Shell';
 import { DocumentExplorer } from './pages/Vault/DocumentExplorer';
 import { VerificationList, VerificationItem } from './pages/Verification/VerificationList';
 import { MeetingCalendar } from './pages/Meetings/MeetingCalendar';
 import { StaffAttendance } from './pages/Attendance/StaffAttendance';
+import { AdminAttendanceOverview } from './pages/Attendance/AdminAttendanceOverview';
 import { PaymentLedger, PaymentRecord } from './pages/Payments/PaymentLedger';
 import { ProjectChatRoom, ChatMessageItem } from './pages/Chat/ProjectChatRoom';
-import { FolderKanban, ArrowRight, UserPlus, RefreshCw, Smartphone, Monitor, ChevronLeft } from 'lucide-react';
+import { FolderKanban, ArrowRight, UserPlus, RefreshCw, Smartphone, Monitor, ChevronLeft, CalendarCheck, Bell, Check, X } from 'lucide-react';
 import { AdminUserManagementModal } from './components/AdminUserManagementModal';
 import { MobileShell } from './components/mobile/MobileShell';
 import { MobileDashboard } from './components/mobile/MobileDashboard';
@@ -85,6 +86,8 @@ function MainApp() {
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessageItem[]>([]);
   const [meetings, setMeetings] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<InAppNotificationItem[]>([]);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number>(0);
 
   // Real Attendance Session State
   const [isClockedIn, setIsClockedIn] = useState(false);
@@ -98,15 +101,31 @@ function MainApp() {
     };
   }, [user?.role, token]);
 
+  // Maintain a stable ref for projects to avoid infinite effect invalidation
+  const projectsRef = useRef<ProjectSummary[]>(projects);
+  useEffect(() => {
+    projectsRef.current = projects;
+  }, [projects]);
+
   // Load Projects from Database
   const fetchProjects = useCallback(async () => {
     try {
       const res = await fetch('/api/projects', { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
-        setProjects(data);
-        if (data.length > 0 && !data.some((p: ProjectSummary) => p.projectCode === selectedProjectCode)) {
-          setSelectedProjectCode(data[0].projectCode);
+        if (Array.isArray(data)) {
+          setProjects((prev) => {
+            if (
+              prev.length === data.length &&
+              prev.every((p, i) => p.id === data[i]?.id && p.projectCode === data[i]?.projectCode && p.name === data[i]?.name)
+            ) {
+              return prev;
+            }
+            return data;
+          });
+          if (data.length > 0 && !data.some((p: ProjectSummary) => p.projectCode === selectedProjectCode)) {
+            setSelectedProjectCode(data[0].projectCode);
+          }
         }
       }
     } catch (err) {
@@ -128,24 +147,68 @@ function MainApp() {
     }
   }, [getAuthHeaders, user?.role]);
 
-  // Load Payments for active project
+  // Load Payments: retrieve payments for projects and strictly enrich with accurate projectCode & name
   const fetchPayments = useCallback(async () => {
     if (user?.role === 'STAFF') return;
     try {
-      const res = await fetch(`/api/payments/project/${selectedProjectCode}`, { headers: getAuthHeaders() });
-      if (res.ok) {
-        const data = await res.json();
-        setPayments(data);
+      let rawPayments: any[] = [];
+      const currentProjects: Array<{ id: string; projectCode: string; name: string }> =
+        projectsRef.current.length > 0
+          ? projectsRef.current
+          : [{ id: 'ecc32385-2999-4336-a5fc-45e11f7d46d3', projectCode: 'AF-VILLA', name: 'Villa Horizon Luxury Residence' }];
+
+      if (user?.role === 'ADMIN') {
+        // Query payments across all projects in parallel
+        const responses = await Promise.all(
+          currentProjects.map(async (prj) => {
+            try {
+              const res = await fetch(`/api/payments/project/${encodeURIComponent(prj.projectCode)}`, { headers: getAuthHeaders() });
+              if (res.ok) {
+                const data = await res.json();
+                return Array.isArray(data)
+                  ? data.map((item) => ({ ...item, projectCode: prj.projectCode, projectName: prj.name }))
+                  : [];
+              }
+              return [];
+            } catch {
+              return [];
+            }
+          })
+        );
+        rawPayments = responses.flat();
+      } else {
+        const res = await fetch(`/api/payments/project/${encodeURIComponent(selectedProjectCode)}`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const data = await res.json();
+          rawPayments = Array.isArray(data) ? data : [];
+        }
       }
+
+      // Ensure every payment has its definitive, unchangeable projectCode and projectName
+      const enriched = rawPayments.map((p) => {
+        const matchingProject = currentProjects.find(
+          (prj) => prj.id === p.projectId || prj.projectCode === p.projectCode
+        );
+        return {
+          ...p,
+          projectCode: matchingProject?.projectCode || p.projectCode || 'AF-VILLA',
+          projectName: matchingProject?.name || p.projectName || 'Villa Horizon Luxury Residence',
+          milestoneTitle: p.milestoneTitle || p.bankName || p.referenceNumber || 'Milestone Payment',
+        };
+      });
+
+      setPayments(enriched);
     } catch (err) {
       console.error('Failed to load payments from DB', err);
     }
   }, [getAuthHeaders, user?.role, selectedProjectCode]);
 
-  // Load Meetings for active project
+  // Load Meetings for active project or all studio meetings if admin (Admin & Client Leader only)
   const fetchMeetings = useCallback(async () => {
+    if (user?.role === 'STAFF' || user?.role === 'CLIENT_VIEWER') return;
     try {
-      const res = await fetch(`/api/meetings?projectCode=${selectedProjectCode}`, { headers: getAuthHeaders() });
+      const url = user?.role === 'ADMIN' ? '/api/meetings' : `/api/meetings?projectCode=${encodeURIComponent(selectedProjectCode)}`;
+      const res = await fetch(url, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setMeetings(data);
@@ -153,7 +216,7 @@ function MainApp() {
     } catch (err) {
       console.error('Failed to load meetings from DB', err);
     }
-  }, [getAuthHeaders, selectedProjectCode]);
+  }, [getAuthHeaders, selectedProjectCode, user?.role]);
 
   // Load Attendance Session (Staff)
   const fetchAttendance = useCallback(async () => {
@@ -173,7 +236,7 @@ function MainApp() {
   const fetchChat = useCallback(async () => {
     if (user?.role === 'STAFF') return;
     try {
-      const res = await fetch(`/api/chat/projects/${selectedProjectCode}/messages`, { headers: getAuthHeaders() });
+      const res = await fetch(`/api/chat/projects/${encodeURIComponent(selectedProjectCode)}/messages`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setChatMessages(data);
@@ -182,6 +245,139 @@ function MainApp() {
       console.error('Failed to load chat from DB', err);
     }
   }, [getAuthHeaders, user?.role, selectedProjectCode]);
+
+  // Load Notifications and synthesize meeting invitations for invited participants
+  const fetchNotifications = useCallback(async () => {
+    if (!user) return;
+    try {
+      let apiNotifs: InAppNotificationItem[] = [];
+      try {
+        const res = await fetch('/api/notifications', { headers: getAuthHeaders() });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.notifications && Array.isArray(data.notifications)) {
+            apiNotifs = data.notifications;
+          }
+        }
+      } catch (_) {}
+
+      // Synthesize meeting invitations directly from meetings where user is an attendee
+      const userName = user.fullName || user.username || '';
+      const nameLower = userName.toLowerCase();
+      let readKeys: string[] = [];
+      try {
+        readKeys = JSON.parse(localStorage.getItem(`read_notifs_${user.id}`) || '[]');
+      } catch (_) {}
+
+      const meetingNotifs: InAppNotificationItem[] = [];
+      meetings.forEach((m: any) => {
+        let attendees: string[] = Array.isArray(m.attendees) ? [...m.attendees] : [];
+        let agenda = m.agenda;
+        let location = m.location;
+        if (m.notes && typeof m.notes === 'string' && m.notes.trim().startsWith('{')) {
+          try {
+            const parsed = JSON.parse(m.notes);
+            if (Array.isArray(parsed.attendees)) attendees = parsed.attendees;
+            if (!agenda && parsed.agenda) agenda = parsed.agenda;
+            if (!location && parsed.location) location = parsed.location;
+          } catch (_) {}
+        }
+        if (!agenda) agenda = m.notes || 'Consultation Meeting';
+        if (!location) location = m.type === 'SITE_VISIT' ? 'On Site' : 'Studio HQ Boardroom';
+
+        const isUserAttending = attendees.some((att) => {
+          const aLower = att.toLowerCase();
+          return (
+            aLower.includes(nameLower) ||
+            nameLower.includes(aLower) ||
+            (aLower.includes('ronak') && nameLower.includes('ronak')) ||
+            (aLower.includes('priya') && nameLower.includes('priya')) ||
+            (aLower.includes('rajesh') && nameLower.includes('rajesh')) ||
+            (aLower.includes('pooja') && nameLower.includes('pooja'))
+          );
+        });
+
+        if (isUserAttending) {
+          const notifId = `meeting-invite-${m.id}`;
+          const isRead = readKeys.includes(notifId);
+          meetingNotifs.push({
+            id: notifId,
+            recipientId: user.id,
+            projectId: m.projectId,
+            projectCode: m.projectCode,
+            category: 'MEETING',
+            title: `Meeting Invitation: ${agenda}`,
+            message: `${m.requestedBy || 'Studio Administrator'} invited you to attend an architectural ${
+              m.type === 'SITE_VISIT' ? 'Site Visit' : 'Studio Meeting'
+            } on ${m.bookingDate} (${m.slotTime || m.slot}) at ${location}.`,
+            deepLink: '/meetings',
+            isRead,
+            createdAt: m.createdAt || new Date().toISOString(),
+          });
+        }
+      });
+
+      const allNotifsMap = new Map<string, InAppNotificationItem>();
+      meetingNotifs.forEach((n) => allNotifsMap.set(n.id, n));
+      apiNotifs.forEach((n) => allNotifsMap.set(n.id, n));
+
+      const merged = Array.from(allNotifsMap.values()).sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      setNotifications(merged);
+      setUnreadNotificationsCount(merged.filter((n) => !n.isRead).length);
+    } catch (err) {
+      console.error('Failed to load notifications', err);
+    }
+  }, [user, getAuthHeaders, meetings]);
+
+  const handleMarkAllNotificationsRead = async () => {
+    if (!user) return;
+    try {
+      const allIds = notifications.map((n) => n.id);
+      localStorage.setItem(`read_notifs_${user.id}`, JSON.stringify(allIds));
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      setUnreadNotificationsCount(0);
+      fetch('/api/notifications/read-all', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      }).catch(() => {});
+    } catch (e) {
+      console.error('Failed to mark all notifications read', e);
+    }
+  };
+
+  const handleNotificationClick = async (notif: InAppNotificationItem) => {
+    if (!user) return;
+    try {
+      let stored: string[] = [];
+      try {
+        stored = JSON.parse(localStorage.getItem(`read_notifs_${user.id}`) || '[]');
+      } catch (_) {}
+      if (!stored.includes(notif.id)) {
+        stored.push(notif.id);
+        localStorage.setItem(`read_notifs_${user.id}`, JSON.stringify(stored));
+      }
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notif.id ? { ...n, isRead: true } : n))
+      );
+      setUnreadNotificationsCount((prev) => Math.max(0, prev - 1));
+      fetch(`/api/notifications/${notif.id}/read`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      }).catch(() => {});
+
+      if (notif.category === 'MEETING' || notif.deepLink === '/meetings') {
+        if (currentUser.role === 'ADMIN' || currentUser.role === 'CLIENT_LEADER') {
+          setActiveTab('meetings');
+          setMobileTab('meetings');
+        }
+      }
+    } catch (e) {
+      console.error('Failed handling notification click', e);
+    }
+  };
 
   // Refresh all active module data
   const refreshAllData = useCallback(async () => {
@@ -193,20 +389,33 @@ function MainApp() {
       fetchMeetings(),
       fetchAttendance(),
       fetchChat(),
+      fetchNotifications(),
     ]);
     setIsRefreshing(false);
-  }, [fetchProjects, fetchVerifications, fetchPayments, fetchMeetings, fetchAttendance, fetchChat]);
+  }, [fetchProjects, fetchVerifications, fetchPayments, fetchMeetings, fetchAttendance, fetchChat, fetchNotifications]);
 
-  // Fetch initial data on mount
+  // Fetch initial data on user login (guarded against re-fetch cycles)
+  const initialDataLoadedRef = useRef<string | null>(null);
+  const userIdentifier = user ? `${user.id || user.role}_${token || 'local'}` : null;
   useEffect(() => {
-    if (user) {
+    if (userIdentifier && initialDataLoadedRef.current !== userIdentifier) {
+      initialDataLoadedRef.current = userIdentifier;
       refreshAllData();
     }
-  }, [user, refreshAllData]);
+  }, [userIdentifier, refreshAllData]);
 
-  // Refetch when switching project
+  // Keep notifications fresh when meetings change
   useEffect(() => {
-    if (user && selectedProjectCode) {
+    if (user && meetings.length > 0) {
+      fetchNotifications();
+    }
+  }, [user, meetings, fetchNotifications]);
+
+  // Refetch only when active project actually changes
+  const prevProjectCodeRef = useRef<string>(selectedProjectCode);
+  useEffect(() => {
+    if (user && selectedProjectCode && prevProjectCodeRef.current !== selectedProjectCode) {
+      prevProjectCodeRef.current = selectedProjectCode;
       fetchPayments();
       fetchMeetings();
       fetchChat();
@@ -238,7 +447,7 @@ function MainApp() {
       const res = await fetch(`/api/verification/${id}/revision`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ notes }),
+        body: JSON.stringify({ notes, feedbackNote: notes }),
       });
       if (res.ok) {
         await fetchVerifications();
@@ -248,6 +457,34 @@ function MainApp() {
       }
     } catch (err) {
       console.error('Revision request failed', err);
+    }
+  };
+
+  // Submit Design Verification (Staff & Admin)
+  const handleSubmitVerification = async (data: {
+    projectId: string;
+    folderId: string;
+    drawingTitle: string;
+    fileKey: string;
+    previewKey?: string;
+    notes: string;
+  }) => {
+    try {
+      const res = await fetch('/api/verification/submit', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        await fetchVerifications();
+        await fetchProjects();
+        alert('Verification request submitted successfully. Admin has been notified for review.');
+      } else {
+        const err = await res.json();
+        alert(`Verification submission failed: ${err.error || 'Server error'}`);
+      }
+    } catch (err) {
+      console.error('Verification submission failed', err);
     }
   };
 
@@ -271,13 +508,54 @@ function MainApp() {
     }
   };
 
-  // Send Chat Message
-  const handleSendMessage = async (text: string) => {
+  // Create Milestone Payment (Admin Only)
+  const handleCreatePayment = async (data: {
+    projectCode?: string;
+    milestoneTitle: string;
+    amount: number;
+    paymentMode: 'CHEQUE' | 'UPI' | 'NEFT_RTGS' | 'CASH';
+    referenceNumber?: string;
+    bankName?: string;
+    status: 'PENDING_CLEARANCE' | 'CONFIRMED';
+  }) => {
     try {
-      const res = await fetch(`/api/chat/projects/${selectedProjectCode}/messages`, {
+      const targetProject = data.projectCode || (selectedProjectCode !== 'ALL' ? selectedProjectCode : 'AF-VILLA');
+      const res = await fetch('/api/payments', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ messageText: text }),
+        body: JSON.stringify({
+          projectCode: targetProject,
+          milestoneTitle: data.milestoneTitle,
+          amount: data.amount,
+          paymentMode: data.paymentMode,
+          referenceNumber: data.referenceNumber,
+          bankName: data.bankName,
+          status: data.status,
+        }),
+      });
+      if (res.ok) {
+        await fetchPayments();
+      } else {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to record payment');
+      }
+    } catch (err: any) {
+      console.error('Create payment failed', err);
+      throw err;
+    }
+  };
+
+  // Send Chat Message
+  const handleSendMessage = async (text: string, attachment?: { name: string; size: number; url: string }) => {
+    try {
+      const messageText = text.trim() || (attachment ? `Shared file: ${attachment.name}` : '');
+      const res = await fetch(`/api/chat/projects/${encodeURIComponent(selectedProjectCode)}/messages`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          messageText,
+          attachmentKey: attachment ? attachment.url : undefined,
+        }),
       });
       if (res.ok) {
         await fetchChat();
@@ -312,6 +590,124 @@ function MainApp() {
       }
     } catch (err) {
       console.error('Booking error', err);
+    }
+  };
+
+  // Arrange Meeting (Admin initiates based on task, time, and attendees)
+  const handleArrangeMeeting = async (data: {
+    projectCode: string;
+    bookingDate: string;
+    slot: string;
+    type: 'OFFICE_MEETING' | 'SITE_VISIT';
+    agenda: string;
+    attendees: string[];
+    location?: string;
+    notes?: string;
+  }) => {
+    try {
+      const structuredNotes = JSON.stringify({
+        agenda: data.agenda,
+        attendees: data.attendees,
+        location: data.location || (data.type === 'SITE_VISIT' ? 'On Site' : 'Studio HQ Boardroom'),
+        notes: data.notes || '',
+      });
+      const res = await fetch('/api/meetings/request', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          ...data,
+          notes: structuredNotes,
+        }),
+      });
+      if (res.ok) {
+        await fetchMeetings();
+        alert(`Meeting successfully scheduled for ${data.bookingDate} (${data.slot})! All invited attendees have been notified.`);
+      } else {
+        const err = await res.json();
+        alert(`Meeting scheduling failed: ${err.error || 'Server error'}`);
+      }
+    } catch (err) {
+      console.error('Failed to arrange meeting', err);
+    }
+  };
+
+  // Approve Meeting Slot (Admin)
+  const handleApproveMeeting = async (id: string) => {
+    try {
+      const res = await fetch(`/api/meetings/${id}/approve`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        await fetchMeetings();
+        alert('Consultation confirmed successfully.');
+      } else {
+        const err = await res.json();
+        alert(`Approval failed: ${err.error || 'Server error'}`);
+      }
+    } catch (err) {
+      console.error('Failed to approve meeting', err);
+    }
+  };
+
+  // Cancel Meeting
+  const handleCancelMeeting = async (id: string) => {
+    if (!window.confirm('Are you sure you want to cancel this meeting?')) return;
+    try {
+      const res = await fetch(`/api/meetings/${id}/cancel`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        await fetchMeetings();
+        alert('Meeting has been cancelled.');
+      } else {
+        const err = await res.json();
+        alert(`Cancellation failed: ${err.error || 'Server error'}`);
+      }
+    } catch (err) {
+      console.error('Failed to cancel meeting', err);
+    }
+  };
+
+  // Invitee RSVP (Confirm / In vs Decline / Out)
+  const handleRsvpMeeting = async (meetingId: string, rsvp: 'IN' | 'OUT') => {
+    try {
+      if (user?.fullName) {
+        localStorage.setItem(`meeting_rsvp_${meetingId}_${user.fullName}`, rsvp);
+      }
+      setMeetings((prev) =>
+        prev.map((m) => {
+          if (m.id === meetingId) {
+            let parsed: any = {};
+            if (m.notes && typeof m.notes === 'string') {
+              try {
+                parsed = JSON.parse(m.notes);
+              } catch (_) {
+                parsed = { notes: m.notes };
+              }
+            }
+            const currentRsvp = parsed.rsvp || m.rsvp || {};
+            if (user?.fullName) currentRsvp[user.fullName] = rsvp;
+            parsed.rsvp = currentRsvp;
+            return {
+              ...m,
+              notes: JSON.stringify(parsed),
+              rsvp: currentRsvp,
+            };
+          }
+          return m;
+        })
+      );
+
+      await fetch(`/api/meetings/${meetingId}/rsvp`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ rsvp }),
+      });
+      await fetchNotifications();
+    } catch (err) {
+      console.error('Failed to update meeting RSVP', err);
     }
   };
 
@@ -494,6 +890,7 @@ function MainApp() {
           }}
           onChangePassword={() => setIsChangePasswordOpen(true)}
           onLogout={logout}
+          unreadCount={unreadNotificationsCount}
         >
           {/* If a sub-module is opened from the action grid */}
           {mobileSubModule ? (
@@ -516,7 +913,7 @@ function MainApp() {
                   <ChevronLeft size={20} color="#0C0C0D" />
                 </button>
                 <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, textTransform: 'capitalize', color: '#0C0C0D' }}>
-                  {mobileSubModule === 'verification' ? 'Design Verification' : mobileSubModule}
+                  {mobileSubModule === 'verification' ? 'Design Verification' : (mobileSubModule === 'attendance' && currentUser.role === 'ADMIN' ? 'Staff Attendance & Work Logs' : mobileSubModule)}
                 </h3>
               </div>
 
@@ -526,6 +923,9 @@ function MainApp() {
                   items={verifications}
                   onApprove={handleApproveVerification}
                   onRequestRevision={handleRequestRevision}
+                  onSubmitVerification={handleSubmitVerification}
+                  projectCode={selectedProjectCode}
+                  getAuthHeaders={getAuthHeaders}
                 />
               )}
 
@@ -534,18 +934,25 @@ function MainApp() {
                   userRole={currentUser.role}
                   showPricing={currentUser.showPricing ?? true}
                   payments={payments}
+                  projects={projects}
+                  selectedProjectCode={selectedProjectCode}
                   onSubmitDiscrepancy={handleDiscrepancySubmit}
+                  onCreatePayment={handleCreatePayment}
                 />
               )}
 
               {mobileSubModule === 'attendance' && (
-                <StaffAttendance
-                  isClockedIn={isClockedIn}
-                  pendingUpdates={pendingUpdates}
-                  onClockIn={handleClockIn}
-                  onClockOut={handleClockOut}
-                  onSubmitUpdate={handleDailyUpdate}
-                />
+                currentUser.role === 'ADMIN' ? (
+                  <AdminAttendanceOverview getAuthHeaders={getAuthHeaders} />
+                ) : (
+                  <StaffAttendance
+                    isClockedIn={isClockedIn}
+                    pendingUpdates={pendingUpdates}
+                    onClockIn={handleClockIn}
+                    onClockOut={handleClockOut}
+                    onSubmitUpdate={handleDailyUpdate}
+                  />
+                )
               )}
 
               {mobileSubModule === 'chat' && (
@@ -578,7 +985,9 @@ function MainApp() {
                       setMobileTab('projects');
                       setMobileProjectStep('list');
                     } else if (viewId === 'meetings') {
-                      setMobileTab('meetings');
+                      if (currentUser.role === 'ADMIN' || currentUser.role === 'CLIENT_LEADER') {
+                        setMobileTab('meetings');
+                      }
                     } else if (['verification', 'payments', 'attendance', 'chat', 'vault'].includes(viewId)) {
                       setMobileSubModule(viewId);
                     } else {
@@ -624,6 +1033,7 @@ function MainApp() {
                   {mobileProjectStep === 'folder' && (
                     <MobileDrawingFolderView
                       projectName={selectedProject.name}
+                      projectCode={selectedProject.projectCode}
                       phaseName={activePhase === 'concept' ? 'Concept Design' : 'Construction'}
                       folderName={activeFolderName}
                       onBack={() => setMobileProjectStep('detail')}
@@ -635,13 +1045,22 @@ function MainApp() {
                 </>
               )}
 
-              {/* TAB 3: MEETINGS */}
-              {mobileTab === 'meetings' && (
+              {/* TAB 3: MEETINGS (ADMIN & CLIENT LEADER ONLY) */}
+              {mobileTab === 'meetings' && (currentUser.role === 'ADMIN' || currentUser.role === 'CLIENT_LEADER') && (
                 <div style={{ padding: '0 16px 120px 16px' }}>
                   <MeetingCalendar
                     projectCode={selectedProjectCode}
+                    userRole={currentUser.role}
+                    userName={currentUser.fullName}
+                    meetings={meetings}
                     bookedSlots={bookedSlots}
                     onBookSlot={handleBookSlot}
+                    onRsvpMeeting={handleRsvpMeeting}
+                    onArrangeMeeting={handleArrangeMeeting}
+                    onApproveMeeting={handleApproveMeeting}
+                    onCancelMeeting={handleCancelMeeting}
+                    getAuthHeaders={getAuthHeaders}
+                    projects={projects}
                     activeMeeting={activeMeeting ? {
                       id: activeMeeting.id,
                       slotTime: activeMeeting.slotTime || activeMeeting.slot,
@@ -649,6 +1068,19 @@ function MainApp() {
                       agenda: activeMeeting.agenda || 'Design Review',
                       status: activeMeeting.status === 'RESCHEDULE_PENDING' ? 'RESCHEDULE_PENDING' : 'CONFIRMED',
                     } : undefined}
+                  />
+                </div>
+              )}
+
+              {/* TAB 3 (ALTERNATIVE FOR STAFF): ATTENDANCE */}
+              {mobileTab === 'attendance' && (
+                <div style={{ padding: '0 16px 120px 16px' }}>
+                  <StaffAttendance
+                    isClockedIn={isClockedIn}
+                    pendingUpdates={pendingUpdates}
+                    onClockIn={handleClockIn}
+                    onClockOut={handleClockOut}
+                    onSubmitUpdate={handleDailyUpdate}
                   />
                 </div>
               )}
@@ -680,6 +1112,10 @@ function MainApp() {
         <MobileNotificationsSheet
           isOpen={isNotificationsOpen}
           onClose={() => setIsNotificationsOpen(false)}
+          notifications={notifications}
+          unreadCount={unreadNotificationsCount}
+          onMarkAllRead={handleMarkAllNotificationsRead}
+          onNotificationClick={handleNotificationClick}
         />
 
         <MobileChangePasswordModal
@@ -862,10 +1298,149 @@ function MainApp() {
         activeTab={activeTab}
         onTabChange={(tab) => setActiveTab(tab)}
         onLogout={logout}
+        notifications={notifications}
+        unreadNotificationsCount={unreadNotificationsCount}
+        onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
+        onNotificationClick={handleNotificationClick}
       >
         {/* TAB 1: PROJECTS OVERVIEW DASHBOARD (REAL SUPABASE DB) */}
         {activeTab === 'projects' && (
           <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+            {/* Top Meeting Invitations Banner for Staff and Clients */}
+            {notifications.some((n) => n.category === 'MEETING') && currentUser.role !== 'ADMIN' && (
+              <div
+                style={{
+                  marginBottom: '20px',
+                  padding: '16px 20px',
+                  backgroundColor: 'rgba(197, 160, 89, 0.08)',
+                  border: '1px solid var(--accent-gold)',
+                  borderRadius: 'var(--radius-lg)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '14px',
+                  boxShadow: 'var(--shadow-sm)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <div
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '10px',
+                      backgroundColor: 'var(--accent-gold)',
+                      color: '#0d0f12',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <CalendarCheck size={22} />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 800,
+                          backgroundColor: 'var(--accent-gold)',
+                          color: '#0d0f12',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        Meeting Invitation
+                      </span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                        Studio Administrator has included you as an attendee
+                      </span>
+                    </div>
+                    <h4 style={{ margin: '0 0 2px 0', fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      {notifications.find((n) => n.category === 'MEETING')?.title}
+                    </h4>
+                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      {notifications.find((n) => n.category === 'MEETING')?.message}
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const notif = notifications.find((n) => n.category === 'MEETING');
+                      const meetingId = notif?.id?.replace('meeting-invite-', '');
+                      if (meetingId) handleRsvpMeeting(meetingId, 'IN');
+                    }}
+                    style={{
+                      padding: '7px 14px',
+                      backgroundColor: 'var(--accent-emerald)',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '12px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      boxShadow: '0 2px 5px rgba(18, 183, 106, 0.25)',
+                    }}
+                  >
+                    <Check size={13} strokeWidth={3} />
+                    <span>I'm In</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const notif = notifications.find((n) => n.category === 'MEETING');
+                      const meetingId = notif?.id?.replace('meeting-invite-', '');
+                      if (meetingId) handleRsvpMeeting(meetingId, 'OUT');
+                    }}
+                    style={{
+                      padding: '7px 12px',
+                      backgroundColor: 'var(--bg-surface)',
+                      color: 'var(--text-secondary)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <X size={13} strokeWidth={2.5} />
+                    <span>I'm Out</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('meetings')}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: 'var(--accent-gold)',
+                      color: '#0d0f12',
+                      border: 'none',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '12px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <span>Open Calendar</span>
+                    <ArrowRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div style={{ marginBottom: '24px' }}>
               <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--accent-gold)', fontWeight: 700 }}>
                 Active Studio Portfolios
@@ -1007,15 +1582,27 @@ function MainApp() {
             items={verifications}
             onApprove={handleApproveVerification}
             onRequestRevision={handleRequestRevision}
+            onSubmitVerification={handleSubmitVerification}
+            projectCode={selectedProjectCode}
+            getAuthHeaders={getAuthHeaders}
           />
         )}
 
-        {/* TAB 4: CONSULTATION MEETINGS (3 FIXED SLOTS) */}
-        {activeTab === 'meetings' && (
+        {/* TAB 4: CONSULTATION MEETINGS (ADMIN & CLIENT LEADER ONLY) */}
+        {activeTab === 'meetings' && (currentUser.role === 'ADMIN' || currentUser.role === 'CLIENT_LEADER') && (
           <MeetingCalendar
             projectCode={selectedProjectCode}
+            userRole={currentUser.role}
+            userName={currentUser.fullName}
+            meetings={meetings}
             bookedSlots={bookedSlots}
             onBookSlot={handleBookSlot}
+            onRsvpMeeting={handleRsvpMeeting}
+            onArrangeMeeting={handleArrangeMeeting}
+            onApproveMeeting={handleApproveMeeting}
+            onCancelMeeting={handleCancelMeeting}
+            getAuthHeaders={getAuthHeaders}
+            projects={projects}
             activeMeeting={activeMeeting ? {
               id: activeMeeting.id,
               slotTime: activeMeeting.slotTime || activeMeeting.slot,
@@ -1026,15 +1613,19 @@ function MainApp() {
           />
         )}
 
-        {/* TAB 5: ATTENDANCE & CLOCK-OUT HARD GATE */}
+        {/* TAB 5: ATTENDANCE & CLOCK-OUT HARD GATE / ADMIN OVERVIEW */}
         {activeTab === 'attendance' && (
-          <StaffAttendance
-            isClockedIn={isClockedIn}
-            pendingUpdates={pendingUpdates}
-            onClockIn={handleClockIn}
-            onClockOut={handleClockOut}
-            onSubmitUpdate={handleDailyUpdate}
-          />
+          currentUser.role === 'ADMIN' ? (
+            <AdminAttendanceOverview getAuthHeaders={getAuthHeaders} />
+          ) : (
+            <StaffAttendance
+              isClockedIn={isClockedIn}
+              pendingUpdates={pendingUpdates}
+              onClockIn={handleClockIn}
+              onClockOut={handleClockOut}
+              onSubmitUpdate={handleDailyUpdate}
+            />
+          )
         )}
 
         {/* TAB 6: PAYMENTS LEDGER (STRICTLY HIDDEN FOR STAFF) */}
@@ -1043,7 +1634,10 @@ function MainApp() {
             userRole={currentUser.role}
             showPricing={currentUser.showPricing ?? true}
             payments={payments}
+            projects={projects}
+            selectedProjectCode={selectedProjectCode}
             onSubmitDiscrepancy={handleDiscrepancySubmit}
+            onCreatePayment={handleCreatePayment}
           />
         )}
 

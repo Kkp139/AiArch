@@ -57,7 +57,11 @@ export async function chatRoutes(app: FastifyInstance) {
       senderName: m.sender.fullName,
       senderRole: m.sender.role,
       text: m.messageText,
-      attachmentUrl: m.attachmentKey ? `https://${process.env.S3_BUCKET_NAME || 'afdesign-vault-prod'}.r2.cloudflarestorage.com/${m.attachmentKey}` : undefined,
+      attachmentUrl: m.attachmentKey
+        ? m.attachmentKey.startsWith('data:') || m.attachmentKey.startsWith('http://') || m.attachmentKey.startsWith('https://')
+          ? m.attachmentKey
+          : `https://${process.env.S3_BUCKET_NAME || 'afdesign-vault-prod'}.r2.cloudflarestorage.com/${m.attachmentKey}`
+        : undefined,
       createdAt: m.createdAt,
     }));
   });
