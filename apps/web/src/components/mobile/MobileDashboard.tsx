@@ -64,6 +64,7 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({ user, onNaviga
       // STAFF ROLE (Figma 21:3239)
       return [
         { id: 'projects', label: 'Project', icon: FolderKanban },
+        { id: 'meetings', label: 'Meetings', icon: CalendarDays },
         { id: 'attendance', label: 'Attendance', icon: Clock },
         { id: 'updates', label: 'Updates', icon: CalendarCheck },
         { id: 'targets', label: 'Targets', icon: Target },

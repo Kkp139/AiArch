@@ -23,7 +23,7 @@ describe('Meeting Management & Atomic Slot Concurrency', () => {
 
   it('ATOMIC COLLISION LOCK: allows first booking and strictly rejects overlapping booking for same date/slot', async () => {
     const engine = new MeetingReservationEngine();
-    const date = '2026-11-15';
+    const date = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const slot = 'SLOT_12_00_13_30';
 
     // First request

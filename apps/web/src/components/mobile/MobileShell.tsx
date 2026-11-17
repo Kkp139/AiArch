@@ -28,6 +28,7 @@ export interface MobileShellProps {
   onOpenProfile?: () => void;
   onChangePassword?: () => void;
   onLogout?: () => void;
+  unreadCount?: number;
   children: React.ReactNode;
 }
 
@@ -39,6 +40,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
   onOpenProfile,
   onChangePassword,
   onLogout,
+  unreadCount = 0,
   children,
 }) => {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
@@ -79,7 +81,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
             title="Notifications"
           >
             <Bell size={18} />
-            <span className="figma-notif-badge">4</span>
+            {unreadCount > 0 && <span className="figma-notif-badge">{unreadCount}</span>}
           </button>
 
           {/* User Profile Avatar Pill with Dropdown (Figma: 224:4851) */}
