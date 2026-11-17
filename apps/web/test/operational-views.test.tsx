@@ -105,4 +105,69 @@ describe('Operational Views UX Verification', () => {
     // 12:00–13:30 should be marked booked/disabled
     expect(screen.getByText(/booked/i)).toBeInTheDocument();
   });
+
+  it('PAYMENTS PROJECT FILTERING: associates payments strictly with their respective project and displays empty state for projects without payments', () => {
+    const mockPayments = [
+      {
+        id: 'pay-1',
+        projectId: 'proj-villa',
+        projectCode: 'AF-VILLA',
+        projectName: 'Villa Horizon',
+        milestoneTitle: 'Villa Foundation Completed',
+        amount: 250000,
+        paymentMode: 'NEFT_RTGS' as const,
+        referenceNumber: 'UTR-1111',
+        bankName: 'HDFC Bank',
+        status: 'CONFIRMED' as const,
+        recordedBy: 'Admin User',
+        createdAt: '2026-10-15',
+      },
+      {
+        id: 'pay-2',
+        projectId: 'proj-tower',
+        projectCode: 'AF-TOWER',
+        projectName: 'Skyline Tower',
+        milestoneTitle: 'Tower Soil Testing',
+        amount: 150000,
+        paymentMode: 'CHEQUE' as const,
+        referenceNumber: 'CHQ-2222',
+        bankName: 'ICICI Bank',
+        status: 'CONFIRMED' as const,
+        recordedBy: 'Admin User',
+        createdAt: '2026-10-18',
+      },
+    ];
+
+    const mockProjects = [
+      { id: 'proj-villa', projectCode: 'AF-VILLA', name: 'Villa Horizon' },
+      { id: 'proj-tower', projectCode: 'AF-TOWER', name: 'Skyline Tower' },
+      { id: 'proj-metro', projectCode: 'AMC-METRO', name: 'Metro Plaza' },
+    ];
+
+    render(
+      <PaymentLedger
+        userRole="ADMIN"
+        showPricing={true}
+        payments={mockPayments}
+        projects={mockProjects}
+      />
+    );
+
+    // Initial view (ALL): both projects are listed
+    expect(screen.getByText('Villa Foundation Completed')).toBeInTheDocument();
+    expect(screen.getByText('Tower Soil Testing')).toBeInTheDocument();
+
+    // Filter to AF-TOWER only
+    const select = screen.getByRole('combobox');
+    fireEvent.change(select, { target: { value: 'AF-TOWER' } });
+
+    expect(screen.getByText('Tower Soil Testing')).toBeInTheDocument();
+    expect(screen.queryByText('Villa Foundation Completed')).not.toBeInTheDocument();
+
+    // Filter to AMC-METRO (zero payments logged)
+    fireEvent.change(select, { target: { value: 'AMC-METRO' } });
+    expect(screen.getByText(/No Payment Records Found for AMC-METRO/i)).toBeInTheDocument();
+    expect(screen.queryByText('Villa Foundation Completed')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tower Soil Testing')).not.toBeInTheDocument();
+  });
 });

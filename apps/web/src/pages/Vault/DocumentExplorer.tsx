@@ -3,7 +3,7 @@ import { TreeView, VaultCategory } from '../../components/vault/TreeView';
 import { GridView, VaultFileItem } from '../../components/vault/GridView';
 import { UploadModal, UploadResult } from '../../components/vault/UploadModal';
 import { DwgViewer } from '../../components/vault/DwgViewer';
-import { UserRole } from '../../context/AuthContext';
+import { UserRole, useAuth } from '../../context/AuthContext';
 import { Upload, LayoutGrid, ListFilter, CheckCircle2 } from 'lucide-react';
 
 export interface DocumentExplorerProps {
@@ -44,17 +44,31 @@ export function DocumentExplorer({
   clientName = 'Client Representative',
   userEmail = 'client@example.com',
 }: DocumentExplorerProps) {
+  const { token } = useAuth();
   const [selectedCategoryId, setSelectedCategoryId] = useState('01_SITE_DRGS');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [activePreviewFile, setActivePreviewFile] = useState<VaultFileItem | null>(null);
   const [files, setFiles] = useState<VaultFileItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  const getAuthHeaders = () => {
+    const authToken = token || (typeof window !== 'undefined' ? localStorage.getItem('pronex_auth_token') : null);
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+    return headers;
+  };
+
   // Fetch real documents from Supabase API
   const fetchDocuments = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/vault/projects/${projectCode}/documents`);
+      const res = await fetch(`/api/vault/projects/${encodeURIComponent(projectCode)}/documents`, {
+        headers: getAuthHeaders(),
+      });
       if (res.ok) {
         const data = await res.json();
         const allFiles: VaultFileItem[] = [];
@@ -106,7 +120,7 @@ export function DocumentExplorer({
       // Post upload to live API
       await fetch('/api/vault/presigned-upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           projectCode,
           filename: result.finalFileName,

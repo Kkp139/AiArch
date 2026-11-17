@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AuthProvider, useAuth, UserProfile, UserRole } from './context/AuthContext';
 import { LoginPage } from './pages/Auth/LoginPage';
 import { Shell, InAppNotificationItem } from './components/layout/Shell';
@@ -101,15 +101,31 @@ function MainApp() {
     };
   }, [user?.role, token]);
 
+  // Maintain a stable ref for projects to avoid infinite effect invalidation
+  const projectsRef = useRef<ProjectSummary[]>(projects);
+  useEffect(() => {
+    projectsRef.current = projects;
+  }, [projects]);
+
   // Load Projects from Database
   const fetchProjects = useCallback(async () => {
     try {
       const res = await fetch('/api/projects', { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
-        setProjects(data);
-        if (data.length > 0 && !data.some((p: ProjectSummary) => p.projectCode === selectedProjectCode)) {
-          setSelectedProjectCode(data[0].projectCode);
+        if (Array.isArray(data)) {
+          setProjects((prev) => {
+            if (
+              prev.length === data.length &&
+              prev.every((p, i) => p.id === data[i]?.id && p.projectCode === data[i]?.projectCode && p.name === data[i]?.name)
+            ) {
+              return prev;
+            }
+            return data;
+          });
+          if (data.length > 0 && !data.some((p: ProjectSummary) => p.projectCode === selectedProjectCode)) {
+            setSelectedProjectCode(data[0].projectCode);
+          }
         }
       }
     } catch (err) {
@@ -131,15 +147,57 @@ function MainApp() {
     }
   }, [getAuthHeaders, user?.role]);
 
-  // Load Payments for active project
+  // Load Payments: retrieve payments for projects and strictly enrich with accurate projectCode & name
   const fetchPayments = useCallback(async () => {
     if (user?.role === 'STAFF') return;
     try {
-      const res = await fetch(`/api/payments/project/${selectedProjectCode}`, { headers: getAuthHeaders() });
-      if (res.ok) {
-        const data = await res.json();
-        setPayments(data);
+      let rawPayments: any[] = [];
+      const currentProjects: Array<{ id: string; projectCode: string; name: string }> =
+        projectsRef.current.length > 0
+          ? projectsRef.current
+          : [{ id: 'ecc32385-2999-4336-a5fc-45e11f7d46d3', projectCode: 'AF-VILLA', name: 'Villa Horizon Luxury Residence' }];
+
+      if (user?.role === 'ADMIN') {
+        // Query payments across all projects in parallel
+        const responses = await Promise.all(
+          currentProjects.map(async (prj) => {
+            try {
+              const res = await fetch(`/api/payments/project/${encodeURIComponent(prj.projectCode)}`, { headers: getAuthHeaders() });
+              if (res.ok) {
+                const data = await res.json();
+                return Array.isArray(data)
+                  ? data.map((item) => ({ ...item, projectCode: prj.projectCode, projectName: prj.name }))
+                  : [];
+              }
+              return [];
+            } catch {
+              return [];
+            }
+          })
+        );
+        rawPayments = responses.flat();
+      } else {
+        const res = await fetch(`/api/payments/project/${encodeURIComponent(selectedProjectCode)}`, { headers: getAuthHeaders() });
+        if (res.ok) {
+          const data = await res.json();
+          rawPayments = Array.isArray(data) ? data : [];
+        }
       }
+
+      // Ensure every payment has its definitive, unchangeable projectCode and projectName
+      const enriched = rawPayments.map((p) => {
+        const matchingProject = currentProjects.find(
+          (prj) => prj.id === p.projectId || prj.projectCode === p.projectCode
+        );
+        return {
+          ...p,
+          projectCode: matchingProject?.projectCode || p.projectCode || 'AF-VILLA',
+          projectName: matchingProject?.name || p.projectName || 'Villa Horizon Luxury Residence',
+          milestoneTitle: p.milestoneTitle || p.bankName || p.referenceNumber || 'Milestone Payment',
+        };
+      });
+
+      setPayments(enriched);
     } catch (err) {
       console.error('Failed to load payments from DB', err);
     }
@@ -148,7 +206,7 @@ function MainApp() {
   // Load Meetings for active project or all studio meetings if admin
   const fetchMeetings = useCallback(async () => {
     try {
-      const url = user?.role === 'ADMIN' ? '/api/meetings' : `/api/meetings?projectCode=${selectedProjectCode}`;
+      const url = user?.role === 'ADMIN' ? '/api/meetings' : `/api/meetings?projectCode=${encodeURIComponent(selectedProjectCode)}`;
       const res = await fetch(url, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
@@ -177,7 +235,7 @@ function MainApp() {
   const fetchChat = useCallback(async () => {
     if (user?.role === 'STAFF') return;
     try {
-      const res = await fetch(`/api/chat/projects/${selectedProjectCode}/messages`, { headers: getAuthHeaders() });
+      const res = await fetch(`/api/chat/projects/${encodeURIComponent(selectedProjectCode)}/messages`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setChatMessages(data);
@@ -333,12 +391,15 @@ function MainApp() {
     setIsRefreshing(false);
   }, [fetchProjects, fetchVerifications, fetchPayments, fetchMeetings, fetchAttendance, fetchChat, fetchNotifications]);
 
-  // Fetch initial data on mount
+  // Fetch initial data on user login (guarded against re-fetch cycles)
+  const initialDataLoadedRef = useRef<string | null>(null);
+  const userIdentifier = user ? `${user.id || user.role}_${token || 'local'}` : null;
   useEffect(() => {
-    if (user) {
+    if (userIdentifier && initialDataLoadedRef.current !== userIdentifier) {
+      initialDataLoadedRef.current = userIdentifier;
       refreshAllData();
     }
-  }, [user, refreshAllData]);
+  }, [userIdentifier, refreshAllData]);
 
   // Keep notifications fresh when meetings change
   useEffect(() => {
@@ -347,9 +408,11 @@ function MainApp() {
     }
   }, [user, meetings, fetchNotifications]);
 
-  // Refetch when switching project
+  // Refetch only when active project actually changes
+  const prevProjectCodeRef = useRef<string>(selectedProjectCode);
   useEffect(() => {
-    if (user && selectedProjectCode) {
+    if (user && selectedProjectCode && prevProjectCodeRef.current !== selectedProjectCode) {
+      prevProjectCodeRef.current = selectedProjectCode;
       fetchPayments();
       fetchMeetings();
       fetchChat();
@@ -442,13 +505,54 @@ function MainApp() {
     }
   };
 
-  // Send Chat Message
-  const handleSendMessage = async (text: string) => {
+  // Create Milestone Payment (Admin Only)
+  const handleCreatePayment = async (data: {
+    projectCode?: string;
+    milestoneTitle: string;
+    amount: number;
+    paymentMode: 'CHEQUE' | 'UPI' | 'NEFT_RTGS' | 'CASH';
+    referenceNumber?: string;
+    bankName?: string;
+    status: 'PENDING_CLEARANCE' | 'CONFIRMED';
+  }) => {
     try {
-      const res = await fetch(`/api/chat/projects/${selectedProjectCode}/messages`, {
+      const targetProject = data.projectCode || (selectedProjectCode !== 'ALL' ? selectedProjectCode : 'AF-VILLA');
+      const res = await fetch('/api/payments', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ messageText: text }),
+        body: JSON.stringify({
+          projectCode: targetProject,
+          milestoneTitle: data.milestoneTitle,
+          amount: data.amount,
+          paymentMode: data.paymentMode,
+          referenceNumber: data.referenceNumber,
+          bankName: data.bankName,
+          status: data.status,
+        }),
+      });
+      if (res.ok) {
+        await fetchPayments();
+      } else {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to record payment');
+      }
+    } catch (err: any) {
+      console.error('Create payment failed', err);
+      throw err;
+    }
+  };
+
+  // Send Chat Message
+  const handleSendMessage = async (text: string, attachment?: { name: string; size: number; url: string }) => {
+    try {
+      const messageText = text.trim() || (attachment ? `Shared file: ${attachment.name}` : '');
+      const res = await fetch(`/api/chat/projects/${encodeURIComponent(selectedProjectCode)}/messages`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          messageText,
+          attachmentKey: attachment ? attachment.url : undefined,
+        }),
       });
       if (res.ok) {
         await fetchChat();
@@ -827,7 +931,10 @@ function MainApp() {
                   userRole={currentUser.role}
                   showPricing={currentUser.showPricing ?? true}
                   payments={payments}
+                  projects={projects}
+                  selectedProjectCode={selectedProjectCode}
                   onSubmitDiscrepancy={handleDiscrepancySubmit}
+                  onCreatePayment={handleCreatePayment}
                 />
               )}
 
@@ -921,6 +1028,7 @@ function MainApp() {
                   {mobileProjectStep === 'folder' && (
                     <MobileDrawingFolderView
                       projectName={selectedProject.name}
+                      projectCode={selectedProject.projectCode}
                       phaseName={activePhase === 'concept' ? 'Concept Design' : 'Construction'}
                       folderName={activeFolderName}
                       onBack={() => setMobileProjectStep('detail')}
@@ -1508,7 +1616,10 @@ function MainApp() {
             userRole={currentUser.role}
             showPricing={currentUser.showPricing ?? true}
             payments={payments}
+            projects={projects}
+            selectedProjectCode={selectedProjectCode}
             onSubmitDiscrepancy={handleDiscrepancySubmit}
+            onCreatePayment={handleCreatePayment}
           />
         )}
 

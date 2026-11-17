@@ -107,6 +107,16 @@ export function MeetingCalendar({
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [agenda, setAgenda] = useState('');
 
+  // Date-specific slot lock calculation
+  const dateBookedSlots = React.useMemo(() => {
+    return meetings
+      .filter((m) => {
+        const mDate = m.bookingDate ? m.bookingDate.split('T')[0] : '';
+        return mDate === selectedDate && m.status !== 'CANCELLED' && m.status !== 'REJECTED';
+      })
+      .map((m) => m.slotTime || m.slot);
+  }, [meetings, selectedDate]);
+
   // Arrange Meeting Modal State (Admin initiates meeting based on task and time)
   const [isArrangeModalOpen, setIsArrangeModalOpen] = useState(false);
   const [arrangeTask, setArrangeTask] = useState('');
@@ -460,7 +470,7 @@ export function MeetingCalendar({
         {/* 3 Fixed Slots Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '16px' }}>
           {FIXED_MEETING_SLOTS.map((slot) => {
-            const isBooked = bookedSlots.includes(slot);
+            const isBooked = dateBookedSlots.includes(slot) || bookedSlots.includes(slot);
             const isSelected = selectedSlot === slot;
 
             return (

@@ -70,11 +70,15 @@ export function ProjectChatRoom({
         setAttachmentError('Only image attachments are permitted in project chat.');
         return;
       }
-      setSelectedAttachment({
-        name: file.name,
-        size: file.size,
-        url: URL.createObjectURL(file),
-      });
+      const reader = new FileReader();
+      reader.onload = () => {
+        setSelectedAttachment({
+          name: file.name,
+          size: file.size,
+          url: reader.result as string,
+        });
+      };
+      reader.readAsDataURL(file);
     }
   };
 

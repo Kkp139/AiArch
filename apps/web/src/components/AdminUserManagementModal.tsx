@@ -42,10 +42,12 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
   const [email, setEmail] = useState('');
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
 
+  const authToken = token || (typeof window !== 'undefined' ? localStorage.getItem('pronex_auth_token') : '');
+
   const fetchUsers = async () => {
     try {
       const res = await fetch('/api/auth/users', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.ok) {
         const data = await res.json();
@@ -58,7 +60,9 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
 
   const fetchProjects = async () => {
     try {
-      const res = await fetch('/api/projects');
+      const res = await fetch('/api/projects', {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
       if (res.ok) {
         const data = await res.json();
         setProjects(data || []);
@@ -101,7 +105,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${authToken}`,
         },
         body: JSON.stringify({
           username: username.trim() || undefined,

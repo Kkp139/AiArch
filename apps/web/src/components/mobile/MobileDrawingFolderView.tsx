@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronLeft, Search, FileText, ChevronRight } from 'lucide-react';
 import { MobileViewToggle } from './MobileViewToggle';
 
@@ -15,6 +15,7 @@ export interface DrawingItem {
 
 export interface MobileDrawingFolderViewProps {
   projectName: string;
+  projectCode?: string;
   phaseName: string;
   folderName: string;
   onBack: () => void;
@@ -88,6 +89,7 @@ const SAMPLE_DRAWINGS: DrawingItem[] = [
 
 export const MobileDrawingFolderView: React.FC<MobileDrawingFolderViewProps> = ({
   projectName,
+  projectCode,
   phaseName,
   folderName,
   onBack,
@@ -97,11 +99,65 @@ export const MobileDrawingFolderView: React.FC<MobileDrawingFolderViewProps> = (
 }) => {
   const [internalViewMode, setInternalViewMode] = useState<'list' | 'grid'>('list');
   const [searchQuery, setSearchQuery] = useState('');
+  const [realDrawings, setRealDrawings] = useState<DrawingItem[]>([]);
+  const [hasLoadedApi, setHasLoadedApi] = useState(false);
+
+  useEffect(() => {
+    if (!projectCode) return;
+    const fetchVaultDocs = async () => {
+      try {
+        const authToken = typeof window !== 'undefined' ? localStorage.getItem('pronex_auth_token') : '';
+        const res = await fetch(`/api/vault/projects/${encodeURIComponent(projectCode)}/documents`, {
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const docs: DrawingItem[] = [];
+          data.folders?.forEach((folder: any) => {
+            // Check if folder name or code matches
+            const folderMatches =
+              folder.categoryName?.toLowerCase().includes(folderName.toLowerCase()) ||
+              folderName.toLowerCase().includes(folder.categoryCode?.toLowerCase() || '') ||
+              folder.categoryCode?.toLowerCase().includes(folderName.replace(/\s+/g, '').toLowerCase());
+
+            if (folderMatches || data.folders.length === 1) {
+              folder.documents?.forEach((doc: any, idx: number) => {
+                docs.push({
+                  id: doc.id,
+                  title: doc.fileName.replace(/\.[^/.]+$/, ''),
+                  code: `DWG-${idx + 101}`,
+                  version: 'V1',
+                  status: 'Approved',
+                  fileSize: `${((doc.fileSizeBytes || 2500000) / (1024 * 1024)).toFixed(1)} MB`,
+                  uploadedBy: doc.uploader?.fullName || 'Studio Arch',
+                  date: new Date(doc.createdAt).toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  }),
+                });
+              });
+            }
+          });
+          if (docs.length > 0) {
+            setRealDrawings(docs);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load mobile drawings from vault API, falling back to sample set', err);
+      } finally {
+        setHasLoadedApi(true);
+      }
+    };
+    fetchVaultDocs();
+  }, [projectCode, folderName]);
 
   const viewMode = propViewMode ?? internalViewMode;
   const setViewMode = propOnViewModeChange ?? setInternalViewMode;
 
-  const filtered = SAMPLE_DRAWINGS.filter(
+  const activeDrawingList = realDrawings.length > 0 ? realDrawings : SAMPLE_DRAWINGS;
+
+  const filtered = activeDrawingList.filter(
     (d) =>
       d.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       d.code.toLowerCase().includes(searchQuery.toLowerCase())

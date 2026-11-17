@@ -177,11 +177,19 @@ export async function vaultRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Document not found' });
     }
 
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required to download documents.' });
+    }
+
+    if (!userHasProjectAccess(user, document.projectId)) {
+      return reply.status(403).send({ error: 'Access denied: You are not assigned to this project.' });
+    }
+
     // Check project master download switch
     if (document.project.allowClientDownloads === 'VIEW_ONLY') {
-      const authHeader = request.headers.authorization || '';
       // Admin and Staff can always download; clients cannot
-      const isClient = authHeader.includes('client');
+      const isClient = user.role === 'CLIENT_LEADER' || user.role === 'CLIENT_VIEWER';
       if (isClient) {
         return reply.status(403).send({ error: 'Download permission denied for this document (View Only mode enforced)' });
       }

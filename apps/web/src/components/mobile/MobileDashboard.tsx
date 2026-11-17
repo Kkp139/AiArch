@@ -82,7 +82,7 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({ user, onNaviga
       <div className="figma-welcome-box">
         <h1 className="figma-welcome-title">Welcome</h1>
         <p className="figma-welcome-subtitle">
-          Welcome {user.fullName} ({user.role})
+          Welcome {user.fullName}
         </p>
       </div>
 

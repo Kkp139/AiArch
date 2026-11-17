@@ -131,7 +131,7 @@ export function VerificationList({
           return;
         }
         const headers = getAuthHeaders ? getAuthHeaders() : {};
-        const res = await fetch(`/api/vault/projects/${projectCode}/documents`, { headers });
+        const res = await fetch(`/api/vault/projects/${encodeURIComponent(projectCode)}/documents`, { headers });
         if (res.ok) {
           const data = await res.json();
           if (data.folders && Array.isArray(data.folders)) {
