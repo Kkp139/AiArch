@@ -46,8 +46,11 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({ user, onNaviga
     } else if (user.role === 'CLIENT_LEADER' || user.role === 'CLIENT_VIEWER') {
       const cards = [
         { id: 'projects', label: 'Project', icon: FolderKanban },
-        { id: 'meetings', label: 'Meeting', icon: CalendarDays },
       ];
+      // Meetings section strictly reserved for Admin and Client Leader
+      if (user.role === 'CLIENT_LEADER' && user.allowMeetings !== false) {
+        cards.push({ id: 'meetings', label: 'Meeting', icon: CalendarDays });
+      }
       if (user.showPricing) {
         cards.push({ id: 'payments', label: 'Payments', icon: CreditCard });
       }
@@ -61,15 +64,14 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({ user, onNaviga
       );
       return cards;
     } else {
-      // STAFF ROLE (Figma 21:3239)
+      // STAFF ROLE (Figma 21:3239) - Meetings section strictly removed (Admin & Client Leader only)
       return [
         { id: 'projects', label: 'Project', icon: FolderKanban },
-        { id: 'meetings', label: 'Meetings', icon: CalendarDays },
         { id: 'attendance', label: 'Attendance', icon: Clock },
         { id: 'updates', label: 'Updates', icon: CalendarCheck },
         { id: 'targets', label: 'Targets', icon: Target },
         { id: 'announcement', label: 'Announcement', icon: Megaphone },
-        { id: 'verification', label: 'Design Verification', icon: CheckSquare }, // Verified in Step 2: Staff has access
+        { id: 'verification', label: 'Design Verification', icon: CheckSquare },
       ];
     }
   };

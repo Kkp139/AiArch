@@ -106,6 +106,35 @@ describe('Operational Views UX Verification', () => {
     expect(screen.getByText(/booked/i)).toBeInTheDocument();
   });
 
+  it('MEETINGS ISOLATION: strictly forbids Staff and Client Viewer from accessing MeetingCalendar', () => {
+    const { rerender } = render(
+      <MeetingCalendar
+        projectCode="LAP"
+        userRole="STAFF"
+      />
+    );
+    expect(screen.getByText(/access denied/i)).toBeInTheDocument();
+    expect(screen.queryByText('12:00–13:30')).not.toBeInTheDocument();
+
+    rerender(
+      <MeetingCalendar
+        projectCode="LAP"
+        userRole="CLIENT_VIEWER"
+      />
+    );
+    expect(screen.getByText(/access denied/i)).toBeInTheDocument();
+    expect(screen.queryByText('12:00–13:30')).not.toBeInTheDocument();
+
+    rerender(
+      <MeetingCalendar
+        projectCode="LAP"
+        userRole="CLIENT_LEADER"
+      />
+    );
+    expect(screen.queryByText(/access denied/i)).not.toBeInTheDocument();
+    expect(screen.getByText('12:00–13:30')).toBeInTheDocument();
+  });
+
   it('PAYMENTS PROJECT FILTERING: associates payments strictly with their respective project and displays empty state for projects without payments', () => {
     const mockPayments = [
       {

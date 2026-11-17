@@ -10,6 +10,7 @@ import {
   Home,
   FolderKanban,
   CalendarDays,
+  Clock,
   MoreHorizontal,
 } from 'lucide-react';
 import './mobile.css';
@@ -196,13 +197,25 @@ export const MobileShell: React.FC<MobileShellProps> = ({
           <span>Projects</span>
         </button>
 
-        <button
-          className={`figma-dock-tab ${activeTab === 'meetings' ? 'active' : ''}`}
-          onClick={() => onTabChange('meetings')}
-        >
-          <CalendarDays size={18} />
-          <span>Meetings</span>
-        </button>
+        {(user.role === 'ADMIN' || user.role === 'CLIENT_LEADER') && (
+          <button
+            className={`figma-dock-tab ${activeTab === 'meetings' ? 'active' : ''}`}
+            onClick={() => onTabChange('meetings')}
+          >
+            <CalendarDays size={18} />
+            <span>Meetings</span>
+          </button>
+        )}
+
+        {user.role === 'STAFF' && (
+          <button
+            className={`figma-dock-tab ${activeTab === 'attendance' ? 'active' : ''}`}
+            onClick={() => onTabChange('attendance')}
+          >
+            <Clock size={18} />
+            <span>Attendance</span>
+          </button>
+        )}
 
         <button
           className={`figma-dock-tab ${activeTab === 'more' ? 'active' : ''}`}

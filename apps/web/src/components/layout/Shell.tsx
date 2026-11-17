@@ -65,7 +65,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'projects', label: 'Projects', icon: FolderKanban, roles: ['ADMIN', 'STAFF', 'CLIENT_LEADER', 'CLIENT_VIEWER'] },
   { id: 'vault', label: 'Document Vault', icon: FileBox, roles: ['ADMIN', 'STAFF', 'CLIENT_LEADER', 'CLIENT_VIEWER'] },
   { id: 'verification', label: 'Verifications', icon: CheckSquare, roles: ['ADMIN', 'STAFF'] }, // STRICT SPEC: Admin & Staff only
-  { id: 'meetings', label: 'Meetings', icon: CalendarDays, roles: ['ADMIN', 'STAFF', 'CLIENT_LEADER', 'CLIENT_VIEWER'] },
+  { id: 'meetings', label: 'Meetings', icon: CalendarDays, roles: ['ADMIN', 'CLIENT_LEADER'] }, // STRICT SPEC: Admin & Client Leader only (Staff and Client Viewer forbidden)
   { id: 'payments', label: 'Payments', icon: CreditCard, roles: ['ADMIN', 'CLIENT_LEADER', 'CLIENT_VIEWER'], requiresPricingToggle: true },
   { id: 'attendance', label: 'Attendance', icon: Clock, roles: ['ADMIN', 'STAFF'] },
   { id: 'chat', label: 'Project Chat', icon: MessageSquare, roles: ['ADMIN', 'CLIENT_LEADER'] },
@@ -125,9 +125,14 @@ export function Shell({
       return !!user.showPricing;
     }
 
-    // 4. Dynamic Meetings Rule: Admin is always allowed; Client Leader/Viewer require allowMeetings toggle
-    if (item.id === 'meetings' && (user.role === 'CLIENT_LEADER' || user.role === 'CLIENT_VIEWER')) {
-      return user.allowMeetings !== false;
+    // 4. Meetings Rule: Admin is always allowed; Client Leader requires allowMeetings toggle; Staff & Client Viewer forbidden
+    if (item.id === 'meetings') {
+      if (user.role === 'STAFF' || user.role === 'CLIENT_VIEWER') {
+        return false;
+      }
+      if (user.role === 'CLIENT_LEADER') {
+        return user.allowMeetings !== false;
+      }
     }
 
     return true;

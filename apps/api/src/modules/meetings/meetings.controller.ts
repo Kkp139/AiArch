@@ -24,11 +24,15 @@ export const REVERSE_SLOT_MAP: Record<TimeSlot, string> = {
 import { resolveUserFromRequest, userHasProjectAccess } from '../../lib/auth-guard';
 
 export async function meetingRoutes(app: FastifyInstance) {
-  // Get all meetings (Requires authentication; non-admin users only see meetings for assigned projects or requested by them)
+  // Get all meetings (Requires authentication; strictly reserved for Admin and Client Leader)
   app.get('/api/meetings', async (request: FastifyRequest<{ Querystring: { projectCode?: string; date?: string } }>, reply: FastifyReply) => {
     const user = await resolveUserFromRequest(request);
     if (!user) {
       return reply.status(401).send({ error: 'Authentication required. Please sign in to access consultations.' });
+    }
+
+    if (user.role === 'STAFF' || user.role === 'CLIENT_VIEWER') {
+      return reply.status(403).send({ error: 'Access denied: Consultation meetings are reserved for Administrators and Client Leaders.' });
     }
 
     const { projectCode, date } = request.query;
@@ -314,6 +318,10 @@ export async function meetingRoutes(app: FastifyInstance) {
     const user = await resolveUserFromRequest(request);
     if (!user) {
       return reply.status(401).send({ error: 'Authentication required.' });
+    }
+
+    if (user.role === 'STAFF' || user.role === 'CLIENT_VIEWER') {
+      return reply.status(403).send({ error: 'Access denied: Consultation meetings are reserved for Administrators and Client Leaders.' });
     }
 
     const schema = z.object({

@@ -93,6 +93,31 @@ export function MeetingCalendar({
   getAuthHeaders,
   projects = [],
 }: MeetingCalendarProps) {
+  // STRICT SPEC: Meetings are exclusively for Admin and Client Leader. Staff and Client Viewer are forbidden.
+  if (userRole === 'STAFF' || userRole === 'CLIENT_VIEWER') {
+    return (
+      <div
+        style={{
+          padding: '48px 24px',
+          backgroundColor: 'var(--bg-secondary)',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--border-subtle)',
+          textAlign: 'center',
+          maxWidth: '600px',
+          margin: '0 auto',
+        }}
+      >
+        <CalendarCheck size={44} color="var(--accent-rose)" style={{ marginBottom: '16px' }} />
+        <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
+          Access Denied
+        </h2>
+        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+          Consultation meetings and scheduling are reserved exclusively for Studio Administrators and Client Leaders.
+        </p>
+      </div>
+    );
+  }
+
   const isAdmin = userRole === 'ADMIN';
 
   // Filter for meetings list

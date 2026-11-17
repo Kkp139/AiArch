@@ -203,8 +203,9 @@ function MainApp() {
     }
   }, [getAuthHeaders, user?.role, selectedProjectCode]);
 
-  // Load Meetings for active project or all studio meetings if admin
+  // Load Meetings for active project or all studio meetings if admin (Admin & Client Leader only)
   const fetchMeetings = useCallback(async () => {
+    if (user?.role === 'STAFF' || user?.role === 'CLIENT_VIEWER') return;
     try {
       const url = user?.role === 'ADMIN' ? '/api/meetings' : `/api/meetings?projectCode=${encodeURIComponent(selectedProjectCode)}`;
       const res = await fetch(url, { headers: getAuthHeaders() });
@@ -368,8 +369,10 @@ function MainApp() {
       }).catch(() => {});
 
       if (notif.category === 'MEETING' || notif.deepLink === '/meetings') {
-        setActiveTab('meetings');
-        setMobileTab('meetings');
+        if (currentUser.role === 'ADMIN' || currentUser.role === 'CLIENT_LEADER') {
+          setActiveTab('meetings');
+          setMobileTab('meetings');
+        }
       }
     } catch (e) {
       console.error('Failed handling notification click', e);
@@ -982,7 +985,9 @@ function MainApp() {
                       setMobileTab('projects');
                       setMobileProjectStep('list');
                     } else if (viewId === 'meetings') {
-                      setMobileTab('meetings');
+                      if (currentUser.role === 'ADMIN' || currentUser.role === 'CLIENT_LEADER') {
+                        setMobileTab('meetings');
+                      }
                     } else if (['verification', 'payments', 'attendance', 'chat', 'vault'].includes(viewId)) {
                       setMobileSubModule(viewId);
                     } else {
@@ -1040,8 +1045,8 @@ function MainApp() {
                 </>
               )}
 
-              {/* TAB 3: MEETINGS */}
-              {mobileTab === 'meetings' && (
+              {/* TAB 3: MEETINGS (ADMIN & CLIENT LEADER ONLY) */}
+              {mobileTab === 'meetings' && (currentUser.role === 'ADMIN' || currentUser.role === 'CLIENT_LEADER') && (
                 <div style={{ padding: '0 16px 120px 16px' }}>
                   <MeetingCalendar
                     projectCode={selectedProjectCode}
@@ -1063,6 +1068,19 @@ function MainApp() {
                       agenda: activeMeeting.agenda || 'Design Review',
                       status: activeMeeting.status === 'RESCHEDULE_PENDING' ? 'RESCHEDULE_PENDING' : 'CONFIRMED',
                     } : undefined}
+                  />
+                </div>
+              )}
+
+              {/* TAB 3 (ALTERNATIVE FOR STAFF): ATTENDANCE */}
+              {mobileTab === 'attendance' && (
+                <div style={{ padding: '0 16px 120px 16px' }}>
+                  <StaffAttendance
+                    isClockedIn={isClockedIn}
+                    pendingUpdates={pendingUpdates}
+                    onClockIn={handleClockIn}
+                    onClockOut={handleClockOut}
+                    onSubmitUpdate={handleDailyUpdate}
                   />
                 </div>
               )}
@@ -1570,8 +1588,8 @@ function MainApp() {
           />
         )}
 
-        {/* TAB 4: CONSULTATION MEETINGS (3 FIXED SLOTS) */}
-        {activeTab === 'meetings' && (
+        {/* TAB 4: CONSULTATION MEETINGS (ADMIN & CLIENT LEADER ONLY) */}
+        {activeTab === 'meetings' && (currentUser.role === 'ADMIN' || currentUser.role === 'CLIENT_LEADER') && (
           <MeetingCalendar
             projectCode={selectedProjectCode}
             userRole={currentUser.role}
