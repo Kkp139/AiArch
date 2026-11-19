@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node ../../node_modules/vite/bin/vite.js",
-    "build": "node ../../node_modules/vite/bin/vite.js build && node ../../scripts/sync-dist.js",
-    "build:web": "node ../../node_modules/vite/bin/vite.js build && node ../../scripts/sync-dist.js",
-    "preview": "node ../../node_modules/vite/bin/vite.js preview",
-    "test": "node ../../node_modules/vitest/vitest.mjs run"
+    "dev": "vite",
+    "build": "vite build",
+    "build:web": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "clsx": "^2.1.0",
