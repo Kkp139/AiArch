@@ -140,7 +140,9 @@ function MainApp() {
       const res = await fetch('/api/verification/list', { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
-        setVerifications(data);
+        if (Array.isArray(data)) {
+          setVerifications(data);
+        }
       }
     } catch (err) {
       console.error('Failed to load verifications from DB', err);
@@ -396,13 +398,28 @@ function MainApp() {
 
   // Fetch initial data on user login (guarded against re-fetch cycles)
   const initialDataLoadedRef = useRef<string | null>(null);
-  const userIdentifier = user ? `${user.id || user.role}_${token || 'local'}` : null;
+  const userIdentifier = user ? `${user.id || 'usr'}_${user.role}_${token || 'local'}` : null;
   useEffect(() => {
     if (userIdentifier && initialDataLoadedRef.current !== userIdentifier) {
       initialDataLoadedRef.current = userIdentifier;
       refreshAllData();
     }
   }, [userIdentifier, refreshAllData]);
+
+  // Re-fetch tab data when user navigates to an operational module
+  useEffect(() => {
+    if (activeTab === 'verification' || mobileSubModule === 'verification') {
+      fetchVerifications();
+    } else if (activeTab === 'payments' || mobileSubModule === 'payments') {
+      fetchPayments();
+    } else if (activeTab === 'meetings' || mobileTab === 'meetings') {
+      fetchMeetings();
+    } else if (activeTab === 'attendance' || mobileSubModule === 'attendance') {
+      fetchAttendance();
+    } else if (activeTab === 'chat' || mobileSubModule === 'chat') {
+      fetchChat();
+    }
+  }, [activeTab, mobileSubModule, mobileTab, fetchVerifications, fetchPayments, fetchMeetings, fetchAttendance, fetchChat]);
 
   // Keep notifications fresh when meetings change
   useEffect(() => {
@@ -926,6 +943,7 @@ function MainApp() {
                   onSubmitVerification={handleSubmitVerification}
                   projectCode={selectedProjectCode}
                   getAuthHeaders={getAuthHeaders}
+                  onRefresh={fetchVerifications}
                 />
               )}
 
@@ -1585,6 +1603,7 @@ function MainApp() {
             onSubmitVerification={handleSubmitVerification}
             projectCode={selectedProjectCode}
             getAuthHeaders={getAuthHeaders}
+            onRefresh={fetchVerifications}
           />
         )}
 

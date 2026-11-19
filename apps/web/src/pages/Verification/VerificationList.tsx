@@ -62,6 +62,7 @@ export interface VerificationListProps {
   }) => Promise<void>;
   projectCode?: string;
   getAuthHeaders?: () => Record<string, string>;
+  onRefresh?: () => Promise<void> | void;
 }
 
 const STANDARD_16_CATEGORIES = [
@@ -91,9 +92,17 @@ export function VerificationList({
   onSubmitVerification,
   projectCode = 'AF-VILLA',
   getAuthHeaders,
+  onRefresh,
 }: VerificationListProps) {
   const isAdmin = userRole === 'ADMIN';
   const isStaff = userRole === 'STAFF';
+
+  // Automatically refresh items if empty on mount
+  useEffect(() => {
+    if (items.length === 0 && onRefresh) {
+      onRefresh();
+    }
+  }, [items.length, onRefresh]);
 
   // Filter State
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REVISION'>('ALL');
@@ -563,6 +572,28 @@ export function VerificationList({
 
         {/* Staff & Admin Action: Request Verification */}
         <div style={{ display: 'flex', gap: '10px' }}>
+          {onRefresh && (
+            <button
+              onClick={() => onRefresh()}
+              title="Refresh verification items from database"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '10px 14px',
+                backgroundColor: 'var(--bg-tertiary)',
+                color: 'var(--text-secondary)',
+                borderRadius: 'var(--radius-md)',
+                fontSize: '13px',
+                fontWeight: 600,
+                border: '1px solid var(--border-subtle)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <RotateCw size={14} /> Refresh
+            </button>
+          )}
           {(isStaff || isAdmin) && (
             <button
               onClick={() => {
@@ -635,9 +666,29 @@ export function VerificationList({
             <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 6px 0' }}>
               No verification submissions in this view
             </p>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '0 0 14px 0' }}>
               Staff can submit drawings for verification using the &quot;Request Verification&quot; button above.
             </p>
+            {onRefresh && (
+              <button
+                onClick={() => onRefresh()}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 16px',
+                  backgroundColor: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  border: '1px solid var(--border-subtle)',
+                  cursor: 'pointer',
+                }}
+              >
+                <RotateCw size={13} /> Refresh Submissions
+              </button>
+            )}
           </div>
         ) : (
           filteredItems.map((item) => {
