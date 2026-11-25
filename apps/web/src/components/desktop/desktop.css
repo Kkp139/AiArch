@@ -2118,3 +2118,907 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ==========================================================================
+   Complete Desktop Views Layout & Components (Dashboard, Projects, Meetings, Verification)
+   ========================================================================== */
+
+/* Shared Header & Section Typography */
+.desk-dashboard,
+.desk-projects-view,
+.desk-meetings-view,
+.desk-verification-view {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.desk-dashboard-header,
+.desk-projects-header,
+.desk-meetings-header,
+.desk-verification-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.desk-section-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--desk-text-primary);
+  letter-spacing: -0.01em;
+  margin-top: 4px;
+}
+
+/* Dashboard KPI Metrics Grid */
+.desk-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.desk-metric-card {
+  background: var(--desk-white);
+  border: 1px solid var(--desk-border-subtle);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: var(--desk-shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.desk-metric-card:hover {
+  border-color: var(--desk-gold-border);
+  box-shadow: var(--desk-shadow-hover);
+  transform: translateY(-1px);
+}
+
+.desk-metric-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.desk-metric-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--desk-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.desk-metric-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--desk-gold-soft);
+  color: var(--desk-gold-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.desk-metric-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.desk-metric-val {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--desk-text-primary);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.desk-metric-sub {
+  font-size: 12px;
+  color: var(--desk-text-muted);
+  font-weight: 500;
+}
+
+/* Quick Operational Actions Grid */
+.desk-quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+}
+
+.desk-action-card {
+  background: var(--desk-white);
+  border: 1px solid var(--desk-border-subtle);
+  border-radius: 16px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--desk-shadow-card);
+  transition: all 0.16s ease;
+}
+
+.desk-action-card:hover {
+  border-color: var(--desk-gold);
+  background: var(--desk-gold-soft);
+  box-shadow: var(--desk-shadow-hover);
+  transform: translateY(-1px);
+}
+
+.desk-action-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--desk-gold-soft);
+  border: 1px solid var(--desk-gold-border);
+  color: var(--desk-gold-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.desk-action-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.desk-action-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--desk-text-primary);
+}
+
+.desk-action-desc {
+  font-size: 12px;
+  color: var(--desk-text-secondary);
+  line-height: 1.35;
+}
+
+.desk-action-arrow {
+  color: var(--desk-text-muted);
+  flex-shrink: 0;
+  transition: transform 0.16s ease, color 0.16s ease;
+}
+
+.desk-action-card:hover .desk-action-arrow {
+  color: var(--desk-gold-dark);
+  transform: translate(2px, -2px);
+}
+
+/* Dashboard Split Feed Lists */
+.desk-meetings-list,
+.desk-verification-list {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 18px 18px;
+}
+
+.desk-meeting-item,
+.desk-verification-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--desk-border-subtle);
+}
+
+.desk-meeting-item:last-child,
+.desk-verification-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.desk-meeting-time-box {
+  background: var(--desk-gold-soft);
+  border: 1px solid var(--desk-gold-border);
+  border-radius: 12px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 108px;
+  flex-shrink: 0;
+}
+
+.desk-meeting-time {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--desk-espresso);
+}
+
+.desk-meeting-day {
+  font-size: 11px;
+  color: var(--desk-gold-dark);
+  font-weight: 600;
+}
+
+.desk-meeting-details,
+.desk-verification-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.desk-meeting-project,
+.desk-verification-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--desk-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.desk-meeting-client,
+.desk-verification-meta {
+  font-size: 12px;
+  color: var(--desk-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.desk-meeting-actions,
+.desk-verification-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.desk-btn-meet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: var(--desk-info-bg);
+  color: var(--desk-info);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  border: 1px solid rgba(23, 92, 211, 0.2);
+  transition: background 0.15s ease;
+}
+
+.desk-btn-meet:hover {
+  background: #DCEBFF;
+}
+
+.desk-rev-tag,
+.desk-rev-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--desk-surface-subtle);
+  border: 1px solid var(--desk-border-strong);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--desk-text-primary);
+}
+
+.desk-vault-stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--desk-surface-subtle);
+  border: 1px solid var(--desk-border-subtle);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--desk-text-primary);
+}
+
+.desk-count-pill,
+.desk-badge-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--desk-gold-soft);
+  border: 1px solid var(--desk-gold-border);
+  color: var(--desk-gold-dark);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+/* Status Pills */
+.desk-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.desk-status-pill.approved,
+.desk-status-pill.confirmed {
+  background: var(--desk-success-bg);
+  color: var(--desk-success);
+}
+
+.desk-status-pill.pending,
+.desk-status-pill.pending_approval {
+  background: var(--desk-warning-bg);
+  color: var(--desk-warning);
+}
+
+.desk-status-pill.revision,
+.desk-status-pill.rescheduled {
+  background: var(--desk-danger-bg);
+  color: var(--desk-danger);
+}
+
+/* ==========================================================================
+   Desktop Projects & 16-Folder Vault View
+   ========================================================================== */
+.desk-vault-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.desk-phase-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.desk-filter-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--desk-white);
+  border: 1px solid var(--desk-border-strong);
+  border-radius: 12px;
+  padding: 8px 14px;
+  min-width: 240px;
+}
+
+.desk-filter-search input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--desk-text-primary);
+  width: 100%;
+}
+
+.desk-folder-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.desk-folder-icon-box {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--desk-gold-soft);
+  border: 1px solid var(--desk-gold-border);
+  color: var(--desk-gold-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.desk-folder-phase-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--desk-surface-subtle);
+  border: 1px solid var(--desk-border-subtle);
+  color: var(--desk-text-secondary);
+}
+
+.desk-folder-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.desk-folder-name {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--desk-text-primary);
+  margin: 0;
+}
+
+.desk-folder-desc {
+  font-size: 12px;
+  color: var(--desk-text-secondary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.desk-folder-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid var(--desk-border-subtle);
+}
+
+.desk-sheet-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--desk-text-secondary);
+}
+
+.desk-folder-arrow {
+  color: var(--desk-text-muted);
+}
+
+.desk-table-container {
+  background: var(--desk-white);
+  border: 1px solid var(--desk-border-subtle);
+  border-radius: 18px;
+  overflow-x: auto;
+  box-shadow: var(--desk-shadow-card);
+}
+
+.desk-table-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--desk-gold-soft);
+  color: var(--desk-gold-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.desk-btn-row-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--desk-gold-soft);
+  color: var(--desk-gold-dark);
+  border: 1px solid var(--desk-gold-border);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.desk-folder-detail-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.desk-folder-detail-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.desk-breadcrumb-item {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--desk-text-secondary);
+}
+
+.desk-breadcrumb-sep {
+  color: var(--desk-text-muted);
+  margin: 0 6px;
+}
+
+/* ==========================================================================
+   Desktop Meetings Scheduler View
+   ========================================================================== */
+.desk-calendar-week-bar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.desk-day-name {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: inherit;
+  opacity: 0.75;
+}
+
+.desk-day-date {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.desk-day-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--desk-gold-soft);
+  color: var(--desk-gold-dark);
+}
+
+.desk-slots-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.desk-daily-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.desk-slot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--desk-border-subtle);
+}
+
+.desk-slot-time-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--desk-espresso);
+}
+
+.desk-slot-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--desk-text-muted);
+}
+
+.desk-slot-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  flex: 1;
+}
+
+.desk-slot-project-title {
+  font-size: 15.5px;
+  font-weight: 800;
+  color: var(--desk-text-primary);
+}
+
+.desk-slot-client-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--desk-text-secondary);
+}
+
+.desk-slot-agenda {
+  font-size: 13px;
+  color: var(--desk-text-secondary);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.desk-slot-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--desk-border-subtle);
+}
+
+.desk-slot-type,
+.desk-slot-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.desk-slot-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 28px 16px;
+  text-align: center;
+}
+
+.desk-empty-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--desk-text-muted);
+}
+
+.desk-btn-reserve {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  background: var(--desk-gold);
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.desk-radio-group {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ==========================================================================
+   Desktop Drawing Verification Master-Detail Inspector
+   ========================================================================== */
+.desk-verif-master-detail {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) 360px;
+  gap: 16px;
+  align-items: stretch;
+  min-height: 620px;
+}
+
+.desk-verif-queue,
+.desk-verif-viewport,
+.desk-verif-inspector {
+  background: var(--desk-white);
+  border: 1px solid var(--desk-border-subtle);
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--desk-shadow-card);
+}
+
+.desk-queue-header,
+.desk-inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--desk-border-subtle);
+}
+
+.desk-queue-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--desk-surface-subtle);
+  border: 1px solid var(--desk-border-subtle);
+}
+
+.desk-queue-search input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  width: 100%;
+  color: var(--desk-text-primary);
+}
+
+.desk-queue-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.desk-queue-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.desk-queue-item-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--desk-text-primary);
+  margin-bottom: 3px;
+}
+
+.desk-queue-item-meta {
+  font-size: 11.5px;
+  color: var(--desk-text-muted);
+}
+
+.desk-verif-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--desk-border-subtle);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.desk-rev-selector-group,
+.desk-zoom-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.desk-verif-canvas-wrap {
+  flex: 1;
+  background: #F0EFEA;
+  padding: 20px;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.desk-verif-paper {
+  width: 100%;
+  max-width: 680px;
+  min-height: 460px;
+  background: #FFFFFF;
+  border: 1px solid #D5D2CA;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+  padding: 24px;
+  position: relative;
+}
+
+.desk-cad-grid-pattern {
+  position: absolute;
+  inset: 12px;
+  background-image: linear-gradient(to right, rgba(191, 147, 90, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(191, 147, 90, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+}
+
+.desk-cad-drawing-content {
+  position: relative;
+  z-index: 2;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.desk-cad-watermark {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: rgba(53, 38, 24, 0.45);
+}
+
+.desk-official-seal {
+  align-self: flex-end;
+  border: 2px solid var(--desk-success);
+  color: var(--desk-success);
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: rgba(233, 247, 239, 0.9);
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.desk-cad-schematic-mock {
+  border: 1.5px solid #352618;
+  padding: 20px;
+  margin: 24px 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.desk-cad-room {
+  border: 1px dashed #695132;
+  padding: 16px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #352618;
+  text-align: center;
+}
+
+.desk-cad-axis-x,
+.desk-cad-axis-y {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--desk-text-muted);
+}
+
+.desk-inspector-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.desk-checklist-box {
+  background: var(--desk-surface-subtle);
+  border: 1px solid var(--desk-border-subtle);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.desk-checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--desk-text-primary);
+}
+
+.desk-feedback-box {
+  background: var(--desk-danger-bg);
+  border: 1px solid rgba(217, 45, 32, 0.25);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 12.5px;
+  color: var(--desk-danger);
+}
+
+.desk-inspector-actions {
+  padding: 14px 16px;
+  border-top: 1px solid var(--desk-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (max-width: 1280px) {
+  .desk-verif-master-detail {
+    grid-template-columns: 1fr;
+  }
+  .desk-calendar-week-bar {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

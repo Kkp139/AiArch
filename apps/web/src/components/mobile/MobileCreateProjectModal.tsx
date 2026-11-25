@@ -103,8 +103,19 @@ export const MobileCreateProjectModal: React.FC<MobileCreateProjectModalProps> =
   };
 
   const content = (
-    <div style={{ flex: 1, paddingBottom: '120px' }}>
-      <div className="figma-subpage-header">
+    <div style={{ flex: 1, paddingBottom: '28px', backgroundColor: '#F5F4F2', color: '#1D1D1F' }}>
+      <div
+        className="figma-subpage-header"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'stretch',
+          gap: '8px',
+          padding: '18px 20px 14px',
+          backgroundColor: '#FFFFFF',
+          borderBottom: '1px solid #ECECEF',
+        }}
+      >
         <div className="figma-breadcrumbs">
           <span className="figma-breadcrumb-link" onClick={closeHandler}>
             Projects
@@ -113,18 +124,38 @@ export const MobileCreateProjectModal: React.FC<MobileCreateProjectModalProps> =
           <span className="active">Create Project</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-          <button type="button" className="figma-back-btn" onClick={closeHandler}>
-            <ChevronLeft size={24} />
-          </button>
-          <div>
-            <h2 style={{ fontSize: '20px', fontWeight: 800, margin: 0, color: '#0C0C0D' }}>
-              Create New Project
-            </h2>
-            <div style={{ fontSize: '12px', color: '#686869' }}>
-              Auto-Provisions 16 Standard Architecture Folders
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button type="button" className="figma-back-btn" onClick={closeHandler}>
+              <ChevronLeft size={22} />
+            </button>
+            <div>
+              <h2 style={{ fontSize: '19px', fontWeight: 800, margin: 0, color: '#0C0C0D' }}>
+                Create New Project
+              </h2>
+              <div style={{ fontSize: '12px', color: '#686869' }}>
+                Auto-Provisions 16 Standard Architecture Folders
+              </div>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={closeHandler}
+            aria-label="Close"
+            style={{
+              width: '34px',
+              height: '34px',
+              borderRadius: '50%',
+              background: '#F5F5F7',
+              color: '#1D1D1F',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            <X size={16} />
+          </button>
         </div>
       </div>
 
@@ -463,17 +494,35 @@ export const MobileCreateProjectModal: React.FC<MobileCreateProjectModalProps> =
   if (isOpen) {
     return (
       <div
+        onClick={closeHandler}
         style={{
           position: 'fixed',
           inset: 0,
           zIndex: 4500,
-          backgroundColor: '#F2F2F5',
-          overflowY: 'auto',
-          maxWidth: '480px',
-          margin: '0 auto',
+          backgroundColor: 'rgba(15, 15, 18, 0.55)',
+          backdropFilter: 'blur(4px)',
+          WebkitBackdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '16px',
         }}
       >
-        {content}
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: '100%',
+            maxWidth: '580px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            backgroundColor: '#F5F4F2',
+            borderRadius: '24px',
+            boxShadow: '0 24px 64px rgba(0, 0, 0, 0.28)',
+            border: '1px solid #ECECEF',
+          }}
+        >
+          {content}
+        </div>
       </div>
     );
   }
