@@ -20,7 +20,7 @@ export async function announcementRoutes(app: FastifyInstance) {
 
     const announcements = await prisma.announcement.findMany({
       where: {
-        audience: { in: permittedAudiences },
+        audience: { in: permittedAudiences as any },
       },
       include: {
         publisher: {

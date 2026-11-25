@@ -1,12 +1,29 @@
-import { TargetStatus, UserRole } from '../../lib/enums';
+// Pure business-logic helpers for Staff Targets.
+// Parameter types use `string` so this module works regardless of which
+// @prisma/client version (or mock) supplies the enum values to callers.
+
+const TS = {
+  PENDING: 'PENDING',
+  IN_PROGRESS: 'IN_PROGRESS',
+  SUBMITTED: 'SUBMITTED',
+  COMPLETED: 'COMPLETED',
+  OVERDUE: 'OVERDUE',
+} as const;
+
+const UR = {
+  ADMIN: 'ADMIN',
+  STAFF: 'STAFF',
+  CLIENT_LEADER: 'CLIENT_LEADER',
+  CLIENT_VIEWER: 'CLIENT_VIEWER',
+} as const;
 
 /**
  * Dynamically computes target status, ensuring that overdue targets
  * are accurately represented when due date passes before completion.
  */
-export function computeEffectiveTargetStatus(status: TargetStatus, dueDate: Date): TargetStatus {
-  if (status === TargetStatus.COMPLETED) {
-    return TargetStatus.COMPLETED;
+export function computeEffectiveTargetStatus(status: string, dueDate: Date): string {
+  if (status === TS.COMPLETED) {
+    return TS.COMPLETED;
   }
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -15,7 +32,7 @@ export function computeEffectiveTargetStatus(status: TargetStatus, dueDate: Date
   due.setHours(0, 0, 0, 0);
 
   if (due.getTime() < today.getTime()) {
-    return TargetStatus.OVERDUE;
+    return TS.OVERDUE;
   }
 
   return status;
@@ -27,24 +44,24 @@ export function computeEffectiveTargetStatus(status: TargetStatus, dueDate: Date
  * It becomes Completed ONLY after Admin approval. Staff cannot approve their own targets.
  */
 export function validateTargetStatusTransition(
-  userRole: UserRole,
-  currentStatus: TargetStatus,
-  targetStatus: TargetStatus
+  userRole: string,
+  currentStatus: string,
+  targetStatus: string
 ): { allowed: boolean; error?: string } {
   // Clients are never permitted to touch targets
-  if (userRole === UserRole.CLIENT_LEADER || userRole === UserRole.CLIENT_VIEWER) {
+  if (userRole === UR.CLIENT_LEADER || userRole === UR.CLIENT_VIEWER) {
     return { allowed: false, error: 'Access denied: Clients cannot access staff productivity targets.' };
   }
 
   // Admin can perform all valid status transitions
-  if (userRole === UserRole.ADMIN) {
+  if (userRole === UR.ADMIN) {
     return { allowed: true };
   }
 
   // Staff transitions
-  if (userRole === UserRole.STAFF) {
+  if (userRole === UR.STAFF) {
     // Staff CANNOT approve their own target to COMPLETED
-    if (targetStatus === TargetStatus.COMPLETED) {
+    if (targetStatus === TS.COMPLETED) {
       return {
         allowed: false,
         error: 'Access denied: Staff members cannot approve their own completed targets. Submission for Admin review is required.',
@@ -52,12 +69,12 @@ export function validateTargetStatusTransition(
     }
 
     // Staff can start a target (PENDING -> IN_PROGRESS)
-    if (currentStatus === TargetStatus.PENDING && targetStatus === TargetStatus.IN_PROGRESS) {
+    if (currentStatus === TS.PENDING && targetStatus === TS.IN_PROGRESS) {
       return { allowed: true };
     }
 
     // Staff can submit for review (IN_PROGRESS or OVERDUE -> SUBMITTED)
-    if ((currentStatus === TargetStatus.IN_PROGRESS || currentStatus === TargetStatus.OVERDUE) && targetStatus === TargetStatus.SUBMITTED) {
+    if ((currentStatus === TS.IN_PROGRESS || currentStatus === TS.OVERDUE) && targetStatus === TS.SUBMITTED) {
       return { allowed: true };
     }
 
