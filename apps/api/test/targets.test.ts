@@ -3,7 +3,7 @@ import {
   computeEffectiveTargetStatus,
   validateTargetStatusTransition,
 } from '../src/modules/targets/targets.service';
-import { TargetStatus, UserRole } from '@prisma/client';
+import { TargetStatus, UserRole } from '../src/lib/enums';
 
 describe('Staff Targets & Productivity Management (Master Spec Section 10.2)', () => {
   describe('Status Computation & Overdue Enforcement', () => {

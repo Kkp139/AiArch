@@ -1,4 +1,4 @@
-import { TargetStatus, UserRole } from '@prisma/client';
+import { TargetStatus, UserRole } from '../../lib/enums';
 
 /**
  * Dynamically computes target status, ensuring that overdue targets

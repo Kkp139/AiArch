@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { UserRole, AnnouncementAudience, TargetStatus } from '@prisma/client';
+import { UserRole, AnnouncementAudience, TargetStatus } from '../src/lib/enums';
 import { FIXED_16_CATEGORIES } from '../prisma/seed';
 import {
   calculateProgress,

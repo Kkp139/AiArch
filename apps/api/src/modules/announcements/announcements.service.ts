@@ -1,4 +1,4 @@
-import { UserRole, AnnouncementAudience } from '@prisma/client';
+import { UserRole, AnnouncementAudience } from '../../lib/enums';
 
 /**
  * Checks if a user's role grants access to an announcement with the specified audience.

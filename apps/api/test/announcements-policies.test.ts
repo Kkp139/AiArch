@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { canUserReadAnnouncement, getAudiencesForRole } from '../src/modules/announcements/announcements.service';
-import { AnnouncementAudience, UserRole } from '@prisma/client';
+import { AnnouncementAudience, UserRole } from '../src/lib/enums';
 
 describe('Announcements & Studio Policies System (Master Spec Section 9)', () => {
   describe('Audience-based Access Control', () => {
