@@ -2,17 +2,32 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { resolveUserFromRequest, userHasProjectAccess } from '../../lib/auth-guard';
+import { getSocketIO } from '../../gateway/socket.gateway';
+
+function formatAttachmentUrl(attachmentKey: string | null | undefined): string | undefined {
+  if (!attachmentKey) return undefined;
+  if (
+    attachmentKey.startsWith('data:') ||
+    attachmentKey.startsWith('http://') ||
+    attachmentKey.startsWith('https://')
+  ) {
+    return attachmentKey;
+  }
+  const bucket = process.env.S3_BUCKET_NAME || 'afdesign-vault-prod';
+  return `https://${bucket}.r2.cloudflarestorage.com/${attachmentKey}`;
+}
 
 export async function chatRoutes(app: FastifyInstance) {
-  // Get Chat History for a Project (Strictly restricted to Admin and assigned Client Leader!)
-  app.get('/api/chat/projects/:projectCode/messages', async (request: FastifyRequest<{ Params: { projectCode: string } }>, reply: FastifyReply) => {
+  // Get Chat History for a Project (Admin, assigned Client Leader, assigned Client Viewer; Staff strictly 403)
+  app.get('/api/chat/projects/:projectCode/messages', async (
+    request: FastifyRequest<{ Params: { projectCode: string } }>,
+    reply: FastifyReply
+  ) => {
     const user = await resolveUserFromRequest(request);
     if (!user) {
       return reply.status(401).send({ error: 'Authentication required. Please sign in to access project chat.' });
     }
 
-    // CHAT ACCESS RULE: Admin has full access; Client Leader & Client Viewer have dynamic access based on project assignment.
-    // Staff is blocked.
     if (user.role === 'STAFF') {
       return reply.status(403).send({
         error: 'Forbidden: Studio staff cannot access client discussions.',
@@ -40,6 +55,10 @@ export async function chatRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Project not found.' });
     }
 
+    if (user.role !== 'ADMIN' && project.status === 'INACTIVE') {
+      return reply.status(403).send({ error: 'Access denied: Inactive projects are not accessible to client accounts.' });
+    }
+
     const messages = await prisma.chatMessage.findMany({
       where: { projectId: project.id },
       include: {
@@ -50,24 +69,23 @@ export async function chatRoutes(app: FastifyInstance) {
       orderBy: { createdAt: 'asc' },
     });
 
-    return messages.map(m => ({
+    return messages.map((m) => ({
       id: m.id,
       projectId: m.projectId,
       senderId: m.senderId,
       senderName: m.sender.fullName,
       senderRole: m.sender.role,
       text: m.messageText,
-      attachmentUrl: m.attachmentKey
-        ? m.attachmentKey.startsWith('data:') || m.attachmentKey.startsWith('http://') || m.attachmentKey.startsWith('https://')
-          ? m.attachmentKey
-          : `https://${process.env.S3_BUCKET_NAME || 'afdesign-vault-prod'}.r2.cloudflarestorage.com/${m.attachmentKey}`
-        : undefined,
+      attachmentUrl: formatAttachmentUrl(m.attachmentKey),
       createdAt: m.createdAt,
     }));
   });
 
-  // Send Chat Message
-  app.post('/api/chat/projects/:projectCode/messages', async (request: FastifyRequest<{ Params: { projectCode: string } }>, reply: FastifyReply) => {
+  // Send Chat Message (Broadcasts via Socket.io if active)
+  app.post('/api/chat/projects/:projectCode/messages', async (
+    request: FastifyRequest<{ Params: { projectCode: string } }>,
+    reply: FastifyReply
+  ) => {
     const user = await resolveUserFromRequest(request);
     if (!user) {
       return reply.status(401).send({ error: 'Authentication required.' });
@@ -100,10 +118,17 @@ export async function chatRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Project not found.' });
     }
 
+    if (user.role !== 'ADMIN' && project.status === 'INACTIVE') {
+      return reply.status(403).send({ error: 'Access denied: Inactive projects are not accessible to client accounts.' });
+    }
+
     const schema = z.object({
-      messageText: z.string().min(1, 'Message text is required'),
+      messageText: z.string().optional().default(''),
       attachmentKey: z.string().optional(),
-    });
+    }).refine(
+      (data) => data.messageText.trim().length > 0 || Boolean(data.attachmentKey && data.attachmentKey.trim().length > 0),
+      { message: 'Message text or attachment is required' }
+    );
 
     const body = schema.safeParse(request.body);
     if (!body.success) {
@@ -114,7 +139,7 @@ export async function chatRoutes(app: FastifyInstance) {
       data: {
         projectId: project.id,
         senderId: user.id,
-        messageText: body.data.messageText,
+        messageText: body.data.messageText.trim(),
         attachmentKey: body.data.attachmentKey,
       },
       include: {
@@ -122,14 +147,23 @@ export async function chatRoutes(app: FastifyInstance) {
       },
     });
 
-    return {
+    const formattedMessage = {
       id: message.id,
       projectId: message.projectId,
       senderId: message.senderId,
       senderName: message.sender.fullName,
       senderRole: message.sender.role,
       text: message.messageText,
+      attachmentUrl: formatAttachmentUrl(message.attachmentKey),
       createdAt: message.createdAt,
     };
+
+    const io = getSocketIO();
+    if (io) {
+      io.to(`project:${project.id}`).emit('new_message', formattedMessage);
+      io.to(`project:${project.projectCode}`).emit('new_message', formattedMessage);
+    }
+
+    return formattedMessage;
   });
 }

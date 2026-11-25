@@ -22,13 +22,15 @@ export interface InAppNotification {
   createdAt: Date;
 }
 
+import { notificationQueueService } from '../../lib/queue.service';
+
 export class NotificationsService {
   private notifications: InAppNotification[] = [];
 
   /**
    * Dispatches a notification:
    * 1. Creates an immediate In-App record (never duplicated).
-   * 2. Returns push payload data for the BullMQ push worker queue.
+   * 2. Returns push payload data for the BullMQ push worker queue and enqueues job.
    */
   public createNotification(params: {
     recipientId: string;
@@ -71,6 +73,11 @@ export class NotificationsService {
       inAppNotificationId: inAppNotification.id,
       attempt: 0, // initial attempt
     };
+
+    // Asynchronously dispatch to BullMQ push queue
+    notificationQueueService.enqueuePushNotification(pushJob).catch((err) => {
+      console.error('[NotificationsService] Failed to enqueue push job:', err);
+    });
 
     return { inAppNotification, pushJob };
   }

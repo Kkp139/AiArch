@@ -1,8 +1,10 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
+import { DownloadPermission, UserRole } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { calculateProgress } from './progress.service';
 import { validateProjectStatusTransition } from './projects.service';
+import { recordAuditLog } from '../../lib/audit.service';
 
 const STANDARD_FOLDERS = [
   // Phase 1: Concept Design (6)
@@ -32,16 +34,44 @@ import { resolveUserFromRequest, userHasProjectAccess } from '../../lib/auth-gua
 
 export async function projectRoutes(app: FastifyInstance) {
   // Get All Projects (with strict authentication and role-based access filtering)
-  app.get('/api/projects', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/api/projects', async (
+    request: FastifyRequest<{ Querystring: { status?: string } }>,
+    reply: FastifyReply
+  ) => {
     const user = await resolveUserFromRequest(request);
     if (!user) {
       return reply.status(401).send({ error: 'Authentication required. Please sign in to view projects.' });
+    }
+
+    const requestedStatus = request.query?.status?.toUpperCase();
+    const isClient = user.role === 'CLIENT_LEADER' || user.role === 'CLIENT_VIEWER';
+
+    // Clients have zero access to Inactive projects
+    if (isClient && requestedStatus === 'INACTIVE') {
+      return [];
     }
 
     const where: any = {};
     if (user.role !== 'ADMIN') {
       const assignedIds = user.assignedProjects.map(ap => ap.projectId);
       where.id = { in: assignedIds };
+    }
+
+    if (isClient) {
+      where.status = 'ACTIVE';
+    } else if (user.role === 'STAFF') {
+      if (requestedStatus === 'INACTIVE') {
+        where.status = 'INACTIVE';
+      } else if (requestedStatus === 'ALL') {
+        // Staff retains read-only access to assigned inactive projects
+      } else {
+        where.status = 'ACTIVE';
+      }
+    } else {
+      // ADMIN: filter when explicitly requested; otherwise return all projects for lifecycle management
+      if (requestedStatus === 'ACTIVE' || requestedStatus === 'INACTIVE') {
+        where.status = requestedStatus;
+      }
     }
 
     const projects = await prisma.project.findMany({
@@ -147,6 +177,10 @@ export async function projectRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Project not found' });
     }
 
+    if ((user.role === 'CLIENT_LEADER' || user.role === 'CLIENT_VIEWER') && project.status === 'INACTIVE') {
+      return reply.status(403).send({ error: 'Access denied: Inactive projects are not accessible to client accounts.' });
+    }
+
     const populatedCount = project.folders.filter((f) => f.documents.length > 0).length;
     const progress = calculateProgress(populatedCount, 16);
 
@@ -228,6 +262,16 @@ export async function projectRoutes(app: FastifyInstance) {
       },
     });
 
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'CREATE_PROJECT',
+      entityType: 'PROJECT',
+      entityId: project.id,
+      newData: { projectCode: project.projectCode, name: project.name },
+    });
+
     return {
       success: true,
       project: {
@@ -260,6 +304,249 @@ export async function projectRoutes(app: FastifyInstance) {
 
     const populatedCount = folders.filter((f) => f._count.documents > 0).length;
     return calculateProgress(populatedCount, 16);
+  });
+
+  // Get Detailed 16-Category Progress Report (Admin, assigned Client Leader, assigned Client Viewer ONLY; Staff gets 403)
+  app.get('/api/projects/:idOrCode/progress-report', async (
+    request: FastifyRequest<{ Params: { idOrCode: string } }>,
+    reply: FastifyReply
+  ) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role === 'STAFF') {
+      return reply.status(403).send({ error: 'Access denied: Progress Reports are restricted to Administrators and Clients.' });
+    }
+
+    const { idOrCode } = request.params;
+    const project = await prisma.project.findFirst({
+      where: { OR: [{ id: idOrCode }, { projectCode: idOrCode }] },
+      include: {
+        folders: {
+          include: {
+            documents: {
+              select: { id: true, isApprovedDrawing: true, createdAt: true },
+              orderBy: { createdAt: 'desc' },
+            },
+          },
+          orderBy: { displayOrder: 'asc' },
+        },
+      },
+    });
+
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found.' });
+    }
+
+    if (!userHasProjectAccess(user, project.id)) {
+      return reply.status(403).send({ error: 'Access denied: You are not assigned to this project.' });
+    }
+
+    if (project.status === 'INACTIVE' && user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Inactive projects are not accessible to client accounts.' });
+    }
+
+    const countedFolders = project.folders.filter((f) => f.isCounted);
+    const populatedCategories = countedFolders.filter((f) => f.documents.length > 0).length;
+    const pendingCategories = Math.max(0, 16 - populatedCategories);
+    const overall = calculateProgress(populatedCategories, 16);
+
+    const conceptFolders = countedFolders.filter((f) => f.phaseGroup.toUpperCase().startsWith('CONCEPT'));
+    const constructionFolders = countedFolders.filter((f) => f.phaseGroup.toUpperCase().startsWith('CONSTRUCTION'));
+    const otherFolders = countedFolders.filter((f) => f.phaseGroup.toUpperCase() === 'OTHER');
+
+    const summarizePhase = (list: typeof countedFolders) => {
+      const total = list.length;
+      const populated = list.filter((f) => f.documents.length > 0).length;
+      const prog = calculateProgress(populated, total);
+      return {
+        total,
+        populated,
+        pending: Math.max(0, total - populated),
+        percentage: prog.percentage,
+      };
+    };
+
+    let latestTimestamp = project.updatedAt.getTime();
+    const categories = project.folders.map((f) => {
+      const latestDoc = f.documents[0];
+      if (latestDoc && latestDoc.createdAt.getTime() > latestTimestamp) {
+        latestTimestamp = latestDoc.createdAt.getTime();
+      }
+      return {
+        folderId: f.id,
+        categoryCode: f.categoryCode,
+        folderName: f.folderName,
+        phaseGroup: f.phaseGroup,
+        displayOrder: f.displayOrder,
+        isPopulated: f.documents.length > 0,
+        documentCount: f.documents.length,
+        approvedCount: f.documents.filter((d) => d.isApprovedDrawing).length,
+        lastUpdatedAt: latestDoc ? latestDoc.createdAt.toISOString() : null,
+      };
+    });
+
+    return {
+      projectId: project.id,
+      projectCode: project.projectCode,
+      projectName: project.name,
+      completionPercentage: overall.percentage,
+      populatedCategories,
+      pendingCategories,
+      totalCategories: 16,
+      lastUpdatedAt: new Date(latestTimestamp).toISOString(),
+      phaseBreakdown: {
+        concept: summarizePhase(conceptFolders),
+        construction: summarizePhase(constructionFolders),
+        other: summarizePhase(otherFolders),
+      },
+      categories,
+    };
+  });
+
+  // Get Per-Folder Download Permissions (Authenticated + Assigned)
+  app.get('/api/projects/:id/folder-permissions', async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply
+  ) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+
+    const project = await prisma.project.findFirst({
+      where: { OR: [{ id: request.params.id }, { projectCode: request.params.id }] },
+      include: {
+        folders: {
+          include: { permissions: true },
+          orderBy: { displayOrder: 'asc' },
+        },
+      },
+    });
+
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found.' });
+    }
+
+    if (!userHasProjectAccess(user, project.id)) {
+      return reply.status(403).send({ error: 'Access denied: You are not assigned to this project.' });
+    }
+
+    if ((user.role === 'CLIENT_LEADER' || user.role === 'CLIENT_VIEWER') && project.status === 'INACTIVE') {
+      return reply.status(403).send({ error: 'Access denied: Inactive projects are not accessible to client accounts.' });
+    }
+
+    return {
+      projectId: project.id,
+      projectCode: project.projectCode,
+      allowClientDownloads: project.allowClientDownloads,
+      folders: project.folders.map((f) => ({
+        folderId: f.id,
+        categoryCode: f.categoryCode,
+        folderName: f.folderName,
+        phaseGroup: f.phaseGroup,
+        displayOrder: f.displayOrder,
+        permissions: f.permissions.map((perm) => ({
+          id: perm.id,
+          role: perm.role,
+          accessLevel: perm.accessLevel,
+        })),
+      })),
+    };
+  });
+
+  // Update Per-Folder Download Permissions (Admin Only)
+  app.put('/api/projects/:id/folder-permissions', async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply
+  ) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only Admins can update folder permissions.' });
+    }
+
+    const entrySchema = z.object({
+      folderId: z.string().min(1),
+      role: z.enum(['ADMIN', 'STAFF', 'CLIENT_LEADER', 'CLIENT_VIEWER']),
+      accessLevel: z.enum(['VIEW_ONLY', 'VIEW_AND_DOWNLOAD']),
+    });
+
+    const schema = z.union([
+      z.object({ permissions: z.array(entrySchema).min(1) }),
+      entrySchema,
+    ]);
+
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.errors[0]?.message || 'Invalid folder permissions payload' });
+    }
+
+    const project = await prisma.project.findFirst({
+      where: { OR: [{ id: request.params.id }, { projectCode: request.params.id }] },
+      include: { folders: true, folderPermissions: true },
+    });
+    if (!project) {
+      return reply.status(404).send({ error: 'Project not found.' });
+    }
+
+    const entries = 'permissions' in parsed.data ? parsed.data.permissions : [parsed.data];
+    const validFolderIds = new Set(project.folders.map((f) => f.id));
+    for (const entry of entries) {
+      if (!validFolderIds.has(entry.folderId)) {
+        return reply.status(400).send({ error: `Folder '${entry.folderId}' does not belong to this project.` });
+      }
+    }
+
+    const upserted = await prisma.$transaction(
+      entries.map((entry) =>
+        prisma.projectFolderPermission.upsert({
+          where: {
+            projectId_folderId_role: {
+              projectId: project.id,
+              folderId: entry.folderId,
+              role: entry.role as UserRole,
+            },
+          },
+          create: {
+            projectId: project.id,
+            folderId: entry.folderId,
+            role: entry.role as UserRole,
+            accessLevel: entry.accessLevel as DownloadPermission,
+          },
+          update: {
+            accessLevel: entry.accessLevel as DownloadPermission,
+          },
+        })
+      )
+    );
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'UPDATE_FOLDER_PERMISSIONS',
+      entityType: 'PROJECT',
+      entityId: project.id,
+      oldData: project.folderPermissions.map((p) => ({
+        folderId: p.folderId,
+        role: p.role,
+        accessLevel: p.accessLevel,
+      })),
+      newData: upserted.map((p) => ({
+        folderId: p.folderId,
+        role: p.role,
+        accessLevel: p.accessLevel,
+      })),
+    });
+
+    return {
+      success: true,
+      permissions: upserted,
+    };
   });
 
   // Toggle Active / Inactive Status (Admin only - No Project Deletion Allowed)
@@ -298,6 +585,17 @@ export async function projectRoutes(app: FastifyInstance) {
       data: { status: body.data.status },
     });
 
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'UPDATE_PROJECT_STATUS',
+      entityType: 'PROJECT',
+      entityId: updated.id,
+      oldData: { status: currentProject.status },
+      newData: { status: updated.status },
+    });
+
     return {
       success: true,
       projectId: updated.id,
@@ -326,9 +624,41 @@ export async function projectRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'Invalid settings payload' });
     }
 
+    const currentProject = await prisma.project.findUnique({
+      where: { id: request.params.id },
+      select: {
+        id: true,
+        projectCode: true,
+        showPricingClientLeader: true,
+        showPricingClientViewer: true,
+        allowClientMeetings: true,
+        allowClientDownloads: true,
+      },
+    });
+
+    if (!currentProject) {
+      return reply.status(404).send({ error: 'Project not found' });
+    }
+
     const updated = await prisma.project.update({
       where: { id: request.params.id },
       data: body.data,
+    });
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'UPDATE_PROJECT_SETTINGS',
+      entityType: 'PROJECT',
+      entityId: updated.id,
+      oldData: currentProject,
+      newData: {
+        showPricingClientLeader: updated.showPricingClientLeader,
+        showPricingClientViewer: updated.showPricingClientViewer,
+        allowClientMeetings: updated.allowClientMeetings,
+        allowClientDownloads: updated.allowClientDownloads,
+      },
     });
 
     return {

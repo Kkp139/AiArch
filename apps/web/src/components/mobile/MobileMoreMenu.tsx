@@ -1,271 +1,416 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  User,
+  ChevronLeft,
+  ChevronRight,
   Users,
   Smartphone,
-  UserCheck,
-  FileSpreadsheet,
+  History,
   Settings,
-  HelpCircle,
   Info,
-  ChevronRight,
+  HelpCircle,
+  Lock,
   LogOut,
+  BellRing,
+  User as UserIcon,
+  TrendingUp,
+  Megaphone,
+  ShieldCheck,
 } from 'lucide-react';
 import { UserRole } from '../../context/AuthContext';
+import { ProjectSummary } from '../../App';
+import { AuthHeadersInput } from './mobileAuth';
+import { MobileProfileView } from './MobileProfileView';
+import { MobileUserManagementView } from './MobileUserManagementView';
+import { MobileDeviceApprovalsView } from './MobileDeviceApprovalsView';
+import { MobileActivityLogView } from './MobileActivityLogView';
+import { MobileSettingsView } from './MobileSettingsView';
+import { MobileAboutAppView } from './MobileAboutAppView';
+import { MobileHelpSupportView } from './MobileHelpSupportView';
+
+export interface MobileMoreMenuUser {
+  id?: string;
+  fullName: string;
+  username?: string;
+  email?: string;
+  mobile?: string;
+  role: UserRole;
+  showPricing?: boolean;
+  allowMeetings?: boolean;
+}
 
 export interface MobileMoreMenuProps {
-  userRole: UserRole;
-  onOpenUserManagement: () => void;
-  onOpenProfile: () => void;
-  onLogout: () => void;
+  user?: MobileMoreMenuUser;
+  userRole?: UserRole;
+  projects?: ProjectSummary[];
+  authHeaders?: Record<string, string>;
+  getAuthHeaders?: AuthHeadersInput;
+  onOpenUserManagement?: () => void;
+  onOpenProfile?: () => void;
+  onChangePassword?: () => void;
+  onNavigateTab?: (tab: string) => void;
+  onLogout?: () => void;
+  onBack?: () => void;
+}
+
+type MoreSubView =
+  | 'menu'
+  | 'profile'
+  | 'users'
+  | 'devices'
+  | 'audit'
+  | 'settings'
+  | 'about'
+  | 'help';
+
+function getRoleSubtitle(role: UserRole): string {
+  switch (role) {
+    case 'ADMIN':
+      return 'Principal Administrator';
+    case 'STAFF':
+      return 'Studio Architect';
+    case 'CLIENT_LEADER':
+      return 'Client Leader';
+    case 'CLIENT_VIEWER':
+      return 'Client Viewer';
+    default:
+      return role;
+  }
 }
 
 export const MobileMoreMenu: React.FC<MobileMoreMenuProps> = ({
-  userRole,
+  user,
+  userRole: propUserRole,
+  projects = [],
+  authHeaders,
+  getAuthHeaders,
   onOpenUserManagement,
-  onOpenProfile,
+  onOpenProfile: _onOpenProfile,
+  onChangePassword,
+  onNavigateTab,
   onLogout,
+  onBack,
 }) => {
-  return (
-    <div style={{ flex: 1, paddingBottom: '120px' }}>
-      {/* Header (Figma: 55:2381) */}
-      <div className="figma-subpage-header">
-        <h2 style={{ fontSize: '24px', fontWeight: 800, margin: '8px 0 0 0', color: '#0C0C0D' }}>
-          More
-        </h2>
-      </div>
+  const [subView, setSubView] = useState<MoreSubView>('menu');
+  const effectiveRole: UserRole = user?.role || propUserRole || 'STAFF';
+  const effectiveUser: MobileMoreMenuUser = user || {
+    fullName: getRoleSubtitle(effectiveRole),
+    role: effectiveRole,
+  };
 
-      <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        {/* GROUP 1: ACCOUNT */}
-        <div>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: '#686869', marginBottom: '8px' }}>
-            Account
-          </div>
-          <div style={{ background: '#FFFFFF', borderRadius: '18px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.04)', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
-            <div
-              onClick={onOpenProfile}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '14px 16px',
-                cursor: 'pointer',
-                borderBottom: '1px solid #F5F5F7',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#352618', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <User size={20} />
-                </div>
-                <div>
-                  <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>Profile</h4>
-                  <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>Set up your profile</p>
-                </div>
-              </div>
-              <ChevronRight size={18} color="#979798" />
-            </div>
+  const initials =
+    effectiveUser.fullName
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((s) => s[0]?.toUpperCase() || '')
+      .join('') || 'U';
 
-            <div
-              onClick={onOpenUserManagement}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '14px 16px',
-                cursor: 'pointer',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#352618', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Users size={20} />
-                </div>
-                <div>
-                  <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>Team member</h4>
-                  <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>Manage team and role</p>
-                </div>
-              </div>
-              <ChevronRight size={18} color="#979798" />
-            </div>
-          </div>
-        </div>
+  if (subView === 'profile') {
+    return (
+      <MobileProfileView
+        user={effectiveUser}
+        projects={projects}
+        onBack={() => setSubView('menu')}
+        onChangePassword={onChangePassword}
+        onLogout={onLogout}
+      />
+    );
+  }
 
-        {/* GROUP 2: MANAGEMENT (Admin & Staff) */}
-        {userRole === 'ADMIN' && (
-          <div>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: '#686869', marginBottom: '8px' }}>
-              Management
-            </div>
-            <div style={{ background: '#FFFFFF', borderRadius: '18px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.04)', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
-              <div
-                onClick={() => alert('Device Approvals: All mobile & tablet hardware tokens verified under strict biometric binding.')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '14px 16px',
-                  cursor: 'pointer',
-                  borderBottom: '1px solid #F5F5F7',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#352618', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Smartphone size={20} />
-                  </div>
-                  <div>
-                    <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>Device Approvals</h4>
-                    <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>Manage device requests</p>
-                  </div>
-                </div>
-                <ChevronRight size={18} color="#979798" />
-              </div>
+  if (subView === 'users') {
+    return (
+      <MobileUserManagementView
+        userRole={effectiveRole}
+        projects={projects}
+        authHeaders={authHeaders}
+        getAuthHeaders={getAuthHeaders}
+        onBack={() => setSubView('menu')}
+      />
+    );
+  }
 
-              <div
-                onClick={onOpenUserManagement}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '14px 16px',
-                  cursor: 'pointer',
-                  borderBottom: '1px solid #F5F5F7',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#352618', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <UserCheck size={20} />
-                  </div>
-                  <div>
-                    <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>User Management</h4>
-                    <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>Add or remove users (Single-use link)</p>
-                  </div>
-                </div>
-                <ChevronRight size={18} color="#979798" />
-              </div>
+  if (subView === 'devices') {
+    return (
+      <MobileDeviceApprovalsView
+        userRole={effectiveRole}
+        authHeaders={authHeaders}
+        getAuthHeaders={getAuthHeaders}
+        onBack={() => setSubView('menu')}
+      />
+    );
+  }
 
-              <div
-                onClick={() => alert('Activity Log: 48 recent studio actions logged with immutable timestamps.')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '14px 16px',
-                  cursor: 'pointer',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#352618', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <FileSpreadsheet size={20} />
-                  </div>
-                  <div>
-                    <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>Activity Log</h4>
-                    <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>View recent activities</p>
-                  </div>
-                </div>
-                <ChevronRight size={18} color="#979798" />
-              </div>
-            </div>
-          </div>
-        )}
+  if (subView === 'audit') {
+    return (
+      <MobileActivityLogView
+        userRole={effectiveRole}
+        authHeaders={authHeaders}
+        getAuthHeaders={getAuthHeaders}
+        onBack={() => setSubView('menu')}
+      />
+    );
+  }
 
-        {/* GROUP 3: SETTING & SUPPORT */}
-        <div>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: '#686869', marginBottom: '8px' }}>
-            Setting & support
-          </div>
-          <div style={{ background: '#FFFFFF', borderRadius: '18px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.04)', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
-            <div
-              onClick={() => alert('Studio Settings: Notifications, dark mode toggle, WhatsApp gateway.')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '14px 16px',
-                cursor: 'pointer',
-                borderBottom: '1px solid #F5F5F7',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#352618', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Settings size={20} />
-                </div>
-                <div>
-                  <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>Settings</h4>
-                  <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>App preferences</p>
-                </div>
-              </div>
-              <ChevronRight size={18} color="#979798" />
-            </div>
+  if (subView === 'settings') {
+    return (
+      <MobileSettingsView
+        userRole={effectiveRole}
+        authHeaders={authHeaders}
+        getAuthHeaders={getAuthHeaders}
+        onBack={() => setSubView('menu')}
+      />
+    );
+  }
 
-            <div
-              onClick={() => alert('Help & Support: Direct studio hotline +91 98251 99887 or support@asfdesign.in')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '14px 16px',
-                cursor: 'pointer',
-                borderBottom: '1px solid #F5F5F7',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#352618', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <HelpCircle size={20} />
-                </div>
-                <div>
-                  <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>Help & Support</h4>
-                  <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>Get help & contact us</p>
-                </div>
-              </div>
-              <ChevronRight size={18} color="#979798" />
-            </div>
+  if (subView === 'about') {
+    return <MobileAboutAppView onBack={() => setSubView('menu')} />;
+  }
 
-            <div
-              onClick={() => alert('A&F Design Portal v2.4.0 — Architecture & Interior Studio Edition')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '14px 16px',
-                cursor: 'pointer',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#352618', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Info size={20} />
-                </div>
-                <div>
-                  <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>About App</h4>
-                  <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>Version privacy and terms</p>
-                </div>
-              </div>
-              <ChevronRight size={18} color="#979798" />
-            </div>
-          </div>
-        </div>
+  if (subView === 'help') {
+    return <MobileHelpSupportView onBack={() => setSubView('menu')} />;
+  }
 
-        {/* SIGN OUT BUTTON */}
-        <button
-          onClick={onLogout}
+  const isAdmin = effectiveRole === 'ADMIN';
+  const canViewProgress = effectiveRole !== 'STAFF';
+
+  const renderMenuItem = (
+    icon: React.ReactNode,
+    label: string,
+    subtitle: string | undefined,
+    onClick: () => void,
+    danger = false
+  ) => (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        width: '100%',
+        background: 'transparent',
+        border: 'none',
+        padding: '13px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        cursor: 'pointer',
+        textAlign: 'left',
+        borderBottom: '1px solid #F5F5F7',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div
           style={{
-            width: '100%',
-            height: '50px',
-            borderRadius: '16px',
-            background: '#FEE4E2',
-            color: '#D92D20',
-            fontSize: '15px',
-            fontWeight: 700,
-            border: 'none',
+            width: '36px',
+            height: '36px',
+            borderRadius: '10px',
+            background: danger ? '#FEF3F2' : '#F4EFEA',
+            color: danger ? '#B42318' : '#352618',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '8px',
-            cursor: 'pointer',
-            marginTop: '8px',
+            flexShrink: 0,
           }}
         >
-          <LogOut size={18} />
-          <span>Sign Out</span>
+          {icon}
+        </div>
+        <div>
+          <div style={{ fontSize: '14px', fontWeight: 700, color: danger ? '#B42318' : '#0C0C0D' }}>
+            {label}
+          </div>
+          {subtitle && <div style={{ fontSize: '11px', color: '#686869' }}>{subtitle}</div>}
+        </div>
+      </div>
+      <ChevronRight size={16} color="#979798" />
+    </button>
+  );
+
+  return (
+    <div style={{ flex: 1, paddingBottom: '120px' }}>
+      <div className="figma-subpage-header">
+        <div className="figma-breadcrumbs">
+          {onBack && (
+            <>
+              <span className="figma-breadcrumb-link" onClick={onBack}>
+                Home
+              </span>
+              <span className="figma-breadcrumb-sep">&gt;</span>
+            </>
+          )}
+          <span className="active">More</span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {onBack && (
+            <button type="button" className="figma-back-btn" onClick={onBack}>
+              <ChevronLeft size={24} />
+            </button>
+          )}
+          <h2 style={{ fontSize: '20px', fontWeight: 800, margin: 0, color: '#0C0C0D' }}>
+            Studio Menu
+          </h2>
+        </div>
+      </div>
+
+      <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        {/* Real Profile Card (Zero hardcoded names or role parentheses) */}
+        <button
+          type="button"
+          onClick={() => setSubView('profile')}
+          style={{
+            width: '100%',
+            background: '#FFFFFF',
+            borderRadius: '18px',
+            padding: '16px',
+            border: '1px solid rgba(0,0,0,0.04)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+            textAlign: 'left',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                background: '#352618',
+                color: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '17px',
+                fontWeight: 800,
+              }}
+            >
+              {initials}
+            </div>
+            <div>
+              <div style={{ fontSize: '16px', fontWeight: 800, color: '#0C0C0D' }}>
+                {effectiveUser.fullName}
+              </div>
+              <div style={{ fontSize: '12px', color: '#BF935A', fontWeight: 600 }}>
+                {getRoleSubtitle(effectiveRole)}
+              </div>
+            </div>
+          </div>
+          <ChevronRight size={18} color="#979798" />
         </button>
+
+        {/* Admin Governance Section */}
+        {isAdmin && (
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '18px',
+              overflow: 'hidden',
+              border: '1px solid rgba(0,0,0,0.04)',
+            }}
+          >
+            <div style={{ padding: '12px 16px 6px', fontSize: '11px', fontWeight: 800, color: '#686869' }}>
+              ADMIN GOVERNANCE
+            </div>
+            {renderMenuItem(
+              <Users size={17} />,
+              'User Directory',
+              'Manage Staff, Client Leaders & Viewers',
+              () => {
+                if (onOpenUserManagement) {
+                  onOpenUserManagement();
+                } else {
+                  setSubView('users');
+                }
+              }
+            )}
+            {renderMenuItem(
+              <Smartphone size={17} />,
+              'Device Approvals',
+              'Approve or revoke trusted devices',
+              () => setSubView('devices')
+            )}
+            {renderMenuItem(
+              <History size={17} />,
+              'Activity Log',
+              'Studio security & vault audit trail',
+              () => setSubView('audit')
+            )}
+            {onNavigateTab &&
+              renderMenuItem(
+                <BellRing size={17} />,
+                'Admin Reminders',
+                'Milestone deadlines & follow-ups',
+                () => onNavigateTab('reminders')
+              )}
+          </div>
+        )}
+
+        {/* Workspace Shortcuts */}
+        {onNavigateTab && (
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '18px',
+              overflow: 'hidden',
+              border: '1px solid rgba(0,0,0,0.04)',
+            }}
+          >
+            <div style={{ padding: '12px 16px 6px', fontSize: '11px', fontWeight: 800, color: '#686869' }}>
+              WORKSPACE
+            </div>
+            {canViewProgress &&
+              renderMenuItem(
+                <TrendingUp size={17} />,
+                'Progress Report',
+                '16-folder architectural progress',
+                () => onNavigateTab('progress')
+              )}
+            {renderMenuItem(
+              <Megaphone size={17} />,
+              'Announcements',
+              'Studio circulars & notices',
+              () => onNavigateTab('announcement')
+            )}
+            {renderMenuItem(
+              <ShieldCheck size={17} />,
+              'Studio Policies',
+              'Governance documents & sign-off',
+              () => onNavigateTab('policies')
+            )}
+          </div>
+        )}
+
+        {/* Preferences & Account */}
+        <div
+          style={{
+            background: '#FFFFFF',
+            borderRadius: '18px',
+            overflow: 'hidden',
+            border: '1px solid rgba(0,0,0,0.04)',
+          }}
+        >
+          <div style={{ padding: '12px 16px 6px', fontSize: '11px', fontWeight: 800, color: '#686869' }}>
+            ACCOUNT &amp; PREFERENCES
+          </div>
+          {renderMenuItem(<UserIcon size={17} />, 'My Profile', 'Account details & projects', () =>
+            setSubView('profile')
+          )}
+          {renderMenuItem(
+            <Settings size={17} />,
+            'Settings',
+            isAdmin ? 'Theme, governance & offline cache' : 'Display theme & cache',
+            () => setSubView('settings')
+          )}
+          {onChangePassword &&
+            renderMenuItem(<Lock size={17} />, 'Change Password', 'Update login credentials', onChangePassword)}
+          {renderMenuItem(<HelpCircle size={17} />, 'Help & Support', 'FAQs & Studio Desk', () =>
+            setSubView('help')
+          )}
+          {renderMenuItem(<Info size={17} />, 'About A&F Design', 'Studio workspace info', () =>
+            setSubView('about')
+          )}
+          {onLogout &&
+            renderMenuItem(<LogOut size={17} />, 'Sign Out', undefined, onLogout, true)}
+        </div>
       </div>
     </div>
   );

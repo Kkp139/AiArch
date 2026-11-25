@@ -25,28 +25,30 @@ export function StaffAttendance({
   const handlePunchClockIn = () => {
     setGpsStatus('Acquiring high-accuracy GPS coordinates from device...');
 
-    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = parseFloat(position.coords.latitude.toFixed(6));
-          const lng = parseFloat(position.coords.longitude.toFixed(6));
-          const address = `Live GPS: ${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E (Device Location)`;
-          setGpsStatus(`GPS Verified: ${lat}° N, ${lng}° E`);
-          if (onClockIn) onClockIn({ lat, lng, address });
-        },
-        (error) => {
-          console.warn('Hardware geolocation unavailable or permission denied, using studio geofence fallback:', error.message);
-          const coords = { lat: 23.0225, lng: 72.5714, address: 'Ahmedabad Studio HQ (Office Geofence)' };
-          setGpsStatus('GPS Verified: 23.0225° N, 72.5714° E (Studio Office)');
-          if (onClockIn) onClockIn(coords);
-        },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-      );
-    } else {
-      const coords = { lat: 23.0225, lng: 72.5714, address: 'Ahmedabad Studio HQ (Default Geofence)' };
-      setGpsStatus('GPS Verified: 23.0225° N, 72.5714° E (Studio Office)');
-      if (onClockIn) onClockIn(coords);
-    }
+    setTimeout(() => {
+      if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const lat = parseFloat(position.coords.latitude.toFixed(6));
+            const lng = parseFloat(position.coords.longitude.toFixed(6));
+            const address = `Live GPS: ${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E (Device Location)`;
+            setGpsStatus(`GPS Verified: ${lat}° N, ${lng}° E`);
+            if (onClockIn) onClockIn({ lat, lng, address });
+          },
+          (error) => {
+            console.warn('Hardware geolocation unavailable or permission denied, using studio geofence fallback:', error.message);
+            const coords = { lat: 23.0225, lng: 72.5714, address: 'Ahmedabad Studio HQ (Office Geofence)' };
+            setGpsStatus('GPS Verified: 23.0225° N, 72.5714° E (Studio Office)');
+            if (onClockIn) onClockIn(coords);
+          },
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+        );
+      } else {
+        const coords = { lat: 23.0225, lng: 72.5714, address: 'Ahmedabad Studio HQ (Default Geofence)' };
+        setGpsStatus('GPS Verified: 23.0225° N, 72.5714° E (Studio Office)');
+        if (onClockIn) onClockIn(coords);
+      }
+    }, 0);
   };
 
   const handleSubmitSlotUpdate = () => {

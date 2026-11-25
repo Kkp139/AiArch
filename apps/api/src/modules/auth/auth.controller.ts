@@ -10,9 +10,11 @@ import {
   consumeTempToken,
   createSetupToken,
   verifySetupToken,
+  validateAdminDeactivation,
 } from './auth.service';
 import { sendInvitationEmail } from '../../lib/email.service';
 import { resolveUserFromRequest, generateSessionToken } from '../../lib/auth-guard';
+import { recordAuditLog } from '../../lib/audit.service';
 
 export async function authRoutes(app: FastifyInstance) {
   // Step 1: Login endpoint (Universal WhatsApp OTP for ALL roles, including ADMIN)
@@ -62,6 +64,10 @@ export async function authRoutes(app: FastifyInstance) {
 
     if (user.status === 'DEACTIVATED') {
       return reply.status(403).send({ error: 'Your account has been deactivated. Please contact your studio administrator.' });
+    }
+
+    if (user.approvalPending) {
+      return reply.status(403).send({ error: 'Your account access is pending administrator approval.' });
     }
 
     // MANDATORY USER REQUIREMENT:
@@ -198,6 +204,7 @@ export async function authRoutes(app: FastifyInstance) {
         role: dbUser.role,
         mobile: dbUser.mobile,
         email: dbUser.email,
+        approvalPending: dbUser.approvalPending,
         showPricing: canSeePricing,
         allowMeetings: canAccessMeetings,
         assignedProjects: dbUser.assignedProjects.map(p => ({
@@ -238,6 +245,7 @@ export async function authRoutes(app: FastifyInstance) {
         role: user.role,
         mobile: user.mobile,
         email: user.email,
+        approvalPending: Boolean(user.approvalPending),
         showPricing: canSeePricing,
         allowMeetings: canAccessMeetings,
         assignedProjects: user.assignedProjects.map(p => ({
@@ -286,6 +294,7 @@ export async function authRoutes(app: FastifyInstance) {
         mobile: u.mobile,
         email: u.email,
         status: u.status,
+        approvalPending: u.approvalPending,
         setupToken: u.setupToken,
         assignedProjects: u.assignedProjects.map(p => ({
           id: p.project.id,
@@ -415,7 +424,7 @@ export async function authRoutes(app: FastifyInstance) {
     const setupLink = `${clientAppUrl}/setup-password?token=${setupToken}`;
 
     // Specification-compliant safe invitation template
-    const invitationTemplate = `ProNex-ArchAI | Studio Invitation\nPortal URL: ${clientAppUrl}\nRole: ${role}\nUsername: ${username}\nPassword setup: ${setupLink}\nNote: Please use the secure single-use link to create your password.`;
+    const invitationTemplate = `A&F Design | Studio Invitation\nPortal URL: ${clientAppUrl}\nRole: ${role}\nUsername: ${username}\nPassword setup: ${setupLink}\nNote: Please use the secure single-use link to create your password.`;
 
     // Automatically send invitation email via Resend if email was provided
     let emailSent = false;
@@ -432,6 +441,22 @@ export async function authRoutes(app: FastifyInstance) {
         console.error('Failed to send Resend invitation email:', err);
       }
     }
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'CREATE_USER',
+      entityType: 'USER',
+      entityId: newUser.id,
+      newData: {
+        username: newUser.username,
+        fullName: newUser.fullName,
+        role: newUser.role,
+        mobile: newUser.mobile,
+        assignedProjectIds: assignedProjectIds || [],
+      },
+    });
 
     return {
       success: true,
@@ -493,6 +518,16 @@ export async function authRoutes(app: FastifyInstance) {
       },
     });
 
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'SETUP_PASSWORD',
+      entityType: 'USER',
+      entityId: user.id,
+      newData: { passwordConfigured: true },
+    });
+
     return {
       success: true,
       message: 'Your password has been successfully configured. You may now log in.',
@@ -535,9 +570,631 @@ export async function authRoutes(app: FastifyInstance) {
       data: { passwordHash: newHash },
     });
 
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'CHANGE_PASSWORD',
+      entityType: 'USER',
+      entityId: user.id,
+      newData: { passwordChanged: true },
+    });
+
     return {
       success: true,
       message: 'Password updated successfully.',
+    };
+  });
+
+  // Toggle user status (Admin Only - protects last active Admin)
+  app.patch('/api/auth/users/:id/status', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only Admins can modify user status.' });
+    }
+
+    const schema = z.object({
+      status: z.enum(['ACTIVE', 'DEACTIVATED']),
+    });
+
+    const body = schema.safeParse(request.body);
+    if (!body.success) {
+      return reply.status(400).send({ error: 'Status must be ACTIVE or DEACTIVATED' });
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: request.params.id } });
+    if (!targetUser) {
+      return reply.status(404).send({ error: 'User not found' });
+    }
+
+    if (targetUser.role === 'ADMIN' && body.data.status === 'DEACTIVATED') {
+      const activeAdmins = await prisma.user.count({
+        where: { role: 'ADMIN', status: 'ACTIVE' },
+      });
+      const guard = validateAdminDeactivation(activeAdmins);
+      if (!guard.allowed) {
+        return reply.status(400).send({ error: guard.error });
+      }
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: targetUser.id },
+      data: { status: body.data.status },
+    });
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'UPDATE_USER_STATUS',
+      entityType: 'USER',
+      entityId: updated.id,
+      oldData: { status: targetUser.status },
+      newData: { status: updated.status },
+    });
+
+    return {
+      success: true,
+      userId: updated.id,
+      status: updated.status,
+    };
+  });
+
+  // Reassign user projects (Admin Only)
+  app.put('/api/auth/users/:id/assignments', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only Admins can modify project assignments.' });
+    }
+
+    const schema = z.object({
+      projectIds: z.array(z.string()),
+    });
+
+    const body = schema.safeParse(request.body);
+    if (!body.success) {
+      return reply.status(400).send({ error: 'projectIds array is required' });
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id: request.params.id },
+      include: { assignedProjects: true },
+    });
+    if (!targetUser) {
+      return reply.status(404).send({ error: 'User not found' });
+    }
+
+    const oldProjectIds = targetUser.assignedProjects.map(ap => ap.projectId);
+
+    await prisma.$transaction([
+      prisma.projectAssignment.deleteMany({ where: { userId: targetUser.id } }),
+      prisma.projectAssignment.createMany({
+        data: body.data.projectIds.map(projectId => ({
+          userId: targetUser.id,
+          projectId,
+        })),
+        skipDuplicates: true,
+      }),
+    ]);
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'REASSIGN_USER_PROJECTS',
+      entityType: 'USER',
+      entityId: targetUser.id,
+      oldData: { assignedProjectIds: oldProjectIds },
+      newData: { assignedProjectIds: body.data.projectIds },
+    });
+
+    return {
+      success: true,
+      message: 'Project assignments updated successfully',
+      assignedProjectIds: body.data.projectIds,
+    };
+  });
+
+  // Update user role (Admin Only)
+  app.patch('/api/auth/users/:id/role', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only Admins can modify user roles.' });
+    }
+
+    const schema = z.object({
+      role: z.enum(['ADMIN', 'STAFF', 'CLIENT_LEADER', 'CLIENT_VIEWER']),
+    });
+
+    const body = schema.safeParse(request.body);
+    if (!body.success) {
+      return reply.status(400).send({ error: 'Valid role is required' });
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: request.params.id } });
+    if (!targetUser) {
+      return reply.status(404).send({ error: 'User not found' });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: targetUser.id },
+      data: { role: body.data.role },
+    });
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'UPDATE_USER_ROLE',
+      entityType: 'USER',
+      entityId: updated.id,
+      oldData: { role: targetUser.role },
+      newData: { role: updated.role },
+    });
+
+    return {
+      success: true,
+      userId: updated.id,
+      role: updated.role,
+    };
+  });
+
+  // Approve or decline pending user access (Admin Only)
+  app.post('/api/auth/users/:id/approve-access', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only Admins can approve user access.' });
+    }
+
+    const schema = z.object({
+      approved: z.boolean(),
+      note: z.string().optional(),
+    });
+
+    const body = schema.safeParse(request.body);
+    if (!body.success) {
+      return reply.status(400).send({ error: 'Valid approval decision (approved: boolean) is required.' });
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: request.params.id } });
+    if (!targetUser) {
+      return reply.status(404).send({ error: 'User not found' });
+    }
+
+    const nextStatus = body.data.approved ? 'ACTIVE' : 'DEACTIVATED';
+    const updated = await prisma.user.update({
+      where: { id: targetUser.id },
+      data: {
+        approvalPending: false,
+        status: nextStatus,
+      },
+    });
+
+    try {
+      await prisma.notification.create({
+        data: {
+          recipientId: updated.id,
+          category: 'SECURITY',
+          title: body.data.approved ? 'Portal Access Approved' : 'Portal Access Declined',
+          message: body.data.approved
+            ? `Your studio portal access has been approved by ${user.fullName}.${body.data.note ? ` Note: ${body.data.note}` : ''}`
+            : `Your studio portal access request was declined.${body.data.note ? ` Reason: ${body.data.note}` : ''}`,
+          deepLink: '/',
+        },
+      });
+    } catch (err) {
+      console.error('[Auth] Failed to notify user on access approval:', err);
+    }
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: body.data.approved ? 'APPROVE_USER_ACCESS' : 'DECLINE_USER_ACCESS',
+      entityType: 'USER',
+      entityId: updated.id,
+      oldData: { approvalPending: targetUser.approvalPending, status: targetUser.status },
+      newData: { approvalPending: false, status: updated.status, note: body.data.note || null },
+    });
+
+    return {
+      success: true,
+      userId: updated.id,
+      approved: body.data.approved,
+      status: updated.status,
+      approvalPending: updated.approvalPending,
+    };
+  });
+
+  // Resend single-use setup invite link (Admin Only)
+  app.post('/api/auth/users/:id/resend-invite', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only Admins can resend setup invitations.' });
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: request.params.id } });
+    if (!targetUser) {
+      return reply.status(404).send({ error: 'User not found' });
+    }
+
+    const { token: setupToken, expiresAt: setupTokenExpiresAt } = createSetupToken(48);
+    await prisma.user.update({
+      where: { id: targetUser.id },
+      data: {
+        setupToken,
+        setupTokenExpiresAt,
+      },
+    });
+
+    const clientAppUrl = process.env.CLIENT_APP_URL || 'http://localhost:5173';
+    const setupLink = `${clientAppUrl}/setup-password?token=${setupToken}`;
+    const invitationTemplate = `A&F Design | Studio Invitation\nPortal URL: ${clientAppUrl}\nRole: ${targetUser.role}\nUsername: ${targetUser.username}\nPassword setup: ${setupLink}\nNote: Please use the secure single-use link to create your password.`;
+
+    let emailSent = false;
+    if (targetUser.email) {
+      try {
+        const mailRes = await sendInvitationEmail(targetUser.email, {
+          fullName: targetUser.fullName,
+          role: targetUser.role,
+          username: targetUser.username,
+          setupLink,
+        });
+        emailSent = mailRes.success;
+      } catch (err) {
+        console.error('Failed to resend invitation email:', err);
+      }
+    }
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'RESEND_USER_INVITE',
+      entityType: 'USER',
+      entityId: targetUser.id,
+      newData: { username: targetUser.username, emailSent },
+    });
+
+    return {
+      success: true,
+      setupToken,
+      setupLink,
+      invitationTemplate,
+      emailSent,
+    };
+  });
+
+  // List Device Sessions (Admin sees all; non-Admin sees own)
+  app.get('/api/auth/devices', async (
+    request: FastifyRequest<{ Querystring: { status?: string } }>,
+    reply: FastifyReply
+  ) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+
+    const where: any = {};
+    if (user.role !== 'ADMIN') {
+      where.userId = user.id;
+    }
+    if (request.query.status && ['PENDING', 'TRUSTED', 'REVOKED'].includes(request.query.status.toUpperCase())) {
+      where.status = request.query.status.toUpperCase();
+    }
+
+    const devices = await prisma.deviceSession.findMany({
+      where,
+      include: {
+        user: { select: { id: true, fullName: true, username: true, role: true } },
+        approvedBy: { select: { id: true, fullName: true } },
+      },
+      orderBy: [{ status: 'asc' }, { lastActiveAt: 'desc' }],
+    });
+
+    return {
+      devices: devices.map((d) => ({
+        id: d.id,
+        userId: d.userId,
+        userName: d.user.fullName,
+        username: d.user.username,
+        userRole: d.user.role,
+        deviceName: d.deviceName,
+        deviceType: d.deviceType,
+        os: d.os,
+        fingerprint: d.fingerprint,
+        ipAddress: d.ipAddress,
+        location: d.location,
+        status: d.status,
+        approvedById: d.approvedById,
+        approvedByName: d.approvedBy?.fullName || null,
+        lastActiveAt: d.lastActiveAt.toISOString(),
+        createdAt: d.createdAt.toISOString(),
+      })),
+    };
+  });
+
+  // Register Current Device Session (Authenticated)
+  app.post('/api/auth/devices/register', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+
+    const schema = z.object({
+      deviceName: z.string().min(1, 'Device name is required'),
+      deviceType: z.string().optional().default('MOBILE'),
+      os: z.string().min(1, 'Operating system is required'),
+      fingerprint: z.string().min(4, 'Device fingerprint is required'),
+      ipAddress: z.string().optional(),
+      location: z.string().optional(),
+    });
+
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.errors[0]?.message || 'Invalid device registration payload' });
+    }
+
+    const existing = await prisma.deviceSession.findUnique({
+      where: {
+        userId_fingerprint: {
+          userId: user.id,
+          fingerprint: parsed.data.fingerprint,
+        },
+      },
+    });
+
+    const ipAddress = parsed.data.ipAddress || request.ip || null;
+
+    const device = existing
+      ? await prisma.deviceSession.update({
+          where: { id: existing.id },
+          data: {
+            deviceName: parsed.data.deviceName.trim(),
+            deviceType: parsed.data.deviceType.trim().toUpperCase(),
+            os: parsed.data.os.trim(),
+            ipAddress,
+            location: parsed.data.location?.trim() || existing.location,
+            lastActiveAt: new Date(),
+          },
+          include: {
+            user: { select: { id: true, fullName: true, role: true } },
+          },
+        })
+      : await prisma.deviceSession.create({
+          data: {
+            userId: user.id,
+            deviceName: parsed.data.deviceName.trim(),
+            deviceType: parsed.data.deviceType.trim().toUpperCase(),
+            os: parsed.data.os.trim(),
+            fingerprint: parsed.data.fingerprint.trim(),
+            ipAddress,
+            location: parsed.data.location?.trim() || null,
+            status: 'PENDING',
+          },
+          include: {
+            user: { select: { id: true, fullName: true, role: true } },
+          },
+        });
+
+    if (!existing) {
+      // Notify Admins of new pending hardware registration
+      try {
+        const admins = await prisma.user.findMany({
+          where: { role: 'ADMIN', status: 'ACTIVE' },
+          select: { id: true },
+        });
+        if (admins.length > 0) {
+          await prisma.notification.createMany({
+            data: admins.map((a) => ({
+              recipientId: a.id,
+              category: 'SECURITY',
+              title: 'New Device Approval Request',
+              message: `${user.fullName} registered ${device.deviceName} (${device.os}).`,
+              deepLink: '/devices',
+            })),
+          });
+        }
+      } catch (err) {
+        console.error('[Devices] Failed to notify admins:', err);
+      }
+
+      await recordAuditLog({
+        actorId: user.id,
+        actorName: user.fullName,
+        actorRole: user.role,
+        action: 'REGISTER_DEVICE',
+        entityType: 'DEVICE_SESSION',
+        entityId: device.id,
+        newData: { deviceName: device.deviceName, deviceType: device.deviceType, os: device.os, status: device.status },
+      });
+    }
+
+    return {
+      success: true,
+      device: {
+        id: device.id,
+        userId: device.userId,
+        userName: device.user.fullName,
+        userRole: device.user.role,
+        deviceName: device.deviceName,
+        deviceType: device.deviceType,
+        os: device.os,
+        fingerprint: device.fingerprint,
+        ipAddress: device.ipAddress,
+        location: device.location,
+        status: device.status,
+        lastActiveAt: device.lastActiveAt.toISOString(),
+        createdAt: device.createdAt.toISOString(),
+      },
+    };
+  });
+
+  // Approve Device Session (Admin Only)
+  app.post('/api/auth/devices/:id/approve', async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply
+  ) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only Admins can approve device sessions.' });
+    }
+
+    const existing = await prisma.deviceSession.findUnique({ where: { id: request.params.id } });
+    if (!existing) {
+      return reply.status(404).send({ error: 'Device session not found.' });
+    }
+
+    const updated = await prisma.deviceSession.update({
+      where: { id: existing.id },
+      data: {
+        status: 'TRUSTED',
+        approvedById: user.id,
+        lastActiveAt: new Date(),
+      },
+      include: {
+        user: { select: { id: true, fullName: true, role: true } },
+        approvedBy: { select: { id: true, fullName: true } },
+      },
+    });
+
+    try {
+      await prisma.notification.create({
+        data: {
+          recipientId: updated.userId,
+          category: 'SECURITY',
+          title: 'Device Approved',
+          message: `Your device "${updated.deviceName}" has been trusted by ${user.fullName}.`,
+          deepLink: '/devices',
+        },
+      });
+    } catch (err) {
+      console.error('[Devices] Failed to notify user on device approval:', err);
+    }
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'APPROVE_DEVICE',
+      entityType: 'DEVICE_SESSION',
+      entityId: updated.id,
+      oldData: { status: existing.status },
+      newData: { status: updated.status, deviceName: updated.deviceName },
+    });
+
+    return {
+      success: true,
+      device: {
+        id: updated.id,
+        userId: updated.userId,
+        userName: updated.user.fullName,
+        userRole: updated.user.role,
+        deviceName: updated.deviceName,
+        deviceType: updated.deviceType,
+        os: updated.os,
+        fingerprint: updated.fingerprint,
+        ipAddress: updated.ipAddress,
+        location: updated.location,
+        status: updated.status,
+        approvedById: updated.approvedById,
+        approvedByName: updated.approvedBy?.fullName || null,
+        lastActiveAt: updated.lastActiveAt.toISOString(),
+      },
+    };
+  });
+
+  // Revoke Device Session (Admin Only)
+  app.post('/api/auth/devices/:id/revoke', async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply
+  ) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return reply.status(403).send({ error: 'Access denied: Only Admins can revoke device sessions.' });
+    }
+
+    const existing = await prisma.deviceSession.findUnique({ where: { id: request.params.id } });
+    if (!existing) {
+      return reply.status(404).send({ error: 'Device session not found.' });
+    }
+
+    const updated = await prisma.deviceSession.update({
+      where: { id: existing.id },
+      data: {
+        status: 'REVOKED',
+        approvedById: user.id,
+      },
+      include: {
+        user: { select: { id: true, fullName: true, role: true } },
+        approvedBy: { select: { id: true, fullName: true } },
+      },
+    });
+
+    try {
+      await prisma.notification.create({
+        data: {
+          recipientId: updated.userId,
+          category: 'SECURITY',
+          title: 'Device Access Revoked',
+          message: `Access for device "${updated.deviceName}" has been revoked by ${user.fullName}.`,
+          deepLink: '/devices',
+        },
+      });
+    } catch (err) {
+      console.error('[Devices] Failed to notify user on device revocation:', err);
+    }
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'REVOKE_DEVICE',
+      entityType: 'DEVICE_SESSION',
+      entityId: updated.id,
+      oldData: { status: existing.status },
+      newData: { status: updated.status, deviceName: updated.deviceName },
+    });
+
+    return {
+      success: true,
+      device: {
+        id: updated.id,
+        userId: updated.userId,
+        userName: updated.user.fullName,
+        userRole: updated.user.role,
+        deviceName: updated.deviceName,
+        deviceType: updated.deviceType,
+        os: updated.os,
+        fingerprint: updated.fingerprint,
+        ipAddress: updated.ipAddress,
+        location: updated.location,
+        status: updated.status,
+        approvedById: updated.approvedById,
+        approvedByName: updated.approvedBy?.fullName || null,
+        lastActiveAt: updated.lastActiveAt.toISOString(),
+      },
     };
   });
 }

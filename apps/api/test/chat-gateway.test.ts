@@ -58,4 +58,35 @@ describe('Project Chat Access Control & Gateway', () => {
     });
     expect(viewerRes.statusCode).toBe(403);
   });
+
+  it('allows Admin to retrieve chat messages from DB for a valid project', async () => {
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/chat/projects/AF-VILLA/messages',
+      headers: { authorization: 'Bearer mock-admin-token' },
+    });
+    expect(res.statusCode).toBe(200);
+    const msgs = JSON.parse(res.body);
+    expect(Array.isArray(msgs)).toBe(true);
+    expect(msgs.length).toBeGreaterThan(0);
+  });
+
+  it('allows Admin to post a message to project channel and persist it', async () => {
+    const app = await buildApp();
+
+    const postRes = await app.inject({
+      method: 'POST',
+      url: '/api/chat/projects/AF-VILLA/messages',
+      headers: { authorization: 'Bearer mock-admin-token' },
+      payload: {
+        messageText: 'Automated verification test message for consultation room.',
+      },
+    });
+    expect(postRes.statusCode).toBe(200);
+    const sent = JSON.parse(postRes.body);
+    expect(sent.text).toBe('Automated verification test message for consultation room.');
+    expect(sent.senderRole).toBe('ADMIN');
+  });
 });

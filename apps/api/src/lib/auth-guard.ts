@@ -13,6 +13,7 @@ export interface AuthenticatedUser {
   mobile?: string | null;
   email?: string | null;
   status: string;
+  approvalPending?: boolean;
   assignedProjects: Array<{
     id: string;
     projectId: string;

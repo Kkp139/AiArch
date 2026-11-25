@@ -1,236 +1,319 @@
-import React from 'react';
-import { ChevronLeft, Calendar, Check, Bell, ChevronRight, Clock, MapPin } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  X,
+  Bell,
+  CheckCheck,
+  Calendar,
+  CreditCard,
+  ShieldCheck,
+  Clock,
+  MessageSquare,
+  Megaphone,
+  Target,
+} from 'lucide-react';
 import { InAppNotificationItem } from '../layout/Shell';
+import { AuthHeadersInput, formatShortDateTime, resolveAuthHeaders } from './mobileAuth';
 
 export interface MobileNotificationsSheetProps {
   isOpen: boolean;
   onClose: () => void;
   notifications?: InAppNotificationItem[];
   unreadCount?: number;
+  authHeaders?: Record<string, string>;
+  getAuthHeaders?: AuthHeadersInput;
   onMarkAllRead?: () => void;
-  onNotificationClick?: (notif: InAppNotificationItem) => void;
+  onNotificationClick?: (notification: InAppNotificationItem) => void;
+}
+
+function getCategoryStyle(category: string) {
+  switch ((category || '').toUpperCase()) {
+    case 'MEETING':
+      return { bg: 'rgba(191,147,90,0.14)', color: '#9E743F', icon: Calendar };
+    case 'PAYMENT':
+      return { bg: '#ECFDF3', color: '#027A48', icon: CreditCard };
+    case 'VERIFICATION':
+      return { bg: '#EFF8FF', color: '#175CD3', icon: ShieldCheck };
+    case 'CHAT':
+      return { bg: '#F4F3FF', color: '#5925DC', icon: MessageSquare };
+    case 'ANNOUNCEMENT':
+      return { bg: '#FFF4ED', color: '#B93815', icon: Megaphone };
+    case 'TARGET':
+      return { bg: '#FEF3F2', color: '#B42318', icon: Target };
+    default:
+      return { bg: '#F2F4F7', color: '#344054', icon: Bell };
+  }
 }
 
 export const MobileNotificationsSheet: React.FC<MobileNotificationsSheetProps> = ({
   isOpen,
   onClose,
-  notifications = [],
-  unreadCount = 0,
+  notifications: propNotifications,
+  unreadCount: propUnreadCount,
+  authHeaders,
+  getAuthHeaders,
   onMarkAllRead,
   onNotificationClick,
 }) => {
+  const [localNotifications, setLocalNotifications] = useState<InAppNotificationItem[]>([]);
+  const [localUnread, setLocalUnread] = useState(0);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const headers = resolveAuthHeaders(authHeaders ?? getAuthHeaders);
+      const res = await fetch('/api/notifications', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setLocalNotifications(data.notifications || []);
+        setLocalUnread(
+          typeof data.unreadCount === 'number'
+            ? data.unreadCount
+            : (data.notifications || []).filter((n: any) => !n.isRead).length
+        );
+      }
+    } catch {
+      // Leave clean empty state
+    }
+  }, [authHeaders, getAuthHeaders]);
+
+  useEffect(() => {
+    if (isOpen && !propNotifications) {
+      fetchNotifications();
+    }
+  }, [isOpen, propNotifications, fetchNotifications]);
+
   if (!isOpen) return null;
 
+  const notifications = propNotifications ?? localNotifications;
+  const unreadCount =
+    typeof propUnreadCount === 'number' ? propUnreadCount : localUnread;
+
+  const handleMarkAll = async () => {
+    if (onMarkAllRead) {
+      onMarkAllRead();
+      return;
+    }
+    try {
+      const headers = resolveAuthHeaders(authHeaders ?? getAuthHeaders, true);
+      await fetch('/api/notifications/read-all', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({}),
+      });
+      await fetchNotifications();
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleClickNotification = async (notif: InAppNotificationItem) => {
+    if (onNotificationClick) {
+      onNotificationClick(notif);
+      return;
+    }
+    try {
+      if (!notif.isRead) {
+        const headers = resolveAuthHeaders(authHeaders ?? getAuthHeaders, true);
+        await fetch(`/api/notifications/${encodeURIComponent(notif.id)}/read`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({}),
+        });
+        await fetchNotifications();
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   return (
-    <div className="figma-sheet-backdrop" onClick={onClose}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 5000,
+        backgroundColor: 'rgba(0, 0, 0, 0.45)',
+        backdropFilter: 'blur(3px)',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+      }}
+    >
       <div
-        className="figma-sheet-content"
-        onClick={(e) => e.stopPropagation()}
         style={{
-          padding: '20px 20px 32px 20px',
-          borderRadius: '28px 28px 0 0',
-          maxHeight: '90vh',
-          backgroundColor: 'var(--bg-secondary, #FFFFFF)',
-          color: 'var(--text-primary, #0C0C0D)',
-          overflowY: 'auto',
+          width: '100%',
+          maxWidth: '480px',
+          maxHeight: '85vh',
+          backgroundColor: '#FFFFFF',
+          borderTopLeftRadius: '26px',
+          borderTopRightRadius: '26px',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.2)',
+          overflow: 'hidden',
         }}
       >
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+        <div
+          style={{
+            padding: '18px 20px 14px 20px',
+            borderBottom: '1px solid #F0F0F2',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div>
+            <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0C0C0D' }}>
+              Notifications
+            </h3>
+            <span style={{ fontSize: '12px', color: '#686869' }}>
+              {unreadCount > 0 ? `${unreadCount} unread updates` : 'All caught up'}
+            </span>
+          </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={handleMarkAll}
+                style={{
+                  background: '#F4EFEA',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '6px 10px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: '#352618',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                <CheckCheck size={14} /> Mark Read
+              </button>
+            )}
+
             <button
+              type="button"
               onClick={onClose}
+              aria-label="Close notifications"
               style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                background: 'var(--bg-surface, #F5F5F7)',
+                background: '#F5F5F7',
                 border: 'none',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                color: '#4A4A4C',
                 cursor: 'pointer',
               }}
             >
-              <ChevronLeft size={20} color="currentColor" />
+              <X size={18} />
             </button>
-            <h3 style={{ fontSize: '20px', fontWeight: 800, margin: 0, color: 'var(--text-primary, #0C0C0D)' }}>
-              Notifications
-            </h3>
-            {unreadCount > 0 && (
-              <span
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 800,
-                  backgroundColor: 'var(--accent-gold, #BF935A)',
-                  color: '#0d0f12',
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                }}
-              >
-                {unreadCount} new
-              </span>
-            )}
           </div>
-
-          {unreadCount > 0 && onMarkAllRead && (
-            <button
-              onClick={onMarkAllRead}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--accent-gold, #BF935A)',
-                fontSize: '13px',
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              Mark all as read
-            </button>
-          )}
         </div>
 
-        {/* Notifications List */}
-        {notifications.length === 0 ? (
-          <div
-            style={{
-              padding: '40px 16px',
-              textAlign: 'center',
-              color: 'var(--text-muted, #686869)',
-            }}
-          >
-            <Bell size={32} style={{ margin: '0 auto 12px auto', opacity: 0.3 }} />
-            <h4 style={{ margin: '0 0 6px 0', fontSize: '16px', fontWeight: 700, color: 'var(--text-primary, #0C0C0D)' }}>
-              No notifications yet
-            </h4>
-            <p style={{ margin: 0, fontSize: '13px' }}>
-              Meeting invitations and project updates will appear here.
-            </p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {notifications.map((notif) => {
-              const isMeeting = notif.category === 'MEETING';
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '12px 16px 32px 16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+          }}
+        >
+          {notifications.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '50px 20px', color: '#686869' }}>
+              <Bell size={38} color="#979798" style={{ opacity: 0.4, margin: '0 auto 12px auto' }} />
+              <div style={{ fontSize: '15px', fontWeight: 700, color: '#0C0C0D', marginBottom: '4px' }}>
+                No notifications yet
+              </div>
+              <div style={{ fontSize: '13px' }}>
+                Updates on drawings, meetings, and payments appear here.
+              </div>
+            </div>
+          ) : (
+            notifications.map((notif) => {
+              const cat = getCategoryStyle(notif.category);
+              const Icon = cat.icon;
               return (
-                <div
+                <button
                   key={notif.id}
-                  onClick={() => {
-                    if (onNotificationClick) {
-                      onNotificationClick(notif);
-                    }
-                    onClose();
-                  }}
+                  type="button"
+                  onClick={() => handleClickNotification(notif)}
                   style={{
-                    background: notif.isRead ? 'var(--bg-surface, #F9F9FA)' : 'var(--bg-tertiary, #FFFFFF)',
-                    borderRadius: '18px',
-                    padding: '16px',
-                    border: notif.isRead ? '1px solid var(--border-subtle, #EFEFEF)' : '1px solid var(--accent-gold, #BF935A)',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                    width: '100%',
+                    textAlign: 'left',
+                    background: notif.isRead ? '#FFFFFF' : '#FCF9F6',
+                    borderRadius: '16px',
+                    padding: '14px',
+                    border: notif.isRead ? '1px solid #F0F0F2' : '1px solid rgba(191, 147, 90, 0.35)',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  <div
+                    style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '12px',
+                      background: cat.bg,
+                      color: cat.color,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Icon size={18} />
+                  </div>
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div
                       style={{
-                        width: '42px',
-                        height: '42px',
-                        borderRadius: '12px',
-                        background: isMeeting ? 'rgba(191, 147, 90, 0.15)' : 'rgba(59, 130, 246, 0.12)',
-                        color: isMeeting ? 'var(--accent-gold, #BF935A)' : 'var(--accent-blue, #3B82F6)',
                         display: 'flex',
+                        justifyContent: 'space-between',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
+                        gap: '8px',
+                        marginBottom: '4px',
                       }}
                     >
-                      {isMeeting ? <Calendar size={22} /> : <Check size={22} />}
+                      <span style={{ fontSize: '14px', fontWeight: 700, color: '#0C0C0D' }}>
+                        {notif.title}
+                      </span>
+                      {!notif.isRead && (
+                        <span
+                          style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: '#352618',
+                            flexShrink: 0,
+                          }}
+                        />
+                      )}
                     </div>
 
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                        <span
-                          style={{
-                            fontSize: '10px',
-                            fontWeight: 800,
-                            padding: '1px 6px',
-                            borderRadius: '4px',
-                            backgroundColor: isMeeting ? 'var(--accent-gold, #BF935A)' : 'var(--accent-blue, #3B82F6)',
-                            color: '#FFFFFF',
-                            textTransform: 'uppercase',
-                          }}
-                        >
-                          {isMeeting ? 'Meeting Invite' : notif.category}
-                        </span>
+                    <p style={{ fontSize: '12px', color: '#4A4A4C', margin: '0 0 6px 0', lineHeight: 1.4 }}>
+                      {notif.message}
+                    </p>
 
-                        {notif.projectCode && (
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted, #686869)' }}>
-                            {notif.projectCode}
-                          </span>
-                        )}
-
-                        {!notif.isRead && (
-                          <span
-                            style={{
-                              width: '8px',
-                              height: '8px',
-                              borderRadius: '50%',
-                              backgroundColor: 'var(--accent-emerald, #12B76A)',
-                              marginLeft: 'auto',
-                            }}
-                          />
-                        )}
-                      </div>
-
-                      <h4
-                        style={{
-                          fontSize: '14px',
-                          fontWeight: 700,
-                          margin: '0 0 4px 0',
-                          color: 'var(--text-primary, #0C0C0D)',
-                          lineHeight: 1.3,
-                        }}
-                      >
-                        {notif.title}
-                      </h4>
-
-                      <p
-                        style={{
-                          fontSize: '12px',
-                          color: 'var(--text-secondary, #686869)',
-                          margin: '0 0 10px 0',
-                          lineHeight: 1.4,
-                        }}
-                      >
-                        {notif.message}
-                      </p>
-
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '11px', color: 'var(--text-muted, #979798)' }}>
-                          {notif.createdAt ? new Date(notif.createdAt).toLocaleDateString() : 'Recent'}
-                        </span>
-
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '12px',
-                            fontWeight: 700,
-                            color: 'var(--accent-gold, #BF935A)',
-                          }}
-                        >
-                          <span>Open Meeting</span>
-                          <ChevronRight size={14} />
-                        </span>
-                      </div>
+                    <div style={{ fontSize: '11px', color: '#979798', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Clock size={11} /> {formatShortDateTime(notif.createdAt)}
+                      {notif.projectCode && ` • ${notif.projectCode}`}
                     </div>
                   </div>
-                </div>
+                </button>
               );
-            })}
-          </div>
-        )}
+            })
+          )}
+        </div>
       </div>
     </div>
   );

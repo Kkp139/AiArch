@@ -11,9 +11,10 @@ interface SignInFormProps {
 }
 
 export const SignInForm: React.FC<SignInFormProps> = ({ onSuccess }) => {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showForgotHelp, setShowForgotHelp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -110,17 +111,33 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onSuccess }) => {
         </div>
 
         <div className="form-forgot-row">
-          <a
-            href="#forgot-password"
+          <button
+            type="button"
             className="form-text-link"
-            onClick={(e) => {
-              e.preventDefault();
-              alert('Password reset instructions: Please contact your Studio Administrator or project team.');
-            }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            onClick={() => setShowForgotHelp((prev) => !prev)}
           >
             Forgot password?
-          </a>
+          </button>
         </div>
+
+        {showForgotHelp && (
+          <div
+            role="status"
+            style={{
+              padding: '10px 12px',
+              marginBottom: '14px',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(191, 147, 90, 0.12)',
+              border: '1px solid rgba(191, 147, 90, 0.35)',
+              color: '#4A4A4C',
+              fontSize: '12.5px',
+              lineHeight: 1.5,
+            }}
+          >
+            Password resets are issued securely by your Studio Administrator. Contact admin@afdesign.studio or your project coordinator for a single-use reset link.
+          </div>
+        )}
 
         <button
           type="submit"

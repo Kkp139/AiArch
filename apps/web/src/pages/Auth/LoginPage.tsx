@@ -5,9 +5,11 @@ import { SignInForm } from './SignInForm';
 import { ConfirmDetailsForm } from './ConfirmDetailsForm';
 import { OtpVerificationForm } from './OtpVerificationForm';
 import { useAuth } from '../../context/AuthContext';
-import { ArrowRight, Smartphone, Monitor } from 'lucide-react';
+import { useResponsive } from '../../hooks/useResponsive';
+import { ArrowRight, X, ShieldCheck, Headphones, Users } from 'lucide-react';
 
 type AuthStep = 'SIGN_IN' | 'CONFIRM_DETAILS' | 'VERIFY_OTP';
+type InfoModalTopic = 'help' | 'privacy' | 'team' | null;
 
 interface IntermediateAuthData {
   tempToken: string;
@@ -16,13 +18,27 @@ interface IntermediateAuthData {
   debugOtp?: string;
 }
 
+const INFO_MODAL_CONTENT: Record<Exclude<InfoModalTopic, null>, { title: string; body: string }> = {
+  help: {
+    title: 'A&F Design Workspace Support',
+    body: 'Need assistance accessing your studio account or invitation? Reach A&F Design support at support@afdesign.studio or contact your project coordinator.',
+  },
+  privacy: {
+    title: 'Studio Data & Privacy Policy',
+    body: 'All A&F Design architectural drawings, CAD blueprints, and project communications are encrypted and strictly isolated by project and role permissions.',
+  },
+  team: {
+    title: 'Contact Your Project Team',
+    body: 'If your setup invitation expired or your WhatsApp OTP number changed, ask your Studio Administrator to re-issue a secure access link.',
+  },
+};
+
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
+  const { isMobile } = useResponsive();
   const [step, setStep] = useState<AuthStep>('SIGN_IN');
   const [intermediateData, setIntermediateData] = useState<IntermediateAuthData | null>(null);
-  const [isPhoneView, setIsPhoneView] = useState(() => {
-    return typeof window !== 'undefined' ? window.innerWidth <= 768 : false;
-  });
+  const [infoModal, setInfoModal] = useState<InfoModalTopic>(null);
 
   const handleSignInSuccess = (data: {
     requireOtp: boolean;
@@ -31,10 +47,8 @@ export const LoginPage: React.FC = () => {
     user: any;
   }) => {
     if (!data.requireOtp && data.token) {
-      // Direct login (Admin)
       login(data.user, data.token);
     } else if (data.requireOtp && data.tempToken) {
-      // Transition to Step 2 (Staff & Client)
       setIntermediateData({
         tempToken: data.tempToken,
         fullName: data.user.fullName || '',
@@ -64,119 +78,120 @@ export const LoginPage: React.FC = () => {
     login(data.user, data.token);
   };
 
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // FIGMA MOBILE PHONE LOGIN SCREEN (Matching Figma Node 17:102, 21:3621)
-  // Non-scrollable single-screen layout with native safe-area and no fake status bar
-  // -------------------------------------------------------------------------
-  if (isPhoneView) {
-    const isRealMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
-
+  const renderInfoModal = () => {
+    if (!infoModal) return null;
+    const content = INFO_MODAL_CONTENT[infoModal];
     return (
       <div
-        style={
-          isRealMobile
-            ? {
-                backgroundColor: '#0C0C0D',
-                width: '100%',
-                height: '100dvh',
-                minHeight: '100dvh',
-                maxHeight: '100dvh',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                margin: 0,
-                padding: 0,
-              }
-            : {
-                backgroundColor: '#1A1D20',
-                minHeight: '100vh',
-                height: '100vh',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '16px',
-                boxSizing: 'border-box',
-                overflow: 'hidden',
-              }
-        }
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="auth-info-modal-title"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 1200,
+          backgroundColor: 'rgba(12, 12, 13, 0.55)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+        }}
+        onClick={() => setInfoModal(null)}
       >
-        {/* View Switcher Pill (Desktop testing only) */}
-        {!isRealMobile && (
-          <div
-            style={{
-              position: 'fixed',
-              top: '12px',
-              right: '12px',
-              zIndex: 1000,
-              background: 'rgba(20, 24, 29, 0.95)',
-              border: '1px solid #30363d',
-              borderRadius: '20px',
-              padding: '4px 10px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '11px',
-              color: '#c9d1d9',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-            }}
-          >
-            <span style={{ color: '#BF935A', fontWeight: 700 }}>📱 Phone Preview</span>
+        <div
+          style={{
+            width: '100%',
+            maxWidth: '420px',
+            backgroundColor: '#FFFFFF',
+            borderRadius: '16px',
+            padding: '24px',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.25)',
+            border: '1px solid #EAEAED',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#BF935A' }}>
+              {infoModal === 'privacy' ? <ShieldCheck size={18} /> : infoModal === 'team' ? <Users size={18} /> : <Headphones size={18} />}
+              <h3 id="auth-info-modal-title" style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0C0C0D' }}>
+                {content.title}
+              </h3>
+            </div>
             <button
-              onClick={() => setIsPhoneView(false)}
+              type="button"
+              onClick={() => setInfoModal(null)}
+              aria-label="Close dialog"
               style={{
-                background: '#21262d',
-                color: '#8b949e',
+                background: 'none',
                 border: 'none',
-                borderRadius: '12px',
-                padding: '3px 10px',
-                fontSize: '11px',
-                fontWeight: 600,
                 cursor: 'pointer',
+                color: '#686869',
+                padding: '4px',
               }}
             >
-              Desktop View
+              <X size={18} />
             </button>
           </div>
-        )}
+          <p style={{ margin: '0 0 18px 0', fontSize: '13.5px', lineHeight: 1.6, color: '#4A4A4C' }}>
+            {content.body}
+          </p>
+          <button
+            type="button"
+            onClick={() => setInfoModal(null)}
+            style={{
+              width: '100%',
+              height: '40px',
+              backgroundColor: '#BF935A',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Got it
+          </button>
+        </div>
+      </div>
+    );
+  };
 
-        {/* Mobile Device Viewport (Figma Spec - Pure Content, No Fake Status Bar) */}
+  if (isMobile) {
+    return (
+      <div
+        style={{
+          backgroundColor: '#0C0C0D',
+          width: '100%',
+          height: '100dvh',
+          minHeight: '100dvh',
+          maxHeight: '100dvh',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          margin: 0,
+          padding: 0,
+        }}
+      >
         <div
           className="figma-mobile-viewport"
-          style={
-            isRealMobile
-              ? {
-                  width: '100%',
-                  maxWidth: '100%',
-                  height: '100dvh',
-                  minHeight: '100dvh',
-                  maxHeight: '100dvh',
-                  borderRadius: 0,
-                  boxShadow: 'none',
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  backgroundColor: '#0C0C0D',
-                }
-              : {
-                  width: '100%',
-                  maxWidth: '400px',
-                  height: '100%',
-                  maxHeight: '844px',
-                  borderRadius: '32px',
-                  overflow: 'hidden',
-                  backgroundColor: '#0C0C0D',
-                  boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                }
-          }
+          style={{
+            width: '100%',
+            maxWidth: '100%',
+            height: '100dvh',
+            minHeight: '100dvh',
+            maxHeight: '100dvh',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: '#0C0C0D',
+          }}
         >
           {/* Top Architectural Photo Banner with Editorial Text (Figma: 17:102, 21:3621) */}
           <div
             style={{
-              flex: step === 'SIGN_IN' ? '0 0 clamp(280px, 38vh, 340px)' : '0 0 clamp(320px, 44vh, 400px)',
+              flex: '1 1 auto',
+              minHeight: '220px',
               position: 'relative',
               backgroundImage: 'url(/assets/auth/editorial_courtyard_clean.png)',
               backgroundSize: 'cover',
@@ -184,11 +199,10 @@ export const LoginPage: React.FC = () => {
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              padding: 'max(16px, env(safe-area-inset-top, 16px)) 20px 48px 20px',
+              padding: 'max(16px, env(safe-area-inset-top, 16px)) 20px 42px 20px',
               boxSizing: 'border-box',
             }}
           >
-            {/* Figma exact architectural luxury gradient: amber-brown to dark */}
             <div
               style={{
                 position: 'absolute',
@@ -197,7 +211,6 @@ export const LoginPage: React.FC = () => {
               }}
             />
 
-            {/* Logo & Discipline (Figma: 21:3653, 17:132) */}
             <div style={{ position: 'relative', zIndex: 2 }}>
               <img src="/assets/auth/asf_logo.svg" alt="asf design" style={{ height: '38px', width: 'auto' }} />
               <div style={{ fontSize: '12px', fontWeight: 500, letterSpacing: '0.08em', color: '#B9B9BA', marginTop: '6px' }}>
@@ -205,7 +218,6 @@ export const LoginPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Editorial Quote (Figma: 21:3625, 17:137) */}
             <div style={{ position: 'relative', zIndex: 2 }}>
               <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#E8E8E9', lineHeight: '36px', margin: '0 0 4px 0' }}>
                 Great spaces.<br />Built together.
@@ -216,29 +228,27 @@ export const LoginPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Curved Bottom Sheet (Figma: 21:3645, 17:123) - #E8E8E8, 32px top corners, 2px white top border */}
+          {/* Curved Bottom Sheet (Figma: 21:3645, 17:123) */}
           <div
             style={{
               backgroundColor: '#E8E8E8',
               borderTop: '2px solid #FFFFFF',
-              borderRadius: '32px 32px 0 0',
-              marginTop: '-32px',
+              borderRadius: '28px 28px 0 0',
+              marginTop: '-28px',
               position: 'relative',
               zIndex: 10,
-              padding: '32px 20px max(24px, env(safe-area-inset-bottom, 24px)) 20px',
-              flex: 1,
+              padding: '26px 20px max(24px, env(safe-area-inset-bottom, 24px)) 20px',
+              flex: '0 0 auto',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between',
+              maxHeight: '80dvh',
               overflowY: 'auto',
               WebkitOverflowScrolling: 'touch',
               boxSizing: 'border-box',
-              boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.2)',
+              boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.25)',
             }}
           >
-            {step === 'SIGN_IN' && (
-              <SignInForm onSuccess={handleSignInSuccess} />
-            )}
+            {step === 'SIGN_IN' && <SignInForm onSuccess={handleSignInSuccess} />}
 
             {step === 'CONFIRM_DETAILS' && intermediateData && (
               <ConfirmDetailsForm
@@ -261,48 +271,16 @@ export const LoginPage: React.FC = () => {
             )}
           </div>
         </div>
+        {renderInfoModal()}
       </div>
     );
   }
 
-  // -------------------------------------------------------------------------
-  // DESKTOP SPLIT VIEW
-  // -------------------------------------------------------------------------
   return (
     <div className="auth-viewport">
-      {/* Switch to Phone View Button */}
-      <button
-        onClick={() => setIsPhoneView(true)}
-        title="Switch to Mobile Phone Login (Figma Spec)"
-        style={{
-          position: 'fixed',
-          top: '12px',
-          right: '12px',
-          zIndex: 1000,
-          padding: '6px 14px',
-          borderRadius: '20px',
-          backgroundColor: '#352618',
-          color: '#BF935A',
-          border: '1px solid #BF935A',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          fontSize: '12px',
-          fontWeight: 700,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-        }}
-      >
-        <Smartphone size={14} />
-        <span>📱 Phone Screen (Figma)</span>
-      </button>
-
-      {/* Left Column (Desktop) / Top Section (Mobile): Editorial Architecture */}
       <EditorialPanel />
 
-      {/* Right Column (Desktop) / Bottom Sheet (Mobile): Form Container */}
       <div className="auth-form-col">
-        {/* Masthead Header */}
         <div>
           <div className="form-header-row">
             <div className="form-logo-badge">
@@ -312,17 +290,15 @@ export const LoginPage: React.FC = () => {
                 className="form-logo-img"
               />
             </div>
-            <a
-              href="#need-help"
+            <button
+              type="button"
               className="form-help-link"
-              onClick={(e) => {
-                e.preventDefault();
-                alert('Support assistance: Please contact support@pronex-archai.com or +91 98251 00001.');
-              }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              onClick={() => setInfoModal('help')}
             >
               <span>Need help?</span>
               <ArrowRight size={14} />
-            </a>
+            </button>
           </div>
 
           <div style={{ marginBottom: '24px' }}>
@@ -330,11 +306,8 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Dynamic Multi-Step Form */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          {step === 'SIGN_IN' && (
-            <SignInForm onSuccess={handleSignInSuccess} />
-          )}
+          {step === 'SIGN_IN' && <SignInForm onSuccess={handleSignInSuccess} />}
 
           {step === 'CONFIRM_DETAILS' && intermediateData && (
             <ConfirmDetailsForm
@@ -357,37 +330,32 @@ export const LoginPage: React.FC = () => {
           )}
         </div>
 
-        {/* Form Footer */}
         <div className="form-footer-section">
           <div className="form-footer-row-1">
             <span>Secure access. Shared vision.</span>
-            <a
-              href="#privacy"
+            <button
+              type="button"
               className="form-text-link"
-              onClick={(e) => {
-                e.preventDefault();
-                alert('Privacy Policy: All studio CAD drawings and client records are encrypted and protected under strict single-tenant data isolation.');
-              }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              onClick={() => setInfoModal('privacy')}
             >
               Privacy policy →
-            </a>
+            </button>
           </div>
           <div className="form-footer-row-2">
             <span>Having trouble with your invitation or account? </span>
-            <a
-              href="#contact-team"
+            <button
+              type="button"
               className="form-text-link"
-              onClick={(e) => {
-                e.preventDefault();
-                alert('Studio Team Contact: Reach your assigned project coordinator or studio admin.');
-              }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              onClick={() => setInfoModal('team')}
             >
               Contact your project team →
-            </a>
+            </button>
           </div>
         </div>
       </div>
+      {renderInfoModal()}
     </div>
   );
 };
-

@@ -1,95 +1,91 @@
 import React, { useState } from 'react';
-import { ChevronLeft, Lock, Eye, EyeOff, Check, X, Loader2 } from 'lucide-react';
+import { Lock, Eye, EyeOff, CheckCircle2, AlertCircle, X, KeyRound } from 'lucide-react';
+import { AuthHeadersInput, resolveAuthHeaders } from './mobileAuth';
 
 export interface MobileChangePasswordModalProps {
   isOpen: boolean;
   onClose: () => void;
   userRole?: string;
   userName?: string;
+  authHeaders?: Record<string, string>;
+  getAuthHeaders?: AuthHeadersInput;
 }
 
 export const MobileChangePasswordModal: React.FC<MobileChangePasswordModalProps> = ({
   isOpen,
   onClose,
   userName,
+  authHeaders,
+  getAuthHeaders,
 }) => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  // Password rules validation
-  const hasMinLength = newPassword.length >= 8;
-  const hasUpperCase = /[A-Z]/.test(newPassword);
-  const hasLowerCase = /[a-z]/.test(newPassword);
-  const hasNumber = /[0-9]/.test(newPassword);
-  const hasSpecial = /[^A-Za-z0-9]/.test(newPassword);
-
-  const rulesPassedCount = [hasMinLength, hasUpperCase, hasLowerCase, hasNumber, hasSpecial].filter(Boolean).length;
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
-    setSuccessMessage(null);
+    setErrorMsg(null);
+    setSuccessMsg(null);
 
     if (!currentPassword.trim()) {
-      setErrorMessage('Please enter your current password.');
+      setErrorMsg('Please enter your current password.');
       return;
     }
-    if (rulesPassedCount < 4) {
-      setErrorMessage('New password does not meet the security criteria.');
+
+    if (newPassword.length < 8) {
+      setErrorMsg('New password must be at least 8 characters long.');
       return;
     }
+
     if (newPassword !== confirmPassword) {
-      setErrorMessage('New password and confirm password do not match.');
+      setErrorMsg('New password and confirmation do not match.');
       return;
     }
 
-    setIsLoading(true);
-    setErrorMessage(null);
+    if (newPassword === currentPassword) {
+      setErrorMsg('New password cannot be identical to the current password.');
+      return;
+    }
 
+    setSubmitting(true);
     try {
-      const authToken = typeof window !== 'undefined' ? localStorage.getItem('pronex_auth_token') : '';
+      const headers = resolveAuthHeaders(authHeaders ?? getAuthHeaders, true);
       const response = await fetch('/api/auth/change-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
+        headers,
         body: JSON.stringify({
           currentPassword,
           newPassword,
         }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setIsLoading(false);
-        setErrorMessage(data.error || 'Failed to update password.');
+        setErrorMsg(data.error || 'Failed to update password. Please verify your current password.');
+        setSubmitting(false);
         return;
       }
 
-      setIsLoading(false);
-      setSuccessMessage('Password updated successfully!');
+      setSuccessMsg('Your studio password has been updated.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
       setTimeout(() => {
         onClose();
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        setSuccessMessage(null);
-      }, 1200);
-    } catch (err) {
-      setIsLoading(false);
-      setErrorMessage('Network error communicating with studio API.');
+        setSuccessMsg(null);
+      }, 1400);
+    } catch {
+      setErrorMsg('Network error updating password. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -98,8 +94,9 @@ export const MobileChangePasswordModal: React.FC<MobileChangePasswordModalProps>
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 200,
+        zIndex: 5500,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'flex-end',
         justifyContent: 'center',
@@ -108,112 +105,116 @@ export const MobileChangePasswordModal: React.FC<MobileChangePasswordModalProps>
       <div
         style={{
           width: '100%',
-          maxWidth: '420px',
-          maxHeight: '90vh',
-          backgroundColor: '#F0F0F0',
-          borderRadius: '24px 24px 0 0',
-          boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.25)',
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          boxSizing: 'border-box',
-          paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
+          maxWidth: '480px',
+          backgroundColor: '#FFFFFF',
+          borderTopLeftRadius: '26px',
+          borderTopRightRadius: '26px',
+          padding: '24px 20px',
+          boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.2)',
+          animation: 'slideUpSheet 0.25s ease-out',
         }}
       >
-        {/* Header (Figma: 240:5287) */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '12px',
-            padding: '16px 20px',
-            borderBottom: '1px solid #E2E2E6',
-            backgroundColor: '#FFFFFF',
-            position: 'sticky',
-            top: 0,
-            zIndex: 10,
+            justifyContent: 'space-between',
+            marginBottom: '18px',
           }}
         >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '12px',
+                background: 'rgba(191, 147, 90, 0.15)',
+                color: '#352618',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <KeyRound size={20} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0C0C0D' }}>
+                Change Password
+              </h3>
+              <p style={{ fontSize: '12px', color: '#686869', margin: 0 }}>
+                {userName ? `Update credentials for ${userName}` : 'Update your A&F Design credentials'}
+              </p>
+            </div>
+          </div>
+
           <button
+            type="button"
             onClick={onClose}
+            aria-label="Close modal"
             style={{
+              background: '#F5F5F7',
+              border: 'none',
+              borderRadius: '50%',
               width: '32px',
               height: '32px',
-              borderRadius: '50%',
-              background: '#F0F0F2',
-              border: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              color: '#4A4A4C',
               cursor: 'pointer',
             }}
           >
-            <ChevronLeft size={20} color="#1D1D1F" />
+            <X size={18} />
           </button>
-          <h3 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#1D1D1F' }}>
-            Change password
-          </h3>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Security Info Card (Figma: 240:5291) */}
+        {errorMsg && (
           <div
             style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '10px',
-              padding: '12px 14px',
+              background: '#FEF3F2',
+              color: '#B42318',
+              padding: '10px 14px',
+              borderRadius: '12px',
+              fontSize: '13px',
+              fontWeight: 600,
               display: 'flex',
               alignItems: 'center',
-              gap: '10px',
-              border: '1px solid #EAEAED',
+              gap: '8px',
+              marginBottom: '14px',
             }}
           >
-            <Lock size={18} color="#686869" />
-            <span style={{ fontSize: '13px', color: '#686869', lineHeight: 1.4 }}>
-              Use a strong password to keep your account secure
-            </span>
+            <AlertCircle size={16} />
+            <span>{errorMsg}</span>
           </div>
+        )}
 
-          {errorMessage && (
-            <div
-              style={{
-                backgroundColor: '#FFEBEE',
-                border: '1px solid #FFCDD2',
-                borderRadius: '8px',
-                padding: '10px 14px',
-                fontSize: '13px',
-                color: '#D32F2F',
-              }}
-            >
-              {errorMessage}
-            </div>
-          )}
+        {successMsg && (
+          <div
+            style={{
+              background: '#ECFDF3',
+              color: '#027A48',
+              padding: '10px 14px',
+              borderRadius: '12px',
+              fontSize: '13px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '14px',
+            }}
+          >
+            <CheckCircle2 size={16} />
+            <span>{successMsg}</span>
+          </div>
+        )}
 
-          {successMessage && (
-            <div
-              style={{
-                backgroundColor: '#E8F5E9',
-                border: '1px solid #C8E6C9',
-                borderRadius: '8px',
-                padding: '10px 14px',
-                fontSize: '13px',
-                color: '#2E7D32',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <Check size={16} />
-              <span>{successMessage}</span>
-            </div>
-          )}
-
-          {/* Current Password Field (Figma: 240:5296) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: '13.5px', fontWeight: 500, color: '#4A4A4C' }}>
-              Current Password <span style={{ color: '#DF3344' }}>*</span>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 700, color: '#4A4A4C', display: 'block', marginBottom: '6px' }}>
+              Current Password
             </label>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <div style={{ position: 'relative' }}>
+              <Lock size={16} color="#979798" style={{ position: 'absolute', left: '14px', top: '14px' }} />
               <input
                 type={showCurrent ? 'text' : 'password'}
                 placeholder="Enter current password"
@@ -221,17 +222,12 @@ export const MobileChangePasswordModal: React.FC<MobileChangePasswordModalProps>
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 style={{
                   width: '100%',
-                  height: '46px',
-                  borderRadius: '8px',
-                  border: '1px solid #B5B6BC',
-                  backgroundColor: '#FFFFFF',
-                  padding: '0 40px 0 14px',
+                  padding: '12px 42px 12px 40px',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
                   fontSize: '14px',
-                  color: '#0C0C0D',
-                  outline: 'none',
                   boxSizing: 'border-box',
                 }}
-                required
               />
               <button
                 type="button"
@@ -239,11 +235,11 @@ export const MobileChangePasswordModal: React.FC<MobileChangePasswordModalProps>
                 style={{
                   position: 'absolute',
                   right: '12px',
+                  top: '12px',
                   background: 'none',
                   border: 'none',
-                  cursor: 'pointer',
                   color: '#686869',
-                  padding: '4px',
+                  cursor: 'pointer',
                 }}
               >
                 {showCurrent ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -251,30 +247,25 @@ export const MobileChangePasswordModal: React.FC<MobileChangePasswordModalProps>
             </div>
           </div>
 
-          {/* New Password Field (Figma: 240:5301) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: '13.5px', fontWeight: 500, color: '#4A4A4C' }}>
-              New Password <span style={{ color: '#DF3344' }}>*</span>
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 700, color: '#4A4A4C', display: 'block', marginBottom: '6px' }}>
+              New Password (Min 8 chars)
             </label>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <div style={{ position: 'relative' }}>
+              <Lock size={16} color="#979798" style={{ position: 'absolute', left: '14px', top: '14px' }} />
               <input
                 type={showNew ? 'text' : 'password'}
-                placeholder="Enter new password"
+                placeholder="Create new strong password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 style={{
                   width: '100%',
-                  height: '46px',
-                  borderRadius: '8px',
-                  border: '1px solid #B5B6BC',
-                  backgroundColor: '#FFFFFF',
-                  padding: '0 40px 0 14px',
+                  padding: '12px 42px 12px 40px',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
                   fontSize: '14px',
-                  color: '#0C0C0D',
-                  outline: 'none',
                   boxSizing: 'border-box',
                 }}
-                required
               />
               <button
                 type="button"
@@ -282,11 +273,11 @@ export const MobileChangePasswordModal: React.FC<MobileChangePasswordModalProps>
                 style={{
                   position: 'absolute',
                   right: '12px',
+                  top: '12px',
                   background: 'none',
                   border: 'none',
-                  cursor: 'pointer',
                   color: '#686869',
-                  padding: '4px',
+                  cursor: 'pointer',
                 }}
               >
                 {showNew ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -294,87 +285,25 @@ export const MobileChangePasswordModal: React.FC<MobileChangePasswordModalProps>
             </div>
           </div>
 
-          {/* Password Strength Meter (Figma: 240:5307) */}
-          <div style={{ display: 'flex', gap: '4px', margin: '2px 0' }}>
-            {[1, 2, 3, 4, 5].map((idx) => {
-              const active = idx <= rulesPassedCount;
-              return (
-                <div
-                  key={idx}
-                  style={{
-                    flex: 1,
-                    height: '6px',
-                    borderRadius: '4px',
-                    backgroundColor: active
-                      ? rulesPassedCount >= 4
-                        ? '#2E7D32'
-                        : '#BF935A'
-                      : '#DBDBDF',
-                    transition: 'background-color 0.2s',
-                  }}
-                />
-              );
-            })}
-          </div>
-
-          {/* Requirements Checklist (Figma: 240:5313) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '4px 0' }}>
-            <span style={{ fontSize: '12px', color: '#686869', lineHeight: 1.35 }}>
-              Password must be at least 8 characters with a mix of letters, number and symbols
-            </span>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {[
-                { label: 'At least 8 characters', passed: hasMinLength },
-                { label: 'One uppercase letter', passed: hasUpperCase },
-                { label: 'One lower letter', passed: hasLowerCase },
-                { label: 'One number', passed: hasNumber },
-                { label: 'One special character', passed: hasSpecial },
-              ].map((rule, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: rule.passed ? '#2E7D32' : '#686869' }}>
-                  <div
-                    style={{
-                      width: '16px',
-                      height: '16px',
-                      borderRadius: '50%',
-                      border: `1.5px solid ${rule.passed ? '#2E7D32' : '#979798'}`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: rule.passed ? '#2E7D32' : 'transparent',
-                    }}
-                  >
-                    {rule.passed && <Check size={10} color="#FFFFFF" />}
-                  </div>
-                  <span>{rule.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Confirm New Password Field (Figma: 240:5331) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: '13.5px', fontWeight: 500, color: '#4A4A4C' }}>
-              Confirm New Password <span style={{ color: '#DF3344' }}>*</span>
+          <div>
+            <label style={{ fontSize: '12px', fontWeight: 700, color: '#4A4A4C', display: 'block', marginBottom: '6px' }}>
+              Confirm New Password
             </label>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <div style={{ position: 'relative' }}>
+              <Lock size={16} color="#979798" style={{ position: 'absolute', left: '14px', top: '14px' }} />
               <input
                 type={showConfirm ? 'text' : 'password'}
-                placeholder="Re-Enter new password"
+                placeholder="Re-enter new password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 style={{
                   width: '100%',
-                  height: '46px',
-                  borderRadius: '8px',
-                  border: '1px solid #B5B6BC',
-                  backgroundColor: '#FFFFFF',
-                  padding: '0 40px 0 14px',
+                  padding: '12px 42px 12px 40px',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
                   fontSize: '14px',
-                  color: '#0C0C0D',
-                  outline: 'none',
                   boxSizing: 'border-box',
                 }}
-                required
               />
               <button
                 type="button"
@@ -382,11 +311,11 @@ export const MobileChangePasswordModal: React.FC<MobileChangePasswordModalProps>
                 style={{
                   position: 'absolute',
                   right: '12px',
+                  top: '12px',
                   background: 'none',
                   border: 'none',
-                  cursor: 'pointer',
                   color: '#686869',
-                  padding: '4px',
+                  cursor: 'pointer',
                 }}
               >
                 {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -394,36 +323,24 @@ export const MobileChangePasswordModal: React.FC<MobileChangePasswordModalProps>
             </div>
           </div>
 
-          {/* Submit Button (Figma: 240:5340) */}
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={submitting}
             style={{
-              width: '100%',
-              height: '48px',
-              backgroundColor: '#BF935A',
+              background: '#352618',
               color: '#FFFFFF',
               border: 'none',
-              borderRadius: '8px',
+              borderRadius: '14px',
+              padding: '14px',
               fontSize: '15px',
-              fontWeight: 600,
+              fontWeight: 700,
               cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
               marginTop: '8px',
-              boxShadow: '0 4px 12px rgba(191, 147, 90, 0.25)',
+              boxShadow: '0 4px 12px rgba(53, 38, 24, 0.2)',
+              opacity: submitting ? 0.7 : 1,
             }}
           >
-            {isLoading ? (
-              <>
-                <Loader2 size={18} className="animate-spin" />
-                <span>Updating...</span>
-              </>
-            ) : (
-              <span>Update Password</span>
-            )}
+            {submitting ? 'Updating Password...' : 'Save New Password'}
           </button>
         </form>
       </div>

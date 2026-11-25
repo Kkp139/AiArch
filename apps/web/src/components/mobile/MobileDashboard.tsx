@@ -1,5 +1,4 @@
 import React from 'react';
-import { UserRole } from '../../context/AuthContext';
 import {
   FolderKanban,
   CalendarDays,
@@ -13,7 +12,9 @@ import {
   MessageSquare,
   BellRing,
   ShieldCheck,
+  LucideIcon,
 } from 'lucide-react';
+import { UserRole } from '../../context/AuthContext';
 
 export interface MobileDashboardProps {
   user: {
@@ -22,87 +23,108 @@ export interface MobileDashboardProps {
     showPricing?: boolean;
     allowMeetings?: boolean;
   };
-  onNavigate: (viewId: string) => void;
+  onNavigate: (tab: string) => void;
+}
+
+interface ActionCardDef {
+  id: string;
+  label: string;
+  icon: LucideIcon;
 }
 
 export const MobileDashboard: React.FC<MobileDashboardProps> = ({ user, onNavigate }) => {
-  // Define action grid cards based on Figma 71:9393, 20:2884, 21:3239
-  const getCardsForRole = () => {
+  const getActionCards = (): ActionCardDef[] => {
     if (user.role === 'ADMIN') {
       return [
-        { id: 'projects', label: 'Project', icon: FolderKanban },
-        { id: 'meetings', label: 'Meeting', icon: CalendarDays },
+        { id: 'projects', label: 'Projects', icon: FolderKanban },
+        { id: 'meetings', label: 'Meetings', icon: CalendarDays },
         { id: 'payments', label: 'Payments', icon: CreditCard },
-        { id: 'announcement', label: 'Announcement', icon: Megaphone },
+        { id: 'announcement', label: 'Announcements', icon: Megaphone },
         { id: 'progress', label: 'Progress Report', icon: TrendingUp },
-        { id: 'verification', label: 'Design Verification', icon: CheckSquare },
+        { id: 'verification', label: 'Verification', icon: CheckSquare },
         { id: 'attendance', label: 'Attendance', icon: Clock },
         { id: 'updates', label: 'Updates', icon: CalendarCheck },
         { id: 'targets', label: 'Targets', icon: Target },
-        { id: 'chat', label: 'Chats', icon: MessageSquare },
+        { id: 'chat', label: 'Chat', icon: MessageSquare },
         { id: 'reminders', label: 'Reminders', icon: BellRing },
         { id: 'policies', label: 'Policies', icon: ShieldCheck },
       ];
-    } else if (user.role === 'CLIENT_LEADER' || user.role === 'CLIENT_VIEWER') {
-      const cards = [
-        { id: 'projects', label: 'Project', icon: FolderKanban },
+    }
+
+    if (user.role === 'CLIENT_LEADER' || user.role === 'CLIENT_VIEWER') {
+      const cards: ActionCardDef[] = [
+        { id: 'projects', label: 'Projects', icon: FolderKanban },
       ];
-      // Meetings section strictly reserved for Admin and Client Leader
+
       if (user.role === 'CLIENT_LEADER' && user.allowMeetings !== false) {
-        cards.push({ id: 'meetings', label: 'Meeting', icon: CalendarDays });
+        cards.push({ id: 'meetings', label: 'Meetings', icon: CalendarDays });
       }
+
       if (user.showPricing) {
         cards.push({ id: 'payments', label: 'Payments', icon: CreditCard });
       }
+
       cards.push(
-        { id: 'announcement', label: 'Announcement', icon: Megaphone },
-        { id: 'progress', label: 'Progress Report', icon: TrendingUp },
-        { id: 'vault', label: 'Document Vault', icon: FolderKanban },
-        { id: 'chat', label: 'Chats', icon: MessageSquare },
-        { id: 'reminders', label: 'Reminders', icon: BellRing },
-        { id: 'policies', label: 'Policies', icon: ShieldCheck }
+        { id: 'announcement', label: 'Announcements', icon: Megaphone },
+        { id: 'progress', label: 'Progress Report', icon: TrendingUp }
       );
+
+      if (user.role === 'CLIENT_LEADER') {
+        cards.push({ id: 'chat', label: 'Chat', icon: MessageSquare });
+      }
+
+      cards.push({ id: 'policies', label: 'Policies', icon: ShieldCheck });
       return cards;
-    } else {
-      // STAFF ROLE (Figma 21:3239) - Meetings section strictly removed (Admin & Client Leader only)
-      return [
-        { id: 'projects', label: 'Project', icon: FolderKanban },
-        { id: 'attendance', label: 'Attendance', icon: Clock },
-        { id: 'updates', label: 'Updates', icon: CalendarCheck },
-        { id: 'targets', label: 'Targets', icon: Target },
-        { id: 'announcement', label: 'Announcement', icon: Megaphone },
-        { id: 'verification', label: 'Design Verification', icon: CheckSquare },
-      ];
     }
+
+    // STAFF
+    return [
+      { id: 'projects', label: 'Projects', icon: FolderKanban },
+      { id: 'attendance', label: 'Attendance', icon: Clock },
+      { id: 'updates', label: 'Updates', icon: CalendarCheck },
+      { id: 'targets', label: 'Targets', icon: Target },
+      { id: 'announcement', label: 'Announcements', icon: Megaphone },
+      { id: 'verification', label: 'Verification', icon: CheckSquare },
+      { id: 'policies', label: 'Policies', icon: ShieldCheck },
+    ];
   };
 
-  const cards = getCardsForRole();
+  const actionCards = getActionCards();
 
   return (
     <div style={{ flex: 1 }}>
-      {/* Welcome Greeting (Figma: 71:9393) */}
-      <div className="figma-welcome-box">
-        <h1 className="figma-welcome-title">Welcome</h1>
-        <p className="figma-welcome-subtitle">
-          Welcome {user.fullName}
-        </p>
+      {/* Welcome Banner (Figma 71:9393) — Full Name only, zero role in parentheses */}
+      <div className="figma-welcome-banner">
+        <div
+          style={{
+            fontSize: '12px',
+            fontWeight: 600,
+            color: '#686869',
+            marginBottom: '4px',
+            letterSpacing: '0.2px',
+          }}
+        >
+          Welcome
+        </div>
+        <h1 className="figma-welcome-title">{user.fullName}</h1>
       </div>
 
-      {/* 3-Column Action Grid */}
+      {/* Role-Aware Action Grid */}
       <div className="figma-action-grid">
-        {cards.map((card) => {
-          const Icon = card.icon;
+        {actionCards.map((card) => {
+          const IconComponent = card.icon;
           return (
-            <div
+            <button
               key={card.id}
+              type="button"
               className="figma-action-card"
               onClick={() => onNavigate(card.id)}
             >
-              <div className="figma-card-badge">
-                <Icon size={20} />
+              <div className="figma-card-icon-wrap">
+                <IconComponent size={20} strokeWidth={2} />
               </div>
-              <span className="figma-card-title">{card.label}</span>
-            </div>
+              <span>{card.label}</span>
+            </button>
           );
         })}
       </div>

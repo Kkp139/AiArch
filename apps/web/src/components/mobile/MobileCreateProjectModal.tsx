@@ -1,77 +1,81 @@
 import React, { useState } from 'react';
-import { ChevronLeft, X } from 'lucide-react';
+import {
+  ChevronLeft,
+  FolderPlus,
+  Building2,
+  MapPin,
+  IndianRupee,
+  Download,
+  Users,
+  CheckCircle2,
+  X,
+} from 'lucide-react';
+import { AuthHeadersInput, resolveAuthHeaders } from './mobileAuth';
 
 export interface MobileCreateProjectModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onProjectCreated: () => void;
-  authHeaders: Record<string, string>;
+  isOpen?: boolean;
+  onClose?: () => void;
+  onBack?: () => void;
+  onSuccess?: () => void;
+  onProjectCreated?: () => void;
+  authHeaders?: Record<string, string>;
+  getAuthHeaders?: AuthHeadersInput;
 }
 
 export const MobileCreateProjectModal: React.FC<MobileCreateProjectModalProps> = ({
   isOpen,
   onClose,
+  onBack,
+  onSuccess,
   onProjectCreated,
   authHeaders,
+  getAuthHeaders,
 }) => {
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const closeHandler = onClose || onBack || (() => {});
+  const successHandler = onProjectCreated || onSuccess;
 
-  // Form State (matching Figma: 188:4155)
   const [formData, setFormData] = useState({
-    projectName: '',
     projectCode: '',
-    category: 'Architecture & Interior',
+    projectName: '',
+    category: 'Residential Villa',
     siteLocation: '',
-    email: '',
-    description: '',
-    totalAgreedFee: 500000,
-    advancePaymentReceived: 100000,
-    allowClientDownloads: 'ALL_APPROVED',
+    totalAgreedFee: '',
+    advancePaymentReceived: '',
+    allowClientDownloads: 'VIEW_AND_DOWNLOAD',
     showPricingClientLeader: true,
     showPricingClientViewer: false,
     allowClientMeetings: true,
   });
 
-  if (!isOpen) return null;
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const handleNext = () => {
-    if (currentStep === 1) {
-      if (!formData.projectName.trim() || !formData.projectCode.trim() || !formData.siteLocation.trim()) {
-        setError('Please fill in Project Name, Code, and Site Location.');
-        return;
-      }
-    }
-    setError(null);
-    if (currentStep < 3) {
-      setCurrentStep((prev) => (prev + 1) as any);
-    }
-  };
+  if (isOpen === false) return null;
 
-  const handleBack = () => {
-    setError(null);
-    if (currentStep > 1) {
-      setCurrentStep((prev) => (prev - 1) as any);
-    } else {
-      onClose();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.projectCode.trim() || !formData.projectName.trim()) {
+      setErrorMsg('Project Code and Project Name are required.');
+      return;
     }
-  };
 
-  const handleSubmit = async () => {
-    setIsSubmitting(true);
-    setError(null);
+    setSubmitting(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
     try {
+      const headers = resolveAuthHeaders(authHeaders ?? getAuthHeaders, true);
       const res = await fetch('/api/projects', {
         method: 'POST',
-        headers: authHeaders,
+        headers,
         body: JSON.stringify({
-          name: formData.projectName,
-          projectCode: formData.projectCode.toUpperCase(),
+          projectCode: formData.projectCode.trim().toUpperCase(),
+          name: formData.projectName.trim(),
           category: formData.category,
-          siteLocation: formData.siteLocation,
-          totalAgreedFee: Number(formData.totalAgreedFee),
-          advancePaymentReceived: Number(formData.advancePaymentReceived),
+          siteLocation: formData.siteLocation.trim(),
+          totalAgreedFee: Number(formData.totalAgreedFee) || 0,
+          advancePaymentReceived: Number(formData.advancePaymentReceived) || 0,
           allowClientDownloads: formData.allowClientDownloads,
           showPricingClientLeader: formData.showPricingClientLeader,
           showPricingClientViewer: formData.showPricingClientViewer,
@@ -79,373 +83,400 @@ export const MobileCreateProjectModal: React.FC<MobileCreateProjectModalProps> =
         }),
       });
 
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        alert(`Project "${formData.projectName}" created with 16 Appendix A folders!`);
-        onProjectCreated();
-        onClose();
+        setSuccessMsg(
+          `Project "${formData.projectName.trim()}" created with 16 standard architectural folders.`
+        );
+        if (successHandler) successHandler();
+        setTimeout(() => {
+          closeHandler();
+        }, 650);
       } else {
-        const data = await res.json();
-        setError(data.error || 'Failed to create project');
+        setErrorMsg(data.error || 'Failed to initialize project workspace.');
       }
-    } catch (err: any) {
-      setError(err.message || 'Network error');
+    } catch {
+      setErrorMsg('Network error creating project. Please try again.');
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
-  return (
-    <div className="figma-sheet-backdrop" onClick={onClose}>
-      <div
-        className="figma-sheet-content"
-        onClick={(e) => e.stopPropagation()}
-        style={{ padding: '20px 20px 32px 20px', borderRadius: '28px 28px 0 0' }}
-      >
-        {/* Top Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button
-              onClick={handleBack}
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                background: '#F5F5F7',
-                border: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-              }}
-            >
-              <ChevronLeft size={20} color="#0C0C0D" />
-            </button>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0C0C0D' }}>
-              Create project
-            </h3>
-          </div>
+  const content = (
+    <div style={{ flex: 1, paddingBottom: '120px' }}>
+      <div className="figma-subpage-header">
+        <div className="figma-breadcrumbs">
+          <span className="figma-breadcrumb-link" onClick={closeHandler}>
+            Projects
+          </span>
+          <span className="figma-breadcrumb-sep">&gt;</span>
+          <span className="active">Create Project</span>
+        </div>
 
-          <button
-            onClick={onClose}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+          <button type="button" className="figma-back-btn" onClick={closeHandler}>
+            <ChevronLeft size={24} />
+          </button>
+          <div>
+            <h2 style={{ fontSize: '20px', fontWeight: 800, margin: 0, color: '#0C0C0D' }}>
+              Create New Project
+            </h2>
+            <div style={{ fontSize: '12px', color: '#686869' }}>
+              Auto-Provisions 16 Standard Architecture Folders
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form
+        onSubmit={handleSubmit}
+        style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}
+      >
+        {errorMsg && (
+          <div
             style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
-              background: '#F5F5F7',
-              border: 'none',
+              background: '#FEF3F2',
+              color: '#B42318',
+              padding: '12px 14px',
+              borderRadius: '12px',
+              fontSize: '13px',
+              fontWeight: 600,
+              border: '1px solid #FECDCA',
               display: 'flex',
+              justifyContent: 'space-between',
               alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
             }}
           >
-            <X size={18} color="#0C0C0D" />
-          </button>
-        </div>
-
-        {/* 3-Step Wizard Stepper (Figma: 188:4155) */}
-        <div style={{ marginBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', padding: '0 20px' }}>
-            <div style={{ position: 'absolute', top: '7px', left: '30px', right: '30px', height: '2px', background: '#E8E8E9', zIndex: 1 }} />
-
-            {/* Step 1 */}
-            <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-              <div
-                style={{
-                  width: '16px',
-                  height: '16px',
-                  borderRadius: '50%',
-                  background: currentStep >= 1 ? '#352618' : '#D0D0D2',
-                  border: currentStep === 1 ? '2px solid #BF935A' : 'none',
-                }}
-              />
-              <span style={{ fontSize: '11px', fontWeight: currentStep === 1 ? 700 : 500, color: currentStep === 1 ? '#BF935A' : '#686869' }}>
-                Basic Info
-              </span>
-            </div>
-
-            {/* Step 2 */}
-            <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-              <div
-                style={{
-                  width: '16px',
-                  height: '16px',
-                  borderRadius: '50%',
-                  background: currentStep >= 2 ? '#352618' : '#D0D0D2',
-                  border: currentStep === 2 ? '2px solid #BF935A' : 'none',
-                }}
-              />
-              <span style={{ fontSize: '11px', fontWeight: currentStep === 2 ? 700 : 500, color: currentStep === 2 ? '#BF935A' : '#686869' }}>
-                Finance & Client
-              </span>
-            </div>
-
-            {/* Step 3 */}
-            <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-              <div
-                style={{
-                  width: '16px',
-                  height: '16px',
-                  borderRadius: '50%',
-                  background: currentStep >= 3 ? '#352618' : '#D0D0D2',
-                  border: currentStep === 3 ? '2px solid #BF935A' : 'none',
-                }}
-              />
-              <span style={{ fontSize: '11px', fontWeight: currentStep === 3 ? 700 : 500, color: currentStep === 3 ? '#BF935A' : '#686869' }}>
-                Setting
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {error && (
-          <div style={{ padding: '10px 14px', background: '#FEE4E2', color: '#D92D20', borderRadius: '10px', fontSize: '13px', marginBottom: '16px' }}>
-            {error}
+            <span>{errorMsg}</span>
+            <button
+              type="button"
+              onClick={() => setErrorMsg(null)}
+              style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
+            >
+              <X size={14} />
+            </button>
           </div>
         )}
 
-        {/* STEP 1: BASIC INFO */}
-        {currentStep === 1 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4A4A4C', marginBottom: '6px' }}>
-                Project Name *
-              </label>
-              <input
-                type="text"
-                className="figma-search-input"
-                style={{ padding: '0 16px' }}
-                placeholder="E.g. The Courtyard House"
-                value={formData.projectName}
-                onChange={(e) => setFormData({ ...formData, projectName: e.target.value })}
-              />
-            </div>
+        {successMsg && (
+          <div
+            style={{
+              background: '#ECFDF3',
+              color: '#027A48',
+              padding: '12px 14px',
+              borderRadius: '12px',
+              fontSize: '13px',
+              fontWeight: 600,
+              border: '1px solid #ABEFC6',
+            }}
+          >
+            {successMsg}
+          </div>
+        )}
 
+        {/* Section 1: Core Project Identity */}
+        <div
+          style={{
+            background: '#FFFFFF',
+            borderRadius: '18px',
+            padding: '18px',
+            border: '1px solid rgba(0,0,0,0.04)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+            <Building2 size={18} color="#352618" />
+            <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>
+              Project Identity
+            </h3>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4A4A4C', marginBottom: '6px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 700, color: '#4A4A4C', display: 'block', marginBottom: '4px' }}>
                 Project Code *
               </label>
               <input
                 type="text"
-                className="figma-search-input"
-                style={{ padding: '0 16px' }}
-                placeholder="E.g. LAP, ART, CRF, AF-VILLA"
+                required
+                placeholder="e.g. AF-RES-04"
                 value={formData.projectCode}
                 onChange={(e) => setFormData({ ...formData, projectCode: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
+                  fontSize: '14px',
+                  boxSizing: 'border-box',
+                }}
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4A4A4C', marginBottom: '6px' }}>
-                Category
-              </label>
-              <select
-                className="figma-search-input"
-                style={{ padding: '0 16px' }}
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              >
-                <option value="Architecture & Interior">Architecture & Interior</option>
-                <option value="Residential Villa">Residential Villa</option>
-                <option value="Commercial Complex">Commercial Complex</option>
-                <option value="Landscape Architecture">Landscape Architecture</option>
-              </select>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4A4A4C', marginBottom: '6px' }}>
-                Site Location *
+              <label style={{ fontSize: '12px', fontWeight: 700, color: '#4A4A4C', display: 'block', marginBottom: '4px' }}>
+                Project Name *
               </label>
               <input
                 type="text"
-                className="figma-search-input"
-                style={{ padding: '0 16px' }}
-                placeholder="E.g. Bodakdev, Ahmedabad, Gujarat"
-                value={formData.siteLocation}
-                onChange={(e) => setFormData({ ...formData, siteLocation: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4A4A4C', marginBottom: '6px' }}>
-                Email (Optional)
-              </label>
-              <input
-                type="email"
-                className="figma-search-input"
-                style={{ padding: '0 16px' }}
-                placeholder="Enter client email address"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4A4A4C', marginBottom: '6px' }}>
-                Description (Optional)
-              </label>
-              <textarea
+                required
+                placeholder="Enter project title"
+                value={formData.projectName}
+                onChange={(e) => setFormData({ ...formData, projectName: e.target.value })}
                 style={{
                   width: '100%',
-                  height: '80px',
-                  padding: '10px 14px',
-                  borderRadius: '14px',
-                  border: '1px solid #E8E8E9',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
                   fontSize: '14px',
-                  fontFamily: 'inherit',
-                  outline: 'none',
+                  boxSizing: 'border-box',
                 }}
-                placeholder="Add a short description of the architectural project..."
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* STEP 2: FINANCE & CLIENT */}
-        {currentStep === 2 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4A4A4C', marginBottom: '6px' }}>
-                Total Agreed Fee (₹)
-              </label>
-              <input
-                type="number"
-                className="figma-search-input"
-                style={{ padding: '0 16px' }}
-                value={formData.totalAgreedFee}
-                onChange={(e) => setFormData({ ...formData, totalAgreedFee: Number(e.target.value) })}
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4A4A4C', marginBottom: '6px' }}>
-                Advance Payment Received (₹)
-              </label>
-              <input
-                type="number"
-                className="figma-search-input"
-                style={{ padding: '0 16px' }}
-                value={formData.advancePaymentReceived}
-                onChange={(e) => setFormData({ ...formData, advancePaymentReceived: Number(e.target.value) })}
-              />
-            </div>
-
-            <div style={{ padding: '14px', background: '#F8F6F3', borderRadius: '14px', border: '1px solid #EBDDCF' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#9E743F', marginBottom: '4px' }}>
-                Client Leader Access
-              </div>
-              <div style={{ fontSize: '12px', color: '#686869' }}>
-                The Client Leader will receive a single-use setup link via WhatsApp / Email to manage approvals and consultations.
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 3: SETTINGS & PERMISSIONS */}
-        {currentStep === 3 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#4A4A4C', marginBottom: '6px' }}>
-                Client Download Permissions
+              <label style={{ fontSize: '12px', fontWeight: 700, color: '#4A4A4C', display: 'block', marginBottom: '4px' }}>
+                Category
               </label>
               <select
-                className="figma-search-input"
-                style={{ padding: '0 16px' }}
-                value={formData.allowClientDownloads}
-                onChange={(e) => setFormData({ ...formData, allowClientDownloads: e.target.value })}
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
+                  fontSize: '14px',
+                  background: '#FFFFFF',
+                  boxSizing: 'border-box',
+                }}
               >
-                <option value="ALL_APPROVED">All Approved Drawings (Default)</option>
-                <option value="WATERMARKED_ONLY">Watermarked Drawings Only</option>
-                <option value="NONE">View Only (No Downloads)</option>
+                <option value="Residential Villa">Residential Villa</option>
+                <option value="Luxury Interior">Luxury Interior</option>
+                <option value="Commercial Tower">Commercial Tower</option>
+                <option value="Hospitality / Resort">Hospitality / Resort</option>
+                <option value="Institutional">Institutional</option>
               </select>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: '#F5F5F7', borderRadius: '12px' }}>
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#0C0C0D' }}>Show Pricing to Client Leader</div>
-                <div style={{ fontSize: '12px', color: '#686869' }}>Toggle fee breakdown and payment ledger visibility</div>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 700, color: '#4A4A4C', display: 'block', marginBottom: '4px' }}>
+                Site Location
+              </label>
+              <div style={{ position: 'relative' }}>
+                <MapPin size={16} color="#686869" style={{ position: 'absolute', left: '12px', top: '14px' }} />
+                <input
+                  type="text"
+                  placeholder="City / Locality"
+                  value={formData.siteLocation}
+                  onChange={(e) => setFormData({ ...formData, siteLocation: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '12px 12px 12px 36px',
+                    borderRadius: '12px',
+                    border: '1px solid #E5E7EB',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                  }}
+                />
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 2: Financial Baseline */}
+        <div
+          style={{
+            background: '#FFFFFF',
+            borderRadius: '18px',
+            padding: '18px',
+            border: '1px solid rgba(0,0,0,0.04)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+            <IndianRupee size={18} color="#352618" />
+            <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>
+              Financial Baseline
+            </h3>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 700, color: '#4A4A4C', display: 'block', marginBottom: '4px' }}>
+                Total Agreed Fee (₹ INR)
+              </label>
+              <input
+                type="number"
+                placeholder="0"
+                value={formData.totalAgreedFee}
+                onChange={(e) => setFormData({ ...formData, totalAgreedFee: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
+                  fontSize: '14px',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 700, color: '#4A4A4C', display: 'block', marginBottom: '4px' }}>
+                Advance Payment Received (₹ INR)
+              </label>
+              <input
+                type="number"
+                placeholder="0"
+                value={formData.advancePaymentReceived}
+                onChange={(e) => setFormData({ ...formData, advancePaymentReceived: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
+                  fontSize: '14px',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Section 3: Client Access & Privacy Matrix */}
+        <div
+          style={{
+            background: '#FFFFFF',
+            borderRadius: '18px',
+            padding: '18px',
+            border: '1px solid rgba(0,0,0,0.04)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+            <Users size={18} color="#352618" />
+            <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0C0C0D' }}>
+              Client Governance Permissions
+            </h3>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 700, color: '#4A4A4C', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                <Download size={14} /> Client Drawing Download Policy
+              </label>
+              <select
+                value={formData.allowClientDownloads}
+                onChange={(e) => setFormData({ ...formData, allowClientDownloads: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
+                  fontSize: '14px',
+                  background: '#FFFFFF',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <option value="VIEW_AND_DOWNLOAD">Clients can View &amp; Download Sheets</option>
+                <option value="VIEW_ONLY">View Only — No Downloads</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0C0C0D' }}>
+                Show Pricing to Client Leader
+              </span>
               <input
                 type="checkbox"
                 checked={formData.showPricingClientLeader}
                 onChange={(e) => setFormData({ ...formData, showPricingClientLeader: e.target.checked })}
-                style={{ width: '20px', height: '20px', accentColor: '#BF935A' }}
+                style={{ width: '18px', height: '18px', accentColor: '#352618' }}
               />
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: '#F5F5F7', borderRadius: '12px' }}>
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#0C0C0D' }}>Show Pricing to Client Viewer</div>
-                <div style={{ fontSize: '12px', color: '#686869' }}>Allow secondary family/team viewers to see financials</div>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0C0C0D' }}>
+                Show Pricing to Client Viewer
+              </span>
               <input
                 type="checkbox"
                 checked={formData.showPricingClientViewer}
                 onChange={(e) => setFormData({ ...formData, showPricingClientViewer: e.target.checked })}
-                style={{ width: '20px', height: '20px', accentColor: '#BF935A' }}
+                style={{ width: '18px', height: '18px', accentColor: '#352618' }}
               />
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: '#F5F5F7', borderRadius: '12px' }}>
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#0C0C0D' }}>Allow Consultation Meetings</div>
-                <div style={{ fontSize: '12px', color: '#686869' }}>Dynamic Meetings module configuration (Decision #3)</div>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0C0C0D' }}>
+                Allow Client Meeting Requests
+              </span>
               <input
                 type="checkbox"
                 checked={formData.allowClientMeetings}
                 onChange={(e) => setFormData({ ...formData, allowClientMeetings: e.target.checked })}
-                style={{ width: '20px', height: '20px', accentColor: '#BF935A' }}
+                style={{ width: '18px', height: '18px', accentColor: '#352618' }}
               />
             </div>
           </div>
-        )}
-
-        {/* Action Button (Figma: 188:4155) */}
-        <div style={{ marginTop: '28px' }}>
-          {currentStep < 3 ? (
-            <button
-              onClick={handleNext}
-              style={{
-                width: '100%',
-                height: '52px',
-                borderRadius: '14px',
-                background: '#BF935A',
-                color: '#FFFFFF',
-                fontSize: '16px',
-                fontWeight: 700,
-                border: 'none',
-                cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(191, 147, 90, 0.35)',
-              }}
-            >
-              Next
-            </button>
-          ) : (
-            <button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              style={{
-                width: '100%',
-                height: '52px',
-                borderRadius: '14px',
-                background: '#BF935A',
-                color: '#FFFFFF',
-                fontSize: '16px',
-                fontWeight: 700,
-                border: 'none',
-                cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(191, 147, 90, 0.35)',
-                opacity: isSubmitting ? 0.7 : 1,
-              }}
-            >
-              {isSubmitting ? 'Creating Project & Folders...' : 'Create Project'}
-            </button>
-          )}
         </div>
-      </div>
+
+        <button
+          type="submit"
+          disabled={submitting}
+          style={{
+            background: '#352618',
+            color: '#FFFFFF',
+            border: 'none',
+            borderRadius: '14px',
+            padding: '16px',
+            fontSize: '15px',
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 12px rgba(53, 38, 24, 0.25)',
+            opacity: submitting ? 0.7 : 1,
+          }}
+        >
+          {submitting ? (
+            <span>Initializing Project Workspace...</span>
+          ) : (
+            <>
+              <FolderPlus size={18} />
+              <span>Create Project &amp; Provision 16 Folders</span>
+            </>
+          )}
+        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', color: '#686869', fontSize: '11px' }}>
+          <CheckCircle2 size={14} color="#12B76A" />
+          <span>6 Concept + 9 Construction + 03_OTHER Vault Ready</span>
+        </div>
+      </form>
     </div>
   );
+
+  if (isOpen) {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 4500,
+          backgroundColor: '#F2F2F5',
+          overflowY: 'auto',
+          maxWidth: '480px',
+          margin: '0 auto',
+        }}
+      >
+        {content}
+      </div>
+    );
+  }
+
+  return content;
 };

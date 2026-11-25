@@ -1,228 +1,390 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import {
+  ChevronLeft,
+  Download,
+  ExternalLink,
+  Calendar,
+  User,
+  FileCode2,
+  ShieldCheck,
+  Loader2,
+  X,
+} from 'lucide-react';
 import { DrawingItem } from './MobileDrawingFolderView';
-import { ChevronLeft, Download, Eye, MoreVertical, X } from 'lucide-react';
+import { AuthHeadersInput, resolveAuthHeaders } from './mobileAuth';
 
 export interface MobileDrawingSheetModalProps {
   drawing: DrawingItem | null;
+  projectName?: string;
+  phaseName?: string;
+  folderName?: string;
+  userRole?: string;
+  allowClientDownloads?: string;
+  authHeaders?: Record<string, string>;
+  getAuthHeaders?: AuthHeadersInput;
   onClose: () => void;
 }
 
 export const MobileDrawingSheetModal: React.FC<MobileDrawingSheetModalProps> = ({
   drawing,
+  projectName = 'Architectural Project',
+  phaseName = 'Drawing Vault',
+  folderName = 'Standard Folder',
+  userRole,
+  allowClientDownloads,
+  authHeaders,
+  getAuthHeaders,
   onClose,
 }) => {
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [loadingUrl, setLoadingUrl] = useState(false);
+  const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (!drawing) return;
+
+    const loadLinks = async () => {
+      setLoadingUrl(true);
+      setBanner(null);
+      setResolvedUrl(drawing.downloadUrl || null);
+      setPreviewUrl(null);
+      try {
+        const headers = resolveAuthHeaders(authHeaders ?? getAuthHeaders);
+        const res = await fetch(
+          `/api/vault/document/${encodeURIComponent(drawing.id)}/download`,
+          { headers }
+        );
+        if (!active) return;
+        if (res.ok) {
+          const data = await res.json();
+          setResolvedUrl(data.downloadUrl || null);
+          setPreviewUrl(data.previewUrl || null);
+        } else {
+          const err = await res.json().catch(() => ({}));
+          if (res.status === 403) {
+            setBanner({
+              type: 'error',
+              message: err.error || 'Downloads are restricted for this project.',
+            });
+          }
+        }
+      } catch {
+        // Keep metadata readable without crashing
+      } finally {
+        if (active) setLoadingUrl(false);
+      }
+    };
+
+    loadLinks();
+    return () => {
+      active = false;
+    };
+  }, [drawing, authHeaders, getAuthHeaders]);
+
   if (!drawing) return null;
 
   const isApproved = drawing.status === 'Approved';
-  const dotColor = isApproved ? '#12B76A' : drawing.status === 'Pending' ? '#F79009' : '#175CD3';
+  const isClient = userRole === 'CLIENT_LEADER' || userRole === 'CLIENT_VIEWER';
+  const downloadAllowed = !isClient || allowClientDownloads !== 'VIEW_ONLY';
+  const displayPreview = previewUrl || (!drawing.isDwg ? resolvedUrl : null);
+
+  const handleOpenExternal = () => {
+    const target = displayPreview || resolvedUrl;
+    if (!target) {
+      setBanner({
+        type: 'error',
+        message: 'No preview file URL returned by storage yet.',
+      });
+      return;
+    }
+    window.open(target, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleDownload = () => {
+    if (!downloadAllowed) {
+      setBanner({
+        type: 'error',
+        message: 'Downloads are disabled for your role on this project.',
+      });
+      return;
+    }
+    if (!resolvedUrl) {
+      setBanner({
+        type: 'error',
+        message: 'Verified download link unavailable.',
+      });
+      return;
+    }
+    window.open(resolvedUrl, '_blank', 'noopener,noreferrer');
+    setBanner({
+      type: 'success',
+      message: `Downloading "${drawing.fileName || drawing.title}"...`,
+    });
+  };
 
   return (
-    <div className="figma-sheet-backdrop" onClick={onClose}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 4000,
+        backgroundColor: '#F5F5F7',
+        display: 'flex',
+        flexDirection: 'column',
+        maxWidth: '480px',
+        margin: '0 auto',
+      }}
+    >
+      {/* Top Modal Header */}
       <div
-        className="figma-sheet-content"
-        onClick={(e) => e.stopPropagation()}
-        style={{ padding: '20px 20px 32px 20px', borderRadius: '28px 28px 0 0' }}
+        style={{
+          background: '#FFFFFF',
+          padding: '16px 20px',
+          borderBottom: '1px solid rgba(0,0,0,0.06)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
       >
-        {/* Top Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button
-              onClick={onClose}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+          <button type="button" className="figma-back-btn" onClick={onClose} aria-label="Close viewer">
+            <ChevronLeft size={24} />
+          </button>
+          <div style={{ minWidth: 0 }}>
+            <h3
               style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                background: '#F5F5F7',
-                border: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
+                fontSize: '16px',
+                fontWeight: 700,
+                margin: 0,
+                color: '#0C0C0D',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }}
             >
-              <ChevronLeft size={20} color="#0C0C0D" />
-            </button>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0C0C0D' }}>
               {drawing.title}
             </h3>
+            <div style={{ fontSize: '12px', color: '#686869' }}>
+              {projectName} • {folderName}
+            </div>
           </div>
+        </div>
+      </div>
 
-          <button
-            onClick={() => alert('Drawing options: Export as DWG, View Revision History, Pin to Quick Access')}
+      {/* Main Content */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 100px 20px' }}>
+        {banner && (
+          <div
             style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
-              background: '#F5F5F7',
-              border: 'none',
+              marginBottom: '14px',
+              padding: '10px 14px',
+              borderRadius: '12px',
+              fontSize: '12px',
+              fontWeight: 600,
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
+              justifyContent: 'space-between',
+              background: banner.type === 'success' ? '#ECFDF3' : '#FEF3F2',
+              color: banner.type === 'success' ? '#027A48' : '#B42318',
+              border: `1px solid ${banner.type === 'success' ? '#ABEFC6' : '#FECDCA'}`,
             }}
           >
-            <MoreVertical size={18} color="#0C0C0D" />
-          </button>
-        </div>
+            <span>{banner.message}</span>
+            <button
+              type="button"
+              onClick={() => setBanner(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit' }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
-        {/* Blueprint Preview Visual Canvas (Figma: 29:1376) */}
+        {/* Blueprint / Preview Surface */}
         <div
           style={{
-            width: '100%',
-            height: '240px',
-            borderRadius: '16px',
-            backgroundColor: '#FAFAFA',
-            border: '1.5px solid #E8E8E9',
+            background: '#1C1B1A',
+            borderRadius: '20px',
+            minHeight: '240px',
+            position: 'relative',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '20px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+            padding: '20px',
+          }}
+        >
+          {loadingUrl ? (
+            <Loader2 size={28} color="#BF935A" className="animate-spin" />
+          ) : displayPreview && /\.(png|jpe?g|webp|gif)(\?|$)/i.test(displayPreview) ? (
+            <img
+              src={displayPreview}
+              alt={drawing.title}
+              style={{ maxWidth: '100%', maxHeight: '260px', borderRadius: '10px', objectFit: 'contain' }}
+            />
+          ) : (
+            <div style={{ textAlign: 'center', color: '#FFFFFF' }}>
+              <FileCode2 size={40} color="#BF935A" style={{ margin: '0 auto 10px' }} />
+              <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.5px' }}>
+                {drawing.isDwg ? 'CAD SHEET PREVIEW' : `${drawing.code} ARCHITECTURAL SHEET`}
+              </div>
+              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.68)', marginTop: '6px' }}>
+                {phaseName} • {folderName}
+              </div>
+            </div>
+          )}
+
+          {isApproved && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '14px',
+                right: '14px',
+                background: 'rgba(18, 183, 106, 0.2)',
+                border: '1px solid rgba(18, 183, 106, 0.5)',
+                color: '#12B76A',
+                padding: '4px 10px',
+                borderRadius: '20px',
+                fontSize: '11px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+            >
+              <ShieldCheck size={14} /> Approved
+            </div>
+          )}
+        </div>
+
+        {/* Technical Metadata Card */}
+        <div
+          style={{
+            background: '#FFFFFF',
+            borderRadius: '20px',
+            padding: '20px',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+            border: '1px solid rgba(0,0,0,0.04)',
+            marginBottom: '20px',
+          }}
+        >
+          <h4 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 16px 0', color: '#0C0C0D' }}>
+            Sheet Metadata
+          </h4>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '13px', color: '#686869', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FileCode2 size={15} /> Format &amp; Size
+              </span>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0C0C0D' }}>
+                {drawing.code} • {drawing.fileSize}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '13px', color: '#686869', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <User size={15} /> Uploaded By
+              </span>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0C0C0D' }}>
+                {drawing.uploadedBy}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '13px', color: '#686869', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Calendar size={15} /> Uploaded On
+              </span>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0C0C0D' }}>
+                {drawing.date}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '13px', color: '#686869' }}>Folder Status</span>
+              <span
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  color: isApproved ? '#027A48' : '#B54708',
+                  background: isApproved ? '#ECFDF3' : '#FFFAEB',
+                  padding: '3px 10px',
+                  borderRadius: '8px',
+                }}
+              >
+                {drawing.status}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Sticky Action Bar */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background: '#FFFFFF',
+          borderTop: '1px solid rgba(0,0,0,0.06)',
+          padding: '14px 20px',
+          display: 'flex',
+          gap: '12px',
+          paddingBottom: 'calc(14px + env(safe-area-inset-bottom))',
+        }}
+      >
+        <button
+          type="button"
+          onClick={handleOpenExternal}
+          style={{
+            flex: 1,
+            height: '46px',
+            borderRadius: '12px',
+            border: '1px solid #352618',
+            background: '#FFFFFF',
+            color: '#352618',
+            fontWeight: 700,
+            fontSize: '14px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            position: 'relative',
-            overflow: 'hidden',
-            marginBottom: '20px',
-            boxShadow: 'inset 0 0 16px rgba(0,0,0,0.02)',
+            gap: '8px',
+            cursor: 'pointer',
           }}
         >
-          {/* Architectural Drawing SVG Blueprint */}
-          <svg width="100%" height="100%" viewBox="0 0 320 220" fill="none" xmlns="http://www.w3.org/2000/svg">
-            {/* Grid Pattern */}
-            <defs>
-              <pattern id="cadGrid" width="20" height="20" patternUnits="userSpaceOnUse">
-                <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#EAEAEB" strokeWidth="0.8" />
-              </pattern>
-            </defs>
-            <rect width="320" height="220" fill="url(#cadGrid)" />
-            {/* Outer Site Boundary */}
-            <rect x="25" y="15" width="270" height="190" stroke="#4A4A4C" strokeWidth="1.5" strokeDasharray="6 3" />
-            <text x="35" y="28" fill="#979798" fontSize="8" fontFamily="monospace">BOUNDARY 32.50m</text>
-            <text x="35" y="198" fill="#979798" fontSize="8" fontFamily="monospace">ROAD SETBACK 6.00m</text>
-            {/* Main Residence Walls */}
-            <rect x="75" y="45" width="170" height="130" stroke="#0C0C0D" strokeWidth="2.5" fill="#FFFFFF" />
-            {/* Internal Rooms */}
-            <line x1="160" y1="45" x2="160" y2="175" stroke="#0C0C0D" strokeWidth="2" />
-            <line x1="75" y1="110" x2="245" y2="110" stroke="#0C0C0D" strokeWidth="2" />
-            {/* Central Courtyard */}
-            <rect x="135" y="85" width="50" height="50" stroke="#BF935A" strokeWidth="1.8" fill="#F8EFE4" strokeDasharray="3 2" />
-            <text x="142" y="112" fill="#BF935A" fontSize="7" fontWeight="bold">COURTYARD</text>
-            <text x="92" y="78" fill="#4A4A4C" fontSize="8">MASTER SUITE</text>
-            <text x="180" y="78" fill="#4A4A4C" fontSize="8">LIVING LOUNGE</text>
-            <text x="92" y="145" fill="#4A4A4C" fontSize="8">STUDIO LAB</text>
-            <text x="180" y="145" fill="#4A4A4C" fontSize="8">DINING & KITCHEN</text>
-            {/* Dimension Lines */}
-            <line x1="75" y1="40" x2="245" y2="40" stroke="#175CD3" strokeWidth="1" />
-            <text x="148" y="38" fill="#175CD3" fontSize="8" textAnchor="middle">17.00m</text>
-          </svg>
+          <ExternalLink size={18} />
+          <span>Open Sheet</span>
+        </button>
 
-          {/* Watermark badge */}
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '10px',
-              right: '12px',
-              background: 'rgba(255,255,255,0.9)',
-              padding: '2px 8px',
-              borderRadius: '6px',
-              fontSize: '10px',
-              fontWeight: 700,
-              color: '#BF935A',
-              border: '1px solid #E8E8E9',
-            }}
-          >
-            A&F STUDIO CAD
-          </div>
-        </div>
-
-        {/* Metadata Information Sheet (Figma: 29:1376) */}
-        <div style={{ marginBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-            <h4 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0C0C0D' }}>
-              {drawing.title}
-            </h4>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 700 }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: dotColor }} />
-              <span style={{ color: dotColor }}>{drawing.status}</span>
-            </div>
-          </div>
-
-          <div style={{ fontSize: '14px', color: '#686869', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-            <span>{drawing.code}</span>
-            <span>•</span>
-            <span style={{ fontWeight: 700, color: '#BF935A' }}>{drawing.version} (Revision Counter)</span>
-          </div>
-
-          <div style={{ height: '1px', background: '#E8E8E9', marginBottom: '14px' }} />
-
-          {/* Key-Value Details */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#686869' }}>Discipline</span>
-              <strong style={{ color: '#0C0C0D' }}>Site Drawings</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#686869' }}>Uploaded by</span>
-              <strong style={{ color: '#0C0C0D' }}>{drawing.uploadedBy}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#686869' }}>Date & Time</span>
-              <strong style={{ color: '#0C0C0D' }}>{drawing.date}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#686869' }}>File Size</span>
-              <strong style={{ color: '#0C0C0D' }}>{drawing.fileSize}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#686869' }}>File Format</span>
-              <strong style={{ color: '#0C0C0D' }}>PDF</strong>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Buttons: View & Download (Figma: 29:1376) */}
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button
-            onClick={() => alert(`Opening high-res architectural canvas for ${drawing.title} (${drawing.code})`)}
-            style={{
-              flex: 1,
-              height: '50px',
-              borderRadius: '14px',
-              background: '#ECECEE',
-              color: '#0C0C0D',
-              fontSize: '15px',
-              fontWeight: 700,
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-            }}
-          >
-            <Eye size={18} />
-            <span>View</span>
-          </button>
-
-          <button
-            onClick={() => alert(`Downloading verified drawing ${drawing.title} (${drawing.code}-${drawing.version}.pdf)`)}
-            style={{
-              flex: 1.3,
-              height: '50px',
-              borderRadius: '14px',
-              background: '#BF935A',
-              color: '#FFFFFF',
-              fontSize: '15px',
-              fontWeight: 700,
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 14px rgba(191, 147, 90, 0.35)',
-            }}
-          >
-            <Download size={18} />
-            <span>Download</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={!downloadAllowed}
+          style={{
+            flex: 1,
+            height: '46px',
+            borderRadius: '12px',
+            border: 'none',
+            background: downloadAllowed ? '#352618' : '#D0D5DD',
+            color: '#FFFFFF',
+            fontWeight: 700,
+            fontSize: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            cursor: downloadAllowed ? 'pointer' : 'not-allowed',
+          }}
+        >
+          <Download size={18} />
+          <span>{downloadAllowed ? 'Download' : 'View Only'}</span>
+        </button>
       </div>
     </div>
   );

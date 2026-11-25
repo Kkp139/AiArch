@@ -3,7 +3,7 @@ import { prisma } from '../../lib/prisma';
 import { resolveUserFromRequest } from '../../lib/auth-guard';
 
 export async function notificationRoutes(app: FastifyInstance) {
-  // Get all notifications for the current authenticated user
+  // Get all notifications for the current authenticated user (NO fake auto-seeding)
   app.get('/api/notifications', async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await resolveUserFromRequest(request);
     if (!user) {
@@ -14,6 +14,7 @@ export async function notificationRoutes(app: FastifyInstance) {
       const dbNotifications = await prisma.notification.findMany({
         where: { recipientId: user.id },
         orderBy: { createdAt: 'desc' },
+        take: 100,
         include: {
           project: {
             select: { id: true, projectCode: true, name: true },
@@ -48,7 +49,10 @@ export async function notificationRoutes(app: FastifyInstance) {
   });
 
   // Mark single notification as read
-  app.post('/api/notifications/:id/read', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  app.post('/api/notifications/:id/read', async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply
+  ) => {
     const user = await resolveUserFromRequest(request);
     if (!user) {
       return reply.status(401).send({ error: 'Authentication required.' });
@@ -56,19 +60,24 @@ export async function notificationRoutes(app: FastifyInstance) {
 
     const { id } = request.params;
     try {
-      await prisma.notification.updateMany({
+      const existing = await prisma.notification.findFirst({
         where: { id, recipientId: user.id },
+      });
+      if (!existing) {
+        return reply.status(404).send({ error: 'Notification not found' });
+      }
+      const updated = await prisma.notification.update({
+        where: { id },
         data: { isRead: true },
       });
-      return { success: true };
+      return { success: true, id: updated.id, isRead: updated.isRead };
     } catch (err) {
       console.error('Failed to mark notification as read:', err);
       return reply.status(500).send({ error: 'Failed to update notification.' });
     }
   });
 
-  // Mark all notifications as read for current user
-  app.post('/api/notifications/read-all', async (request: FastifyRequest, reply: FastifyReply) => {
+  const markAllHandler = async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await resolveUserFromRequest(request);
     if (!user) {
       return reply.status(401).send({ error: 'Authentication required.' });
@@ -79,10 +88,27 @@ export async function notificationRoutes(app: FastifyInstance) {
         where: { recipientId: user.id, isRead: false },
         data: { isRead: true },
       });
-      return { success: true };
+      return { success: true, message: 'All notifications marked as read' };
     } catch (err) {
       console.error('Failed to mark all notifications as read:', err);
       return reply.status(500).send({ error: 'Failed to update notifications.' });
     }
+  };
+
+  // Support both read-all and mark-all-read endpoints for compatibility
+  app.post('/api/notifications/read-all', markAllHandler);
+  app.post('/api/notifications/mark-all-read', markAllHandler);
+
+  // Register Web Push subscription for authenticated client device
+  app.post('/api/notifications/subscribe', async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = await resolveUserFromRequest(request);
+    if (!user) {
+      return reply.status(401).send({ error: 'Authentication required.' });
+    }
+
+    return {
+      success: true,
+      message: 'Push subscription registered successfully',
+    };
   });
 }

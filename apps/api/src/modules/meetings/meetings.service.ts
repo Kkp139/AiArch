@@ -34,6 +34,15 @@ export function isFutureDate(dateStr: string): boolean {
 }
 
 /**
+ * Enforces meeting request RBAC (Master Spec Section 14 + PO Directive)
+ * Only ADMIN and CLIENT_LEADER are authorized to request consultation meetings.
+ * STAFF and CLIENT_VIEWER are strictly prohibited.
+ */
+export function isRoleAllowedToRequestMeeting(role: string): boolean {
+  return role === 'ADMIN' || role === 'CLIENT_LEADER';
+}
+
+/**
  * In-memory / transactional slot collision engine
  * Guarantees that only one meeting booking can occupy a given date & slot globally
  */

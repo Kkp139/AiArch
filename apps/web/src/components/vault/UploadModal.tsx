@@ -16,7 +16,7 @@ export interface UploadModalProps {
 
 // Map short category codes to official 16 Appendix A folder names
 const CATEGORY_MAP: Record<string, string> = {
-  ARCH_PLANS: '01_SITE_DRGS',
+  ARCH_PLANS: '01_ARCHITECTURAL_PLANS',
   SITE: '01_SITE_DRGS',
   SITE_DRGS: '01_SITE_DRGS',
   SITEDRGS: '01_SITE_DRGS',
@@ -77,8 +77,12 @@ const CATEGORY_MAP: Record<string, string> = {
 export function checkNamingConvention(filename: string): { matches: boolean; routedCategory: string } {
   const parts = filename.split('_');
   if (parts.length >= 4) {
-    const categoryCode = parts[1].toUpperCase();
-    const folder = CATEGORY_MAP[categoryCode] || (categoryCode.startsWith('0') ? categoryCode : null);
+    const twoPartCode = `${parts[1]}_${parts[2]}`.toUpperCase();
+    const singleCode = parts[1].toUpperCase();
+    const folder =
+      CATEGORY_MAP[twoPartCode] ||
+      CATEGORY_MAP[singleCode] ||
+      (singleCode.startsWith('0') ? singleCode : null);
     if (folder) {
       return { matches: true, routedCategory: folder };
     }

@@ -1,7 +1,10 @@
+import path from 'path';
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
+import { UserRole } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { resolveUserFromRequest } from '../../lib/auth-guard';
+import { recordAuditLog } from '../../lib/audit.service';
 
 export async function verificationRoutes(app: FastifyInstance) {
   // Get All Submissions (Admin and Staff can access; Revision Counter is visible to both!)
@@ -12,7 +15,6 @@ export async function verificationRoutes(app: FastifyInstance) {
       return reply.status(401).send({ error: 'Authentication required. Please sign in to access Design Verification.' });
     }
 
-    // Only Admin and Staff have access to Design Verification module
     if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
       return reply.status(403).send({ error: 'Access denied: Design Verification is restricted to Admin and Staff.' });
     }
@@ -46,7 +48,7 @@ export async function verificationRoutes(app: FastifyInstance) {
       fileKey: item.fileKey,
       previewKey: item.previewKey,
       revisionNumber: item.revisionNumber,
-      revisionLabel: `Rev ${item.revisionNumber}`, // USER REQUIREMENT: Both Admin and Staff can see revision counter
+      revisionLabel: `Rev ${item.revisionNumber}`, // Both Admin and Staff see revision counter
       status: item.status,
       feedbackNote: item.feedbackNote,
       submittedBy: item.submitter.fullName,
@@ -86,10 +88,6 @@ export async function verificationRoutes(app: FastifyInstance) {
     const { projectId, folderId, drawingTitle, fileKey, previewKey } = body.data;
     const note = body.data.notes || body.data.feedbackNote || null;
 
-    // Resolve submitter user
-    const submitterId = user.id;
-
-    // Check if drawing already exists for this folder/title to increment revision
     const existing = await prisma.designVerification.findFirst({
       where: {
         projectId,
@@ -100,7 +98,6 @@ export async function verificationRoutes(app: FastifyInstance) {
 
     let item;
     if (existing) {
-      // Single workspace rule: replace with updated submission and increment revision counter
       item = await prisma.designVerification.update({
         where: { id: existing.id },
         data: {
@@ -121,13 +118,46 @@ export async function verificationRoutes(app: FastifyInstance) {
           drawingTitle,
           fileKey,
           previewKey,
-          submittedBy: submitterId,
+          submittedBy: user.id,
           revisionNumber: 1,
           status: 'PENDING_REVIEW',
           feedbackNote: note,
         },
       });
     }
+
+    try {
+      const admins = await prisma.user.findMany({
+        where: { role: UserRole.ADMIN, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      const adminTargets = admins.filter((a) => a.id !== user.id);
+      if (adminTargets.length > 0) {
+        await prisma.notification.createMany({
+          data: adminTargets.map((a) => ({
+            recipientId: a.id,
+            projectId,
+            category: 'VERIFICATION',
+            title: `Drawing Submitted for Review: ${drawingTitle}`,
+            message: `${user.fullName} submitted ${drawingTitle} (Rev ${item.revisionNumber}) for verification.`,
+            deepLink: '/verification',
+          })),
+        });
+      }
+    } catch (err) {
+      console.error('[Verification] Failed to notify admins:', err);
+    }
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: existing ? 'RESUBMIT_VERIFICATION' : 'SUBMIT_VERIFICATION',
+      entityType: 'DESIGN_VERIFICATION',
+      entityId: item.id,
+      oldData: existing ? { revisionNumber: existing.revisionNumber, status: existing.status } : undefined,
+      newData: { revisionNumber: item.revisionNumber, drawingTitle: item.drawingTitle, status: item.status },
+    });
 
     return {
       success: true,
@@ -138,8 +168,11 @@ export async function verificationRoutes(app: FastifyInstance) {
     };
   });
 
-  // Approve Drawing (Admin only)
-  app.post('/api/verification/:id/approve', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  // Approve Drawing (Admin only - syncs approved ProjectDocument in Vault & Progress Report)
+  app.post('/api/verification/:id/approve', async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply
+  ) => {
     const user = await resolveUserFromRequest(request);
     if (!user) {
       return reply.status(401).send({ error: 'Authentication required.' });
@@ -148,8 +181,13 @@ export async function verificationRoutes(app: FastifyInstance) {
       return reply.status(403).send({ error: 'Access denied: Only studio Admins can approve drawings.' });
     }
 
+    const current = await prisma.designVerification.findUnique({ where: { id: request.params.id } });
+    if (!current) {
+      return reply.status(404).send({ error: 'Verification submission not found.' });
+    }
+
     const updated = await prisma.designVerification.update({
-      where: { id: request.params.id },
+      where: { id: current.id },
       data: {
         status: 'APPROVED',
         reviewedBy: user.id,
@@ -157,7 +195,19 @@ export async function verificationRoutes(app: FastifyInstance) {
       },
     });
 
-    // Automatically place/replace current approved drawing in ProjectFolder
+    const ext = path.extname(updated.fileKey).toLowerCase() || '.dwg';
+    const isDwg = ext === '.dwg';
+    const mimeType = isDwg
+      ? 'image/vnd.dwg'
+      : ext === '.pdf'
+      ? 'application/pdf'
+      : ext === '.png'
+      ? 'image/png'
+      : ext === '.jpg' || ext === '.jpeg'
+      ? 'image/jpeg'
+      : 'application/octet-stream';
+
+    // Place or replace current approved drawing in ProjectFolder so Vault & Progress Report stay synced
     const existingDoc = await prisma.projectDocument.findFirst({
       where: {
         projectId: updated.projectId,
@@ -172,37 +222,77 @@ export async function verificationRoutes(app: FastifyInstance) {
         data: {
           originalKey: updated.fileKey,
           previewKey: updated.previewKey,
+          isDwg,
+          mimeType,
           isApprovedDrawing: true,
         },
       });
     } else {
+      const targetFileName = updated.drawingTitle.toLowerCase().endsWith(ext)
+        ? updated.drawingTitle
+        : `${updated.drawingTitle}${ext}`;
+
       await prisma.projectDocument.create({
         data: {
           projectId: updated.projectId,
           folderId: updated.folderId,
-          fileName: `${updated.drawingTitle}.dwg`,
+          fileName: targetFileName,
           originalKey: updated.fileKey,
           previewKey: updated.previewKey,
           fileSizeBytes: BigInt(5000000),
-          mimeType: 'image/vnd.dwg',
-          isDwg: true,
+          mimeType,
+          isDwg,
           isApprovedDrawing: true,
-          uploadedBy: user.id,
+          uploadedBy: updated.submittedBy || user.id,
         },
       });
     }
+
+    try {
+      if (updated.submittedBy && updated.submittedBy !== user.id) {
+        await prisma.notification.create({
+          data: {
+            recipientId: updated.submittedBy,
+            projectId: updated.projectId,
+            category: 'VERIFICATION',
+            title: `Drawing Approved: ${updated.drawingTitle}`,
+            message: `${user.fullName} approved ${updated.drawingTitle} (Rev ${updated.revisionNumber}) and published it to the Project Vault.`,
+            deepLink: '/verification',
+          },
+        });
+      }
+    } catch (err) {
+      console.error('[Verification] Failed to notify submitter on approval:', err);
+    }
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'APPROVE_DRAWING',
+      entityType: 'DESIGN_VERIFICATION',
+      entityId: updated.id,
+      oldData: { status: current.status },
+      newData: { status: 'APPROVED', drawingTitle: updated.drawingTitle, revisionNumber: updated.revisionNumber },
+    });
 
     return {
       success: true,
       status: 'APPROVED',
       isLocked: true,
-      item: updated,
+      item: {
+        ...updated,
+        revisionLabel: `Rev ${updated.revisionNumber}`,
+      },
       message: 'Drawing approved and placed in project category as current approved drawing.',
     };
   });
 
   // Request Revision with Feedback Note (Admin only)
-  app.post('/api/verification/:id/revision', async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  app.post('/api/verification/:id/revision', async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply
+  ) => {
     const user = await resolveUserFromRequest(request);
     if (!user) {
       return reply.status(401).send({ error: 'Authentication required.' });
@@ -222,8 +312,13 @@ export async function verificationRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'Feedback note is required' });
     }
 
+    const current = await prisma.designVerification.findUnique({ where: { id: request.params.id } });
+    if (!current) {
+      return reply.status(404).send({ error: 'Verification submission not found.' });
+    }
+
     const updated = await prisma.designVerification.update({
-      where: { id: request.params.id },
+      where: { id: current.id },
       data: {
         status: 'REVISION_REQUIRED',
         feedbackNote: feedbackNote.trim(),
@@ -232,10 +327,41 @@ export async function verificationRoutes(app: FastifyInstance) {
       },
     });
 
+    try {
+      if (updated.submittedBy && updated.submittedBy !== user.id) {
+        await prisma.notification.create({
+          data: {
+            recipientId: updated.submittedBy,
+            projectId: updated.projectId,
+            category: 'VERIFICATION',
+            title: `Revision Requested: ${updated.drawingTitle}`,
+            message: `${user.fullName} requested changes on ${updated.drawingTitle}: ${updated.feedbackNote}`,
+            deepLink: '/verification',
+          },
+        });
+      }
+    } catch (err) {
+      console.error('[Verification] Failed to notify submitter on revision request:', err);
+    }
+
+    await recordAuditLog({
+      actorId: user.id,
+      actorName: user.fullName,
+      actorRole: user.role,
+      action: 'REQUEST_DRAWING_REVISION',
+      entityType: 'DESIGN_VERIFICATION',
+      entityId: updated.id,
+      oldData: { status: current.status },
+      newData: { status: 'REVISION_REQUIRED', feedbackNote: updated.feedbackNote },
+    });
+
     return {
       success: true,
       status: 'REVISION_REQUIRED',
-      item: updated,
+      item: {
+        ...updated,
+        revisionLabel: `Rev ${updated.revisionNumber}`,
+      },
     };
   });
 }

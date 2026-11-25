@@ -1,36 +1,53 @@
-import React, { useState } from 'react';
-import { UserRole } from '../../context/AuthContext';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Bell,
-  ChevronDown,
-  ChevronRight,
-  User,
-  Lock,
-  LogOut,
   Home,
   FolderKanban,
   CalendarDays,
   Clock,
   MoreHorizontal,
+  User as UserIcon,
+  Lock,
+  LogOut,
+  ChevronRight,
 } from 'lucide-react';
+import { UserRole } from '../../context/AuthContext';
 import './mobile.css';
 
+export interface MobileShellUser {
+  id?: string;
+  fullName: string;
+  username?: string;
+  role: UserRole;
+  showPricing?: boolean;
+  allowMeetings?: boolean;
+}
+
 export interface MobileShellProps {
-  user: {
-    fullName: string;
-    role: UserRole;
-    showPricing?: boolean;
-    allowMeetings?: boolean;
-  };
+  user: MobileShellUser;
   activeTab: string;
   onTabChange: (tab: string) => void;
-  onRoleSwitch?: (role: UserRole) => void;
   onOpenNotifications: () => void;
   onOpenProfile?: () => void;
   onChangePassword?: () => void;
   onLogout?: () => void;
   unreadCount?: number;
   children: React.ReactNode;
+}
+
+function getRoleSubtitle(role: UserRole): string {
+  switch (role) {
+    case 'ADMIN':
+      return 'Principal Admin';
+    case 'STAFF':
+      return 'Studio Staff';
+    case 'CLIENT_LEADER':
+      return 'Client Leader';
+    case 'CLIENT_VIEWER':
+      return 'Client Viewer';
+    default:
+      return role;
+  }
 }
 
 export const MobileShell: React.FC<MobileShellProps> = ({
@@ -44,184 +61,212 @@ export const MobileShell: React.FC<MobileShellProps> = ({
   unreadCount = 0,
   children,
 }) => {
-  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  const formatRole = (role?: string) => {
-    if (!role) return '';
-    switch (role.toUpperCase()) {
-      case 'ADMIN':
-        return 'Admin';
-      case 'CLIENT_LEADER':
-        return 'Client Leader';
-      case 'CLIENT_VIEWER':
-        return 'Client Viewer';
-      case 'STAFF':
-        return 'Staff';
-      default:
-        return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
-    }
-  };
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const canAccessMeetings =
+    user.role === 'ADMIN' ||
+    (user.role === 'CLIENT_LEADER' && user.allowMeetings !== false);
+
+  const initials = (user.fullName || 'U')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || '')
+    .join('') || 'U';
 
   return (
-    <div className="figma-mobile-viewport">
-      {/* Top App Bar Header (Figma: 71:9393) */}
-      <header className="figma-mobile-header">
-        <div className="figma-header-brand" onClick={() => onTabChange('home')} style={{ cursor: 'pointer' }}>
+    <div className="figma-mobile-shell">
+      {/* Top App Header (Figma 71:9393 / 224:4851) */}
+      <header className="figma-top-header">
+        <div
+          className="figma-brand-wrap"
+          onClick={() => onTabChange('home')}
+          style={{ cursor: 'pointer' }}
+        >
           <img
-            src="/assets/auth/asf_logo.svg"
+            src="/assets/brand/af_logo_circle.jpg"
             alt="asf design"
-            className="figma-header-logo"
+            className="figma-brand-logo"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
           />
+          <span className="figma-brand-title">A&amp;F Design</span>
         </div>
 
-        <div className="figma-header-actions">
-          {/* Notification Bell */}
+        <div className="figma-header-actions" ref={menuRef}>
           <button
-            className="figma-notif-btn"
+            type="button"
+            className="figma-icon-btn"
+            aria-label="Notifications"
             onClick={onOpenNotifications}
-            title="Notifications"
           >
-            <Bell size={18} />
-            {unreadCount > 0 && <span className="figma-notif-badge">{unreadCount}</span>}
+            <Bell size={20} strokeWidth={2} />
+            {unreadCount > 0 && (
+              <span className="figma-bell-badge">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </button>
 
-          {/* User Profile Avatar Pill with Dropdown (Figma: 224:4851) */}
-          <div style={{ position: 'relative' }}>
-            <div
-              className="figma-profile-pill"
-              onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-              style={{ cursor: 'pointer' }}
-            >
-              <div className="figma-profile-avatar">
-                {user.fullName ? user.fullName.charAt(0) : 'U'}
-              </div>
-              <ChevronDown size={14} color="#4A4A4C" />
-            </div>
+          <button
+            type="button"
+            className="figma-icon-btn"
+            aria-label="Account menu"
+            aria-expanded={profileMenuOpen}
+            onClick={() => setProfileMenuOpen((prev) => !prev)}
+            style={{
+              backgroundColor: profileMenuOpen ? '#352618' : undefined,
+              color: profileMenuOpen ? '#FFFFFF' : undefined,
+              fontWeight: 700,
+              fontSize: '13px',
+            }}
+          >
+            {initials}
+          </button>
 
-            {/* Figma 224:4851 Profile Dropdown */}
-            {profileDropdownOpen && (
-              <>
-                <div
-                  style={{ position: 'fixed', inset: 0, zIndex: 90 }}
-                  onClick={() => setProfileDropdownOpen(false)}
-                />
-                <div className="figma-profile-dropdown">
-                  {/* User Profile Header Row */}
-                  <div className="figma-dropdown-user-row">
-                    <div className="figma-dropdown-avatar">
-                      {user.fullName ? user.fullName.charAt(0) : 'U'}
-                    </div>
-                    <div className="figma-dropdown-user-info">
-                      <span className="figma-dropdown-user-name">{user.fullName || 'User'}</span>
-                      <span className="figma-dropdown-user-role">{formatRole(user.role)}</span>
-                    </div>
-                  </div>
-
-                  <div className="figma-dropdown-divider" />
-
-                  {/* 1. My Profile */}
-                  <button
-                    type="button"
-                    className="figma-dropdown-item"
-                    onClick={() => {
-                      setProfileDropdownOpen(false);
-                      if (onOpenProfile) onOpenProfile();
-                    }}
-                  >
-                    <div className="figma-dropdown-item-left">
-                      <span className="figma-dropdown-item-icon"><User size={18} /></span>
-                      <span className="figma-dropdown-item-label">My Profile</span>
-                    </div>
-                    <ChevronRight size={16} color="#979798" />
-                  </button>
-
-                  {/* 2. Change password */}
-                  <button
-                    type="button"
-                    className="figma-dropdown-item"
-                    onClick={() => {
-                      setProfileDropdownOpen(false);
-                      if (onChangePassword) onChangePassword();
-                    }}
-                  >
-                    <div className="figma-dropdown-item-left">
-                      <span className="figma-dropdown-item-icon"><Lock size={18} /></span>
-                      <span className="figma-dropdown-item-label">Change password</span>
-                    </div>
-                    <ChevronRight size={16} color="#979798" />
-                  </button>
-
-                  <div className="figma-dropdown-divider" />
-
-                  {/* 3. Logout */}
-                  <button
-                    type="button"
-                    className="figma-dropdown-item figma-dropdown-item-logout"
-                    onClick={() => {
-                      setProfileDropdownOpen(false);
-                      if (onLogout) onLogout();
-                    }}
-                  >
-                    <div className="figma-dropdown-item-left">
-                      <span className="figma-dropdown-item-icon"><LogOut size={18} /></span>
-                      <span className="figma-dropdown-item-label">Logout</span>
-                    </div>
-                  </button>
+          {/* Account Dropdown (Profile, Change Password, Sign Out only — NO demo role switcher) */}
+          {profileMenuOpen && (
+            <div className="figma-profile-dropdown">
+              <div
+                style={{
+                  padding: '10px 12px',
+                  borderBottom: '1px solid #F0F0F2',
+                  marginBottom: '6px',
+                }}
+              >
+                <div style={{ fontSize: '14px', fontWeight: 700, color: '#0C0C0D' }}>
+                  {user.fullName}
                 </div>
-              </>
-            )}
-          </div>
+                <div style={{ fontSize: '12px', color: '#686869', marginTop: '2px' }}>
+                  {getRoleSubtitle(user.role)}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="figma-dropdown-item"
+                onClick={() => {
+                  setProfileMenuOpen(false);
+                  if (onOpenProfile) {
+                    onOpenProfile();
+                  } else {
+                    onTabChange('profile');
+                  }
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <UserIcon size={16} />
+                  <span>My Profile</span>
+                </div>
+                <ChevronRight size={14} opacity={0.5} />
+              </button>
+
+              {onChangePassword && (
+                <button
+                  type="button"
+                  className="figma-dropdown-item"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    onChangePassword();
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Lock size={16} />
+                    <span>Change Password</span>
+                  </div>
+                  <ChevronRight size={14} opacity={0.5} />
+                </button>
+              )}
+
+              {onLogout && (
+                <>
+                  <div style={{ height: '1px', background: '#F0F0F2', margin: '6px 0' }} />
+                  <button
+                    type="button"
+                    className="figma-dropdown-item"
+                    style={{ color: '#B42318' }}
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      onLogout();
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <LogOut size={16} />
+                      <span>Sign Out</span>
+                    </div>
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
-      {/* Main View Area (Scrollable within viewport) */}
-      <main style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      {/* Main Content Area */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {children}
       </main>
 
-      {/* 3. Floating Bottom Navigation Bar (Dock) (Figma: 71:9393) */}
-      <nav className="figma-bottom-dock">
+      {/* Bottom Tab Navigation Dock (Figma 71:9393) */}
+      <nav className="figma-bottom-dock" aria-label="Primary Mobile Navigation">
         <button
+          type="button"
           className={`figma-dock-tab ${activeTab === 'home' ? 'active' : ''}`}
           onClick={() => onTabChange('home')}
         >
-          <Home size={18} />
+          <Home size={20} strokeWidth={activeTab === 'home' ? 2.5 : 2} />
           <span>Home</span>
         </button>
 
         <button
+          type="button"
           className={`figma-dock-tab ${activeTab === 'projects' ? 'active' : ''}`}
           onClick={() => onTabChange('projects')}
         >
-          <FolderKanban size={18} />
+          <FolderKanban size={20} strokeWidth={activeTab === 'projects' ? 2.5 : 2} />
           <span>Projects</span>
         </button>
 
-        {(user.role === 'ADMIN' || user.role === 'CLIENT_LEADER') && (
+        {canAccessMeetings && (
           <button
+            type="button"
             className={`figma-dock-tab ${activeTab === 'meetings' ? 'active' : ''}`}
             onClick={() => onTabChange('meetings')}
           >
-            <CalendarDays size={18} />
+            <CalendarDays size={20} strokeWidth={activeTab === 'meetings' ? 2.5 : 2} />
             <span>Meetings</span>
           </button>
         )}
 
         {user.role === 'STAFF' && (
           <button
+            type="button"
             className={`figma-dock-tab ${activeTab === 'attendance' ? 'active' : ''}`}
             onClick={() => onTabChange('attendance')}
           >
-            <Clock size={18} />
+            <Clock size={20} strokeWidth={activeTab === 'attendance' ? 2.5 : 2} />
             <span>Attendance</span>
           </button>
         )}
 
         <button
+          type="button"
           className={`figma-dock-tab ${activeTab === 'more' ? 'active' : ''}`}
           onClick={() => onTabChange('more')}
         >
-          <MoreHorizontal size={18} />
+          <MoreHorizontal size={20} strokeWidth={activeTab === 'more' ? 2.5 : 2} />
           <span>More</span>
         </button>
       </nav>

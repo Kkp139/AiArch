@@ -13,6 +13,12 @@ import { attendanceRoutes } from './modules/attendance/attendance.controller';
 import { paymentRoutes } from './modules/payments/payments.controller';
 import { verificationRoutes } from './modules/verification/verification.controller';
 import { notificationRoutes } from './modules/notifications/notifications.controller';
+import { announcementRoutes } from './modules/announcements/announcements.controller';
+import { targetRoutes } from './modules/targets/targets.controller';
+import { reminderRoutes } from './modules/reminders/reminders.controller';
+import { auditRoutes } from './modules/audit/audit.controller';
+import { settingsRoutes } from './modules/settings/settings.controller';
+import { initializeSocketGateway } from './gateway/socket.gateway';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
@@ -27,7 +33,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     openapi: {
       info: {
         title: 'ProNex-ArchAI Studio Collaboration API',
-        description: 'Interactive API documentation for ProNex-ArchAI Studio Collaboration Portal (A&B Design)',
+        description: 'Interactive API documentation for ProNex-ArchAI Studio Collaboration Portal (A&F Design)',
         version: '1.0.0',
       },
       servers: [
@@ -38,14 +44,20 @@ export async function buildApp(): Promise<FastifyInstance> {
       ],
       tags: [
         { name: 'System', description: 'System health & diagnostic endpoints' },
-        { name: 'Auth', description: 'Authentication, OTP & User session management' },
+        { name: 'Auth', description: 'Authentication, OTP, Devices & User management' },
         { name: 'Chat', description: 'Real-time studio chat and project discussions' },
         { name: 'Projects', description: 'Project lifecycle, progress and folder structure' },
         { name: 'Vault', description: 'Document vault, drawings and presigned uploads' },
         { name: 'Meetings', description: 'Calendar booking, office visits and slots' },
-        { name: 'Attendance', description: 'Staff GPS punch-in/out and work updates' },
+        { name: 'Attendance', description: 'Staff GPS punch-in/out, work updates and regularizations' },
         { name: 'Payments', description: 'Milestones, billing, ledger and discrepancies' },
         { name: 'Verification', description: 'Design reviews, approvals and markups' },
+        { name: 'Notifications', description: 'In-app real-time activity and alerts' },
+        { name: 'Announcements', description: 'Studio circulars and acknowledgable policies' },
+        { name: 'Targets', description: 'Staff productivity targets and milestones' },
+        { name: 'Reminders', description: 'Admin task reminders and deadlines' },
+        { name: 'Audit', description: 'Tamper-evident studio activity audit logs' },
+        { name: 'Settings', description: 'Studio configuration and governance rules' },
       ],
       components: {
         securitySchemes: {
@@ -80,6 +92,11 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(paymentRoutes);
   await app.register(verificationRoutes);
   await app.register(notificationRoutes);
+  await app.register(announcementRoutes);
+  await app.register(targetRoutes);
+  await app.register(reminderRoutes);
+  await app.register(auditRoutes);
+  await app.register(settingsRoutes);
 
   // Health check endpoint
   app.get('/api/health', {
@@ -101,7 +118,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
-      service: `${process.env.STUDIO_NAME || 'A&B Design'} Portal API`,
+      service: `${process.env.STUDIO_NAME || 'A&F Design'} Portal API`,
     };
   });
 
@@ -127,7 +144,8 @@ if (require.main === module) {
         console.error(err);
         process.exit(1);
       }
-      console.log(`ProNex-ArchAI API running on port ${port}`);
+      initializeSocketGateway(app.server);
+      console.log(`A&F Design API running on port ${port} with real-time Socket.io gateway`);
     });
   });
 }

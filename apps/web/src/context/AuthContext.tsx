@@ -8,6 +8,7 @@ export interface UserProfile {
   fullName: string;
   username?: string;
   email?: string;
+  mobile?: string;
   role: UserRole;
   projectIds?: string[];
   showPricing?: boolean;
@@ -21,9 +22,8 @@ interface AuthContextType {
   login: (user: UserProfile, token?: string) => void;
   logout: () => void;
   toggleTheme: () => void;
-  switchRole: (role: UserRole) => void;
+  refreshUser: () => Promise<void>;
 }
-
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -54,62 +54,69 @@ export function AuthProvider({ children, initialUser = null }: { children: React
 
   const login = (u: UserProfile, t?: string) => {
     setUser(u);
-    if (t) {
-      setToken(t);
-      try {
+    try {
+      localStorage.setItem('pronex_auth_user', JSON.stringify(u));
+      if (t) {
+        setToken(t);
         localStorage.setItem('pronex_auth_token', t);
-        localStorage.setItem('pronex_auth_user', JSON.stringify(u));
-      } catch {}
-    }
+      }
+    } catch {}
   };
 
   const logout = () => {
+    const activeToken = token;
     setUser(null);
     setToken(null);
     try {
       localStorage.removeItem('pronex_auth_token');
       localStorage.removeItem('pronex_auth_user');
     } catch {}
-    // Clear session cache in Service Worker to avoid cross-user data exposure
     purgePwaSessionCache();
-    // Call backend logout
-    fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: activeToken ? { Authorization: `Bearer ${activeToken}` } : undefined,
+    }).catch(() => {});
   };
+
+  const refreshUser = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/auth/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401) {
+        logout();
+        return;
+      }
+      if (res.ok) {
+        const data = await res.json();
+        const profile = data?.user || data;
+        if (profile && profile.id && profile.role) {
+          setUser(profile);
+          try {
+            localStorage.setItem('pronex_auth_user', JSON.stringify(profile));
+          } catch {}
+        }
+      }
+    } catch {
+      // Preserve offline/transient session when offline
+    }
+  };
+
+  useEffect(() => {
+    if (token && !initialUser && typeof fetch === 'function') {
+      refreshUser();
+    }
+  }, [token]);
 
   const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
 
-  const switchRole = (newRole: UserRole) => {
-
-
-    if (!user) return;
-    const roleProfiles: Record<UserRole, { fullName: string; showPricing: boolean; allowMeetings: boolean }> = {
-      ADMIN: { fullName: 'Farhaz Patel (Admin)', showPricing: true, allowMeetings: true },
-      STAFF: { fullName: 'Priya Mehta (Staff)', showPricing: false, allowMeetings: false },
-      CLIENT_LEADER: { fullName: 'Aakash Mehta (Client Leader)', showPricing: true, allowMeetings: true },
-      CLIENT_VIEWER: { fullName: 'Sneha Kapoor (Client Viewer)', showPricing: false, allowMeetings: true },
-    };
-
-    const profile = roleProfiles[newRole];
-    const updatedUser: UserProfile = {
-      ...user,
-      role: newRole,
-      fullName: profile.fullName,
-      showPricing: profile.showPricing,
-      allowMeetings: profile.allowMeetings,
-    };
-    setUser(updatedUser);
-    try {
-      localStorage.setItem('pronex_auth_user', JSON.stringify(updatedUser));
-    } catch {}
-  };
-
   return (
-    <AuthContext.Provider value={{ user, token, theme, login, logout, toggleTheme, switchRole }}>
+    <AuthContext.Provider value={{ user, token, theme, login, logout, toggleTheme, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
 }
-
 
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);

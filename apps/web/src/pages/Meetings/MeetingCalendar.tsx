@@ -460,10 +460,9 @@ export function MeetingCalendar({
         </div>
       )}
 
-      {/* SECTION 1: 3 FIXED CONSULTATION SLOTS (Visible to Admin & Clients; hidden for Staff) */}
-      {userRole !== 'STAFF' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+      {/* SECTION 1: 3 FIXED CONSULTATION SLOTS (Admin & Client Leader) */}
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
           <div>
             <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
               Available Consultation Slots for {selectedDate}
@@ -640,10 +639,9 @@ export function MeetingCalendar({
           </div>
         )}
       </div>
-      )}
 
       {/* SECTION 2: SCHEDULED MEETINGS & TASK LIST */}
-      <div style={{ borderTop: userRole !== 'STAFF' ? '1px solid var(--border-subtle)' : 'none', paddingTop: userRole !== 'STAFF' ? '20px' : '0' }}>
+      <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
           <div>
             <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
