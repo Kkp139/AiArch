@@ -12,8 +12,13 @@ export async function startWorker() {
 }
 
 if (require.main === module) {
-  startWorker().catch(err => {
-    console.error('Worker failed to start:', err);
-    process.exit(1);
-  });
+  startWorker()
+    .then(() => {
+      // Keep worker process alive in container
+      setInterval(() => {}, 60_000);
+    })
+    .catch(err => {
+      console.error('Worker failed to start:', err);
+      process.exit(1);
+    });
 }
