@@ -289,28 +289,94 @@ export const DesktopMeetingsView: React.FC<DesktopMeetingsViewProps> = ({
         </div>
       </div>
 
-      {/* Week Selector Bar */}
-      <div className="desk-calendar-week-bar" data-testid="calendar-week-bar">
-        {weekDays.map((day) => {
-          const isSelected = selectedDate === day.date;
-          const dayMeetings = meetings.filter((m) => m.date === day.date);
+      {/* Figma 851:21798 Meeting Panel: Date * + Time slot * */}
+      <div className="desk-meeting-figma-panel" data-testid="figma-meeting-panel">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div className="desk-form-group" style={{ marginBottom: 0 }}>
+            <label htmlFor="meeting-date-picker" style={{ fontSize: '14px', fontWeight: 600, color: '#1D1D1F' }}>
+              Date *
+            </label>
+            <input
+              id="meeting-date-picker"
+              type="date"
+              className="desk-form-input"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+            />
+          </div>
 
-          return (
-            <button
-              key={day.date}
-              type="button"
-              className={`desk-week-day-btn ${isSelected ? 'active' : ''}`}
-              onClick={() => setSelectedDate(day.date)}
-              data-testid={`day-btn-${day.date}`}
-            >
-              <span className="desk-day-name">{day.name}</span>
-              <span className="desk-day-date">{day.date.split('-')[2]}</span>
-              {dayMeetings.length > 0 && (
-                <span className="desk-day-badge">{dayMeetings.length} Slots</span>
-              )}
-            </button>
-          );
-        })}
+          {/* Week Selector Bar */}
+          <div className="desk-calendar-week-bar" data-testid="calendar-week-bar">
+            {weekDays.map((day) => {
+              const isSelected = selectedDate === day.date;
+              const dayMeetings = meetings.filter((m) => m.date === day.date);
+
+              return (
+                <button
+                  key={day.date}
+                  type="button"
+                  className={`desk-week-day-btn ${isSelected ? 'active' : ''}`}
+                  onClick={() => setSelectedDate(day.date)}
+                  data-testid={`day-btn-${day.date}`}
+                >
+                  <span className="desk-day-name">{day.name}</span>
+                  <span className="desk-day-date">{day.date.split('-')[2]}</span>
+                  {dayMeetings.length > 0 && (
+                    <span className="desk-day-badge">{dayMeetings.length}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ fontSize: '14px', fontWeight: 600, color: '#1D1D1F' }}>
+            Time slot *
+          </div>
+          <div className="desk-figma-slot-list">
+            {FIXED_DAILY_SLOTS.map((slot) => {
+              const meetingInSlot = meetings.find(
+                (m) => m.date === selectedDate && m.slotTime.includes(slot.time.split('–')[0].trim())
+              );
+              const isSelectedSlot = formSlot === slot.time;
+
+              return (
+                <button
+                  key={slot.id}
+                  type="button"
+                  className={`desk-figma-slot-row ${isSelectedSlot ? 'selected' : ''} ${meetingInSlot ? 'booked' : ''}`}
+                  onClick={() => {
+                    setFormDate(selectedDate);
+                    setFormSlot(slot.time);
+                    if (!meetingInSlot) {
+                      setIsScheduleModalOpen(true);
+                    }
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Clock size={16} style={{ color: '#BF935A' }} />
+                    <span style={{ fontSize: '14px', fontWeight: 600, color: '#1D1D1F' }}>
+                      {slot.time}
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#686869' }}>
+                      ({slot.label})
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: meetingInSlot ? '#138A4B' : isSelectedSlot ? '#695132' : '#979798',
+                    }}
+                  >
+                    {meetingInSlot ? 'Booked' : isSelectedSlot ? 'Selected' : 'Available'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* 3 Studio Daily Slots Grid */}

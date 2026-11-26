@@ -3008,6 +3008,150 @@
   color: var(--desk-danger);
 }
 
+/* Figma 17:1723 4-Column Bento Module Launcher Grid */
+.desk-bento-card {
+  background: var(--desk-white);
+  border: 1px solid var(--desk-border-subtle);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: var(--desk-shadow-card);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.desk-bento-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--desk-shadow-hover);
+  border-color: var(--desk-gold-border);
+}
+
+.desk-bento-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.desk-bento-icon-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: #40301A;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.desk-bento-pill {
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.desk-bento-pill.green {
+  background: rgba(40, 199, 111, 0.14);
+  color: #28C76F;
+}
+
+.desk-bento-pill.blue {
+  background: #E6F2FF;
+  color: #007AFF;
+}
+
+.desk-bento-pill.amber {
+  background: rgba(255, 159, 67, 0.16);
+  color: #FF9F43;
+}
+
+.desk-bento-pill.red {
+  background: rgba(234, 84, 85, 0.15);
+  color: #EA5455;
+}
+
+.desk-bento-pill.cyan {
+  background: rgba(0, 207, 232, 0.15);
+  color: #00A5BD;
+}
+
+.desk-bento-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--desk-text-primary);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.desk-bento-divider {
+  height: 1px;
+  background: var(--desk-border-subtle);
+  width: 100%;
+}
+
+.desk-bento-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--desk-gold);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Figma 851:21798 Meeting Panel (Date * + Time slot *) */
+.desk-meeting-figma-panel {
+  background: var(--desk-white);
+  border: 1px solid var(--desk-border-subtle);
+  border-radius: 14px;
+  padding: 24px 28px;
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 32px;
+  box-shadow: var(--desk-shadow-card);
+}
+
+.desk-figma-slot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.desk-figma-slot-row {
+  height: 64px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid var(--desk-border-strong);
+  background: var(--desk-white);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.desk-figma-slot-row:hover {
+  border-color: var(--desk-gold-border);
+  background: var(--desk-gold-soft);
+}
+
+.desk-figma-slot-row.selected {
+  border-color: var(--desk-gold);
+  background: var(--desk-gold-soft);
+}
+
+.desk-figma-slot-row.booked {
+  border-color: var(--desk-border-subtle);
+  background: var(--desk-surface-subtle);
+}
+
 .desk-inspector-actions {
   padding: 14px 16px;
   border-top: 1px solid var(--desk-border-subtle);
@@ -3774,6 +3918,7 @@
   }
   .desk-progress-split,
   .desk-meeting-scheduler-panel,
+  .desk-meeting-figma-panel,
   .desk-payment-split-boxes,
   .desk-payment-banner {
     grid-template-columns: 1fr;

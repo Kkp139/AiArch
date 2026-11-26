@@ -224,6 +224,81 @@ export const DesktopDashboardView: React.FC<DesktopDashboardViewProps> = ({
 
   const projectCount = projects.length > 0 ? projects.length : 12;
 
+  const bentoCards = [
+    {
+      id: 'projects',
+      title: 'Projects',
+      pill: `${projectCount} Active`,
+      tone: 'green' as const,
+      cta: 'View Projects',
+      icon: FolderKanban,
+      visible: true,
+    },
+    {
+      id: 'meetings',
+      title: 'Meeting',
+      pill: `${upcomingMeetings.length} Upcoming`,
+      tone: 'blue' as const,
+      cta: 'View Meetings',
+      icon: CalendarDays,
+      visible: !isStaff,
+    },
+    {
+      id: 'payments',
+      title: 'Payments',
+      pill: 'Fee Overview',
+      tone: 'green' as const,
+      cta: 'View Payments',
+      icon: CreditCard,
+      visible: isAdmin || (isClient && !!user.showPricing),
+    },
+    {
+      id: 'announcements',
+      title: 'Announcements',
+      pill: `${announcementsCount || 3} New`,
+      tone: 'amber' as const,
+      cta: 'View Announcements',
+      icon: AlertCircle,
+      visible: true,
+    },
+    {
+      id: 'progress',
+      title: 'Progress Reports',
+      pill: '72% Overall',
+      tone: 'green' as const,
+      cta: 'View Reports',
+      icon: TrendingUp,
+      visible: true,
+    },
+    {
+      id: 'verification',
+      title: 'Design Verification',
+      pill: `${recentVerifications.length} Pending`,
+      tone: 'red' as const,
+      cta: 'Review Drawings',
+      icon: CheckSquare,
+      visible: !isClient,
+    },
+    {
+      id: 'attendance',
+      title: 'Attendance',
+      pill: '20 Present',
+      tone: 'blue' as const,
+      cta: 'View Attendance',
+      icon: Users,
+      visible: !isClient,
+    },
+    {
+      id: 'targets',
+      title: 'Targets',
+      pill: `${targets.length || 3} Active`,
+      tone: 'cyan' as const,
+      cta: 'View Targets',
+      icon: Clock,
+      visible: !isClient,
+    },
+  ].filter((c) => c.visible);
+
   return (
     <div className="desk-dashboard" data-testid="desktop-dashboard-view">
       {/* Welcome Banner */}
@@ -269,6 +344,37 @@ export const DesktopDashboardView: React.FC<DesktopDashboardViewProps> = ({
             </button>
           )}
         </div>
+      </div>
+
+      {/* Figma 17:1723 4-Column Bento Module Launcher Grid */}
+      <div className="desk-bento-grid" data-testid="dashboard-bento-grid">
+        {bentoCards.map((card) => {
+          const IconComp = card.icon;
+          return (
+            <button
+              key={card.id}
+              type="button"
+              className="desk-bento-card"
+              onClick={() => onNavigateTab?.(card.id)}
+              data-testid={`bento-card-${card.id}`}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+                <div className="desk-bento-top">
+                  <div className="desk-bento-icon-box">
+                    <IconComp size={22} />
+                  </div>
+                  <span className={`desk-bento-pill ${card.tone}`}>{card.pill}</span>
+                </div>
+                <h2 className="desk-bento-title">{card.title}</h2>
+              </div>
+              <div className="desk-bento-divider" />
+              <div className="desk-bento-footer">
+                <span>{card.cta}</span>
+                <ArrowUpRight size={18} />
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {/* Top KPI Metrics Row */}
