@@ -69,18 +69,12 @@ export interface MeetingCalendarProps {
   projects?: Array<{ projectCode: string; name: string }>;
 }
 
-const DEFAULT_TEAM_MEMBERS = [
-  { name: 'Ar. Ronak Shah', role: 'Staff Architect', type: 'STAFF' },
-  { name: 'Ar. Priya Sharma', role: 'Design Lead', type: 'STAFF' },
-  { name: 'Rajesh Mehta', role: 'Client Representative', type: 'CLIENT_LEADER' },
-  { name: 'Pooja Mehta', role: 'Client Observer', type: 'CLIENT_VIEWER' },
-  { name: 'Kamal Patel', role: 'Principal Architect', type: 'ADMIN' },
-];
+const DEFAULT_TEAM_MEMBERS: Array<{ name: string; role: string; type: string }> = [];
 
 export function MeetingCalendar({
   projectCode,
   userRole = 'ADMIN',
-  userName = 'Kamal Patel',
+  userName = '',
   meetings = [],
   bookedSlots = [],
   onBookSlot,
@@ -145,7 +139,7 @@ export function MeetingCalendar({
   // Arrange Meeting Modal State (Admin initiates meeting based on task and time)
   const [isArrangeModalOpen, setIsArrangeModalOpen] = useState(false);
   const [arrangeTask, setArrangeTask] = useState('');
-  const [arrangeProject, setArrangeProject] = useState(projectCode || 'AF-VILLA');
+  const [arrangeProject, setArrangeProject] = useState(projectCode || projects[0]?.projectCode || '');
   const [arrangeDate, setArrangeDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
@@ -153,10 +147,7 @@ export function MeetingCalendar({
   });
   const [arrangeSlot, setArrangeSlot] = useState<string>(FIXED_MEETING_SLOTS[0]);
   const [arrangeType, setArrangeType] = useState<'OFFICE_MEETING' | 'SITE_VISIT'>('OFFICE_MEETING');
-  const [selectedAttendees, setSelectedAttendees] = useState<string[]>([
-    'Ar. Ronak Shah',
-    'Rajesh Mehta',
-  ]);
+  const [selectedAttendees, setSelectedAttendees] = useState<string[]>([]);
   const [arrangeLocation, setArrangeLocation] = useState('Studio Boardroom A • Ahmedabad HQ');
   const [arrangeNotes, setArrangeNotes] = useState('');
   const [arrangeError, setArrangeError] = useState<string | null>(null);

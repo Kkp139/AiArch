@@ -59,35 +59,15 @@ export const AdminAttendanceOverview: React.FC<AdminAttendanceOverviewProps> = (
             id: r.id,
             staffName: r.staffName || 'Staff Architect',
             username: r.username || 'staff',
-            mobile: r.mobile || '+91 98251 00002',
+            mobile: r.mobile || '',
             role: 'STAFF',
             isClockedIn: !r.clockOutAt,
             clockInAt: r.clockInAt,
-            clockInAddress: r.clockInAddress || 'Ahmedabad Studio HQ',
+            clockInAddress: r.clockInAddress || '',
             clockOutAt: r.clockOutAt,
             pendingUpdates: r.pendingUpdates || (r.dailyUpdates?.length ? [] : ['Slot 17:30']),
             submittedUpdates: r.dailyUpdates || [],
           }));
-        }
-      } else {
-        // 2. Fallback to live /api/attendance/status
-        const fallbackRes = await fetch('/api/attendance/status', { headers: getAuthHeaders() });
-        if (fallbackRes.ok) {
-          const statusData = await fallbackRes.json();
-          if (statusData.isClockedIn && statusData.activeSession) {
-            records.push({
-              id: statusData.activeSession.id,
-              staffName: 'Ar. Ronak Shah',
-              username: 'staff',
-              mobile: '+91 98251 00002',
-              role: 'STAFF',
-              isClockedIn: true,
-              clockInAt: statusData.activeSession.clockInAt,
-              clockInAddress: statusData.activeSession.clockInAddress || 'Ahmedabad Studio HQ',
-              pendingUpdates: statusData.pendingUpdates || [],
-              submittedUpdates: statusData.submittedUpdates || [],
-            });
-          }
         }
       }
 

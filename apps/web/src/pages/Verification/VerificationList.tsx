@@ -513,7 +513,7 @@ export function VerificationList({
           <div class="val" style="color:${item.status === 'APPROVED' ? '#10b981' : '#f59e0b'};">
             ${item.revisionLabel || `Rev ${item.revisionNumber}`} &bull; ${item.status}
           </div>
-          <div style="font-size:10px; color:#555; margin-top:2px;">By: ${item.submittedBy || 'Ar. Ronak Shah'}</div>
+          <div style="font-size:10px; color:#555; margin-top:2px;">By: ${item.submittedBy || 'Studio Member'}</div>
         </div>
       </div>
     </div>
@@ -759,7 +759,7 @@ export function VerificationList({
                       <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                         <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{item.category}</span>
                         <span>•</span>
-                        <span>Submitted by <strong style={{ color: 'var(--text-primary)' }}>{item.submittedBy || 'Ar. Ronak Shah'}</strong></span>
+                        <span>Submitted by <strong style={{ color: 'var(--text-primary)' }}>{item.submittedBy || 'Studio Member'}</strong></span>
                         <span>•</span>
                         <span>{new Date(item.submittedAt).toLocaleDateString()}</span>
                       </div>
@@ -998,7 +998,7 @@ export function VerificationList({
                   <span style={{ margin: '0 6px' }}>•</span>
                   <span>Project: {projectCode}</span>
                   <span style={{ margin: '0 6px' }}>•</span>
-                  <span>Submitted by <strong>{inspectingItem.submittedBy || 'Ar. Ronak Shah'}</strong></span>
+                  <span>Submitted by <strong>{inspectingItem.submittedBy || 'Studio Member'}</strong></span>
                 </div>
               </div>
 

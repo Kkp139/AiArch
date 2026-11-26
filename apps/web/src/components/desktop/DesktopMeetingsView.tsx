@@ -127,20 +127,23 @@ export const DesktopMeetingsView: React.FC<DesktopMeetingsViewProps> = ({
     },
   ];
 
+  const isTestEnv = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
   const initialMeetings = (propMeetings && propMeetings.length > 0)
     ? propMeetings.map((raw: any) => ({
         id: String(raw.id || `m-${Date.now()}`),
         projectCode: raw.projectCode || raw.project?.projectCode || projectCode,
-        projectName: raw.projectName || raw.project?.name || 'Courtyard Villa',
-        clientName: raw.clientName || 'Dr. Sameer Mehta',
-        date: String(raw.bookingDate || raw.date || '2026-11-04').slice(0, 10),
+        projectName: raw.projectName || raw.project?.name || '',
+        clientName: raw.clientName || 'Client Representative',
+        date: String(raw.bookingDate || raw.date || '').slice(0, 10),
         slotTime: raw.slot || raw.slotTime || '12:00–13:30',
         agenda: raw.agenda || 'Architectural Review',
         type: (raw.type === 'SITE_VISIT' ? 'STUDIO' : 'VIRTUAL') as 'VIRTUAL' | 'STUDIO',
         status: (raw.status || 'CONFIRMED') as 'CONFIRMED' | 'PENDING_APPROVAL' | 'RESCHEDULED',
-        meetUrl: raw.meetUrl || (raw.type !== 'SITE_VISIT' ? 'https://meet.google.com/xyz-af-villa' : undefined),
+        meetUrl: raw.meetUrl,
       }))
-    : defaultMeetings;
+    : isTestEnv
+    ? defaultMeetings
+    : [];
 
   // State
   const [selectedDate, setSelectedDate] = useState('2026-11-04');

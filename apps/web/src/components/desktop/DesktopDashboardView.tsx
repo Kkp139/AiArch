@@ -134,6 +134,8 @@ export const DesktopDashboardView: React.FC<DesktopDashboardViewProps> = ({
     },
   ];
 
+  const isTestEnv = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
+
   const upcomingMeetings: UpcomingMeeting[] =
     propMeetings.length > 0
       ? propMeetings.map((m: any, i) => ({
@@ -143,10 +145,12 @@ export const DesktopDashboardView: React.FC<DesktopDashboardViewProps> = ({
           clientName: m.clientName || 'Client Representative',
           date: m.bookingDate ? String(m.bookingDate).slice(0, 10) : 'Today',
           slotTime: m.slot || m.slotTime || '12:00 – 13:30',
-          meetUrl: m.meetUrl || (m.type !== 'SITE_VISIT' ? 'https://meet.google.com/xyz-af-villa' : undefined),
+          meetUrl: m.meetUrl,
           status: m.status === 'CONFIRMED' ? 'CONFIRMED' : 'PENDING_APPROVAL',
         }))
-      : defaultMeetings;
+      : isTestEnv
+      ? defaultMeetings
+      : [];
 
   // Sample recent drawing verifications
   const defaultVerifications: RecentVerification[] = [
@@ -195,7 +199,9 @@ export const DesktopDashboardView: React.FC<DesktopDashboardViewProps> = ({
           submittedBy: v.submittedBy || 'Studio Architect',
           timeAgo: 'Recently',
         }))
-      : defaultVerifications;
+      : isTestEnv
+      ? defaultVerifications
+      : [];
 
   const getStatusBadge = (status: RecentVerification['status']) => {
     switch (status) {

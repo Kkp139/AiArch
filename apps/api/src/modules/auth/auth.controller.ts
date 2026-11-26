@@ -77,7 +77,7 @@ export async function authRoutes(app: FastifyInstance) {
       username: user.username,
       fullName: user.fullName,
       role: user.role,
-      mobile: user.mobile || '+91 98251 00001',
+      mobile: user.mobile || '',
       assignedProjectCodes: user.assignedProjects.map(p => p.project.projectCode),
     });
 

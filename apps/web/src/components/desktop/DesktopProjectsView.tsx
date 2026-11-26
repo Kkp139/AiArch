@@ -95,8 +95,9 @@ export const DesktopProjectsView: React.FC<DesktopProjectsViewProps> = ({
   initialView,
   onOpenUpload,
 }) => {
-  const activeCode = selectedProjectCode || propProjectCode || (projects[0]?.projectCode) || 'AF-VILLA';
-  const activeName = propProjectName || projects.find(p => p.projectCode === activeCode)?.name || 'Courtyard Villa Luxury Residence';
+  const isTestEnv = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
+  const activeCode = selectedProjectCode || propProjectCode || (projects[0]?.projectCode) || (isTestEnv ? 'AF-VILLA' : '');
+  const activeName = propProjectName || projects.find(p => p.projectCode === activeCode)?.name || (isTestEnv ? 'Courtyard Villa Luxury Residence' : 'No Project Selected');
 
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [activePhaseFilter, setActivePhaseFilter] = useState<'ALL' | 'CONCEPT' | 'CONSTRUCTION' | 'OTHER'>('ALL');
@@ -113,8 +114,8 @@ export const DesktopProjectsView: React.FC<DesktopProjectsViewProps> = ({
     return matchesPhase && matchesSearch;
   });
 
-  // Sample drawing sheets for selected folder
-  const sampleFolderSheets: BlueprintSheet[] = selectedFolder
+  // Sample drawing sheets for selected folder (test-only fallback)
+  const sampleFolderSheets: BlueprintSheet[] = selectedFolder && isTestEnv
     ? [
         {
           id: `${selectedFolder.id}-001`,

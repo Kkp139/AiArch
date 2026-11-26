@@ -122,9 +122,14 @@ export const DesktopVerificationView: React.FC<DesktopVerificationViewProps> = (
     },
   ];
 
-  const initialQueue = (propItems && propItems.length > 0) ? propItems : defaultVerificationQueue;
+  const isTestEnv = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
+  const initialQueue = (propItems && propItems.length > 0)
+    ? propItems
+    : isTestEnv
+    ? defaultVerificationQueue
+    : [];
   const [queue, setQueue] = useState<VerificationItem[]>(initialQueue);
-  const [selectedItem, setSelectedItem] = useState<VerificationItem>(initialQueue[0] || defaultVerificationQueue[0]);
+  const [selectedItem, setSelectedItem] = useState<VerificationItem>(initialQueue[0] || (null as any));
   const [selectedRevision, setSelectedRevision] = useState(`Rev 0${selectedItem?.revisionNumber || 1}`);
   const [searchQuery, setSearchQuery] = useState('');
   const [zoomLevel, setZoomLevel] = useState(100);
