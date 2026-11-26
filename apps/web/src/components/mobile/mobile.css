@@ -304,25 +304,45 @@
 /* 3-Column Luxury Action Grid (Figma: 71:9393) */
 .figma-action-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  padding: 0 20px 120px 20px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 11px;
+  padding: 0 20px 28px 20px;
+}
+
+@media (max-width: 360px) {
+  .figma-action-grid {
+    gap: 8px;
+    padding: 0 14px 24px 14px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .figma-action-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    padding: 0 20px 32px 20px;
+  }
 }
 
 .figma-action-card {
   background: var(--figma-card-bg);
-  border-radius: 18px;
-  padding: 16px 8px;
+  border-radius: 16px;
+  padding: 18px 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   justify-content: center;
+  gap: 10px;
   cursor: pointer;
   border: 1px solid rgba(0, 0, 0, 0.04);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
-  min-height: 104px;
+  min-height: 106px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1D1D1F;
+  line-height: 1.3;
 }
 
 .figma-action-card:hover {
@@ -2061,14 +2081,81 @@
 /* ==========================================================================
    Missing Mobile Figma Shell & Card Helper Classes
    ========================================================================== */
+/* ==========================================================================
+   Mobile & Tablet Responsive Shell Rules (Figma 5:2 + Tablet 768px-1023px)
+   ========================================================================== */
 .figma-mobile-shell {
+  width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
   background-color: var(--figma-bg-mobile, #F5F4F2);
-  color: var(--figma-text-900, #0C0C0D);
+  color: var(--figma-text-900, #1D1D1F);
   display: flex;
   flex-direction: column;
-  padding-bottom: 84px;
+  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  overflow-x: hidden;
+}
+
+@media (max-width: 380px) {
+  .figma-attendance-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .figma-bottom-dock {
+    width: calc(100% - 20px);
+    padding: 6px 6px;
+    bottom: max(12px, env(safe-area-inset-bottom, 12px));
+  }
+  .figma-dock-tab {
+    min-width: 0;
+    flex: 1;
+    padding: 7px 6px;
+    font-size: 10.5px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .figma-mobile-shell {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+  .figma-mobile-shell > main {
+    width: 100%;
+    max-width: 920px;
+    margin: 0 auto;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .figma-top-header {
+    padding: max(14px, env(safe-area-inset-top, 14px)) 28px 14px;
+  }
+  .figma-bottom-dock {
+    max-width: 560px;
+    padding: 8px 14px;
+  }
+  .figma-dock-tab {
+    min-width: 92px;
+    padding: 8px 18px;
+    font-size: 12px;
+  }
+  .figma-project-list-container,
+  .figma-drawing-list-container,
+  .figma-phase-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .figma-project-grid-container,
+  .figma-category-grid-container {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .figma-sheet-content {
+    max-width: 600px;
+    margin: 0 auto;
+    border-radius: 24px;
+  }
 }
 
 .figma-top-header {
@@ -2136,20 +2223,18 @@
 }
 
 .figma-welcome-banner {
-  background: linear-gradient(135deg, #352618 0%, #523B26 100%);
-  color: #FFFFFF;
-  border-radius: 20px;
-  padding: 20px;
-  margin: 14px 16px;
-  box-shadow: 0 10px 26px rgba(53, 38, 24, 0.22);
+  background: transparent;
+  color: #1D1D1F;
+  padding: 12px 20px 18px 20px;
+  margin: 0;
 }
 
 .figma-card-icon-wrap {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: #F9F4EF;
-  color: #BF935A;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #40301A;
+  color: #FFFFFF;
   display: flex;
   align-items: center;
   justify-content: center;

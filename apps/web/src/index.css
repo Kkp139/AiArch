@@ -22,20 +22,20 @@
   --text-secondary: #686869;
   --text-muted: #979798;
 
-  --accent-gold: #c5a059;
-  --accent-gold-hover: #b38f48;
-  --accent-blue: #3b82f6;
-  --accent-emerald: #10b981;
-  --accent-amber: #f59e0b;
-  --accent-rose: #f43f5e;
+  --accent-gold: #BF935A;
+  --accent-gold-hover: #A8814D;
+  --accent-blue: #007AFF;
+  --accent-emerald: #248A3D;
+  --accent-amber: #C97A16;
+  --accent-rose: #DF3344;
 
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 1px 3px rgba(20, 20, 22, 0.04);
+  --shadow-md: 0 4px 14px rgba(20, 20, 22, 0.07);
+  --shadow-lg: 0 12px 28px rgba(20, 20, 22, 0.12);
 
   /* PWA Cross-Platform Safe Area Insets (iOS Notches, Dynamic Island, Home Bar) */
   --sat: env(safe-area-inset-top, 0px);
@@ -48,22 +48,22 @@
 }
 
 [data-theme='light'] {
-  --bg-primary: #f8fafc;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: #f1f5f9;
-  --bg-surface: #e2e8f0;
-  --bg-glass: rgba(255, 255, 255, 0.85);
+  --bg-primary: #F5F4F2;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #F9F4EF;
+  --bg-surface: #ECECEF;
+  --bg-glass: rgba(255, 255, 255, 0.9);
 
-  --border-subtle: #e2e8f0;
-  --border-strong: #cbd5e1;
+  --border-subtle: #ECECEF;
+  --border-strong: #DBDBDF;
 
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
+  --text-primary: #1D1D1F;
+  --text-secondary: #686869;
+  --text-muted: #979798;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.12);
+  --shadow-sm: 0 1px 3px rgba(20, 20, 22, 0.04);
+  --shadow-md: 0 4px 14px rgba(20, 20, 22, 0.07);
+  --shadow-lg: 0 12px 28px rgba(20, 20, 22, 0.12);
 }
 
 * {
