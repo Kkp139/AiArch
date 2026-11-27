@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
 interface SignInFormProps {
+  initialUsername?: string;
+  setupSuccessMessage?: string | null;
   onSuccess: (data: {
     requireOtp: boolean;
     tempToken?: string;
@@ -10,8 +12,12 @@ interface SignInFormProps {
   }) => void;
 }
 
-export const SignInForm: React.FC<SignInFormProps> = ({ onSuccess }) => {
-  const [username, setUsername] = useState('');
+export const SignInForm: React.FC<SignInFormProps> = ({
+  initialUsername = '',
+  setupSuccessMessage = null,
+  onSuccess,
+}) => {
+  const [username, setUsername] = useState(initialUsername);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotHelp, setShowForgotHelp] = useState(false);
@@ -56,6 +62,23 @@ export const SignInForm: React.FC<SignInFormProps> = ({ onSuccess }) => {
       <p className="form-description">
         Access your projects and collaborate with your team.
       </p>
+
+      {setupSuccessMessage && (
+        <div
+          style={{
+            padding: '10px 14px',
+            borderRadius: '10px',
+            backgroundColor: 'rgba(16, 185, 129, 0.12)',
+            border: '1px solid rgba(16, 185, 129, 0.35)',
+            color: '#065f46',
+            fontSize: '13px',
+            fontWeight: 500,
+            marginBottom: '14px',
+          }}
+        >
+          {setupSuccessMessage}
+        </div>
+      )}
 
       {errorMessage && (
         <div className="form-alert-error">

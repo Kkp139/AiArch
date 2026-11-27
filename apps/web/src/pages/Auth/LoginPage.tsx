@@ -4,11 +4,12 @@ import { EditorialPanel } from './EditorialPanel';
 import { SignInForm } from './SignInForm';
 import { ConfirmDetailsForm } from './ConfirmDetailsForm';
 import { OtpVerificationForm } from './OtpVerificationForm';
+import { SetupPasswordForm } from './SetupPasswordForm';
 import { useAuth } from '../../context/AuthContext';
 import { useResponsive } from '../../hooks/useResponsive';
 import { ArrowRight, X, ShieldCheck, Headphones, Users } from 'lucide-react';
 
-type AuthStep = 'SIGN_IN' | 'CONFIRM_DETAILS' | 'VERIFY_OTP';
+type AuthStep = 'SIGN_IN' | 'CONFIRM_DETAILS' | 'VERIFY_OTP' | 'SETUP_PASSWORD';
 type InfoModalTopic = 'help' | 'privacy' | 'team' | null;
 
 interface IntermediateAuthData {
@@ -36,9 +37,33 @@ const INFO_MODAL_CONTENT: Record<Exclude<InfoModalTopic, null>, { title: string;
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const { isMobile } = useResponsive();
-  const [step, setStep] = useState<AuthStep>('SIGN_IN');
+  const initialSetupToken =
+    typeof window !== 'undefined' && window.location.pathname === '/setup-password'
+      ? new URLSearchParams(window.location.search).get('token') || ''
+      : '';
+  const [step, setStep] = useState<AuthStep>(
+    typeof window !== 'undefined' && window.location.pathname === '/setup-password'
+      ? 'SETUP_PASSWORD'
+      : 'SIGN_IN',
+  );
+  const [setupToken] = useState(initialSetupToken);
+  const [prefilledUsername, setPrefilledUsername] = useState('');
+  const [setupSuccessMsg, setSetupSuccessMsg] = useState<string | null>(null);
   const [intermediateData, setIntermediateData] = useState<IntermediateAuthData | null>(null);
   const [infoModal, setInfoModal] = useState<InfoModalTopic>(null);
+
+  const clearSetupUrl = () => {
+    if (typeof window !== 'undefined' && window.location.pathname === '/setup-password') {
+      window.history.replaceState({}, '', '/');
+    }
+  };
+
+  const handleSetupSuccess = (configuredUsername: string) => {
+    clearSetupUrl();
+    setPrefilledUsername(configuredUsername);
+    setSetupSuccessMsg('Password configured successfully! Please sign in with your new password.');
+    setStep('SIGN_IN');
+  };
 
   const handleSignInSuccess = (data: {
     requireOtp: boolean;
@@ -248,7 +273,24 @@ export const LoginPage: React.FC = () => {
               boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.25)',
             }}
           >
-            {step === 'SIGN_IN' && <SignInForm onSuccess={handleSignInSuccess} />}
+            {step === 'SETUP_PASSWORD' && (
+              <SetupPasswordForm
+                token={setupToken}
+                onBackToSignIn={() => {
+                  clearSetupUrl();
+                  setStep('SIGN_IN');
+                }}
+                onSuccess={handleSetupSuccess}
+              />
+            )}
+
+            {step === 'SIGN_IN' && (
+              <SignInForm
+                initialUsername={prefilledUsername}
+                setupSuccessMessage={setupSuccessMsg}
+                onSuccess={handleSignInSuccess}
+              />
+            )}
 
             {step === 'CONFIRM_DETAILS' && intermediateData && (
               <ConfirmDetailsForm
@@ -307,7 +349,24 @@ export const LoginPage: React.FC = () => {
         </div>
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          {step === 'SIGN_IN' && <SignInForm onSuccess={handleSignInSuccess} />}
+          {step === 'SETUP_PASSWORD' && (
+            <SetupPasswordForm
+              token={setupToken}
+              onBackToSignIn={() => {
+                clearSetupUrl();
+                setStep('SIGN_IN');
+              }}
+              onSuccess={handleSetupSuccess}
+            />
+          )}
+
+          {step === 'SIGN_IN' && (
+            <SignInForm
+              initialUsername={prefilledUsername}
+              setupSuccessMessage={setupSuccessMsg}
+              onSuccess={handleSignInSuccess}
+            />
+          )}
 
           {step === 'CONFIRM_DETAILS' && intermediateData && (
             <ConfirmDetailsForm

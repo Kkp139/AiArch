@@ -476,6 +476,38 @@ export async function authRoutes(app: FastifyInstance) {
     };
   });
 
+  // Password Setup Info endpoint (Pre-fills username & fullName from setup token)
+  app.get('/api/auth/setup-password/info', async (request: FastifyRequest, reply: FastifyReply) => {
+    const query = request.query as { token?: string };
+    const token = query?.token?.trim();
+    if (!token) {
+      return reply.status(400).send({ error: 'Valid setup token is required.' });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { setupToken: token },
+      select: {
+        username: true,
+        fullName: true,
+        role: true,
+        setupTokenExpiresAt: true,
+      },
+    });
+
+    if (!user || !user.setupTokenExpiresAt || !verifySetupToken(token, user.setupTokenExpiresAt)) {
+      return reply.status(400).send({
+        error: 'This setup link is invalid or has expired. Please contact studio administration for a new invitation.',
+      });
+    }
+
+    return {
+      valid: true,
+      username: user.username,
+      fullName: user.fullName,
+      role: user.role,
+    };
+  });
+
   // Password Setup endpoint (User sets password using single-use setup link)
   app.post('/api/auth/setup-password', async (request: FastifyRequest, reply: FastifyReply) => {
     const schema = z.object({
