@@ -177,6 +177,7 @@ export const SetupPasswordForm: React.FC<SetupPasswordFormProps> = ({
               id="setup-new-password"
               type={showPassword ? 'text' : 'password'}
               className="form-input"
+              style={{ paddingRight: '44px' }}
               placeholder="Minimum 6 characters"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
@@ -185,7 +186,7 @@ export const SetupPasswordForm: React.FC<SetupPasswordFormProps> = ({
             />
             <button
               type="button"
-              className="form-password-toggle"
+              className="form-input-icon-btn"
               onClick={() => setShowPassword(!showPassword)}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
@@ -194,7 +195,7 @@ export const SetupPasswordForm: React.FC<SetupPasswordFormProps> = ({
           </div>
         </div>
 
-        <div className="form-group" style={{ marginBottom: '18px' }}>
+        <div className="form-group" style={{ marginBottom: '16px' }}>
           <label className="form-label" htmlFor="setup-confirm-password">
             Confirm Password
           </label>
@@ -203,6 +204,7 @@ export const SetupPasswordForm: React.FC<SetupPasswordFormProps> = ({
               id="setup-confirm-password"
               type={showPassword ? 'text' : 'password'}
               className="form-input"
+              style={{ paddingRight: '44px' }}
               placeholder="Re-enter your new password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}

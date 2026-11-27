@@ -343,7 +343,7 @@ export const LoginPage: React.FC = () => {
             </button>
           </div>
 
-          <div style={{ marginBottom: '24px' }}>
+          <div style={{ marginBottom: '12px' }}>
             <span className="form-private-tag">PRIVATE WORKSPACE</span>
           </div>
         </div>
