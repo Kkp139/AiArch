@@ -3920,7 +3920,187 @@
   .desk-meeting-scheduler-panel,
   .desk-meeting-figma-panel,
   .desk-payment-split-boxes,
-  .desk-payment-banner {
+  .desk-payment-banner,
+  .desk-phase-cards-grid {
     grid-template-columns: 1fr;
   }
 }
+
+/* Figma Projects Directory & Phase Overview (850:16318) */
+.desk-projects-directory-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 18px;
+}
+
+.desk-project-dir-card {
+  background: var(--desk-surface, #ffffff);
+  border: 1px solid var(--desk-border, #e6e6eb);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.desk-project-dir-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--brand-gold, #bf935a);
+  box-shadow: 0 10px 24px rgba(12, 12, 13, 0.06);
+}
+
+.desk-project-dir-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.desk-project-dir-title {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--desk-text-primary, #0c0c0d);
+}
+
+.desk-project-dir-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--desk-text-muted, #686869);
+  flex-wrap: wrap;
+}
+
+.desk-project-dir-loc {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--desk-text-secondary, #4a4a4c);
+}
+
+.desk-project-progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.desk-project-progress-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--desk-text-muted, #686869);
+}
+
+.desk-project-progress-track {
+  height: 7px;
+  border-radius: 999px;
+  background: #ececef;
+  overflow: hidden;
+}
+
+.desk-project-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--brand-gold, #bf935a);
+  transition: width 0.25s ease;
+}
+
+.desk-table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--desk-border, #e6e6eb);
+}
+
+.desk-phase-header-card {
+  background: var(--desk-surface, #ffffff);
+  border: 1px solid var(--desk-border, #e6e6eb);
+  border-radius: 16px;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.desk-phase-project-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #352618;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.desk-phase-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.desk-phase-visual-card {
+  background: var(--desk-surface, #ffffff);
+  border: 1px solid var(--desk-border, #e6e6eb);
+  border-radius: 18px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.desk-phase-visual-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--brand-gold, #bf935a);
+  box-shadow: 0 12px 28px rgba(12, 12, 13, 0.08);
+}
+
+.desk-phase-visual-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.desk-phase-image-wrap {
+  width: 100%;
+  height: 220px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f4f4f6;
+}
+
+.desk-phase-image-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.desk-phase-visual-body h2 {
+  margin: 0 0 6px 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--desk-text-primary, #0c0c0d);
+}
+
+.desk-phase-visual-body p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--desk-text-muted, #686869);
+}
+
