@@ -285,3 +285,81 @@ textarea:focus-visible {
   }
 }
 
+/* Responsive Admin User Management Modal */
+.aum-overlay {
+  padding: 24px;
+}
+
+.aum-header {
+  padding: 20px 24px;
+}
+
+.aum-body {
+  padding: 24px;
+}
+
+.aum-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.aum-form-grid > * {
+  min-width: 0;
+}
+
+.aum-form-grid input,
+.aum-form-grid select {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.aum-invite-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.aum-invite-pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.aum-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 640px) {
+  .aum-overlay {
+    padding: 10px;
+  }
+
+  .aum-header {
+    padding: 14px 16px;
+  }
+
+  .aum-body {
+    padding: 16px;
+  }
+
+  .aum-form-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .aum-submit-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+

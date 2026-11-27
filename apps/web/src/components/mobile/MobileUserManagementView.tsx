@@ -127,7 +127,10 @@ export const MobileUserManagementView: React.FC<MobileUserManagementViewProps> =
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName.trim() || !username.trim()) return;
+    if (!fullName.trim() || mobile.trim().length < 10) {
+      setBanner({ type: 'error', message: 'Full Name and valid Mobile Number (min 10 digits) are required.' });
+      return;
+    }
     setSubmitting(true);
     setBanner(null);
     try {
@@ -137,9 +140,9 @@ export const MobileUserManagementView: React.FC<MobileUserManagementViewProps> =
         headers,
         body: JSON.stringify({
           fullName: fullName.trim(),
-          username: username.trim().toLowerCase(),
+          mobile: mobile.trim(),
+          username: username.trim() ? username.trim().toLowerCase() : undefined,
           email: email.trim() || undefined,
-          mobile: mobile.trim() || undefined,
           role,
           assignedProjectIds: selectedProjIds,
         }),
@@ -478,23 +481,9 @@ export const MobileUserManagementView: React.FC<MobileUserManagementViewProps> =
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #E5E7EB', fontSize: '14px', boxSizing: 'border-box' }}
             />
             <input
-              type="text"
-              required
-              placeholder="Username *"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #E5E7EB', fontSize: '14px', boxSizing: 'border-box' }}
-            />
-            <input
-              type="email"
-              placeholder="Email Address"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #E5E7EB', fontSize: '14px', boxSizing: 'border-box' }}
-            />
-            <input
               type="tel"
-              placeholder="Mobile (+91...)"
+              required
+              placeholder="Mobile Number (+91...) *"
               value={mobile}
               onChange={(e) => setMobile(e.target.value)}
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #E5E7EB', fontSize: '14px', boxSizing: 'border-box' }}
@@ -507,7 +496,7 @@ export const MobileUserManagementView: React.FC<MobileUserManagementViewProps> =
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as UserRole)}
-                style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #E5E7EB', fontSize: '13px', background: '#FFFFFF' }}
+                style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #E5E7EB', fontSize: '13px', background: '#FFFFFF', boxSizing: 'border-box' }}
               >
                 <option value="ADMIN">Admin</option>
                 <option value="STAFF">Staff Architect</option>
@@ -516,11 +505,15 @@ export const MobileUserManagementView: React.FC<MobileUserManagementViewProps> =
               </select>
             </div>
 
-            {projectList.length > 0 && (
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 700, color: '#4A4A4C', display: 'block', marginBottom: '6px' }}>
-                  Assign Projects
-                </label>
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: 700, color: '#4A4A4C', display: 'block', marginBottom: '6px' }}>
+                Assign Projects
+              </label>
+              {projectList.length === 0 ? (
+                <div style={{ fontSize: '12px', color: '#686869', padding: '4px 0' }}>
+                  No projects created yet.
+                </div>
+              ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {projectList.map((p) => {
                     const picked = selectedProjIds.includes(p.id);
@@ -549,8 +542,23 @@ export const MobileUserManagementView: React.FC<MobileUserManagementViewProps> =
                     );
                   })}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+
+            <input
+              type="text"
+              placeholder="Username (Optional)"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #E5E7EB', fontSize: '14px', boxSizing: 'border-box' }}
+            />
+            <input
+              type="email"
+              placeholder="Email Address (Optional)"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #E5E7EB', fontSize: '14px', boxSizing: 'border-box' }}
+            />
 
             <button
               type="submit"

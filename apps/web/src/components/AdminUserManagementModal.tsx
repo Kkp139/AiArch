@@ -157,6 +157,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
 
   return (
     <div
+      className="aum-overlay"
       style={{
         position: 'fixed',
         inset: 0,
@@ -166,7 +167,6 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1000,
-        padding: '24px',
       }}
     >
       <div
@@ -185,17 +185,18 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
       >
         {/* Modal Header */}
         <div
+          className="aum-header"
           style={{
-            padding: '20px 24px',
             borderBottom: '1px solid var(--border-subtle)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            gap: '12px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Users size={20} color="var(--accent-gold)" />
-            <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+            <Users size={20} color="var(--accent-gold)" style={{ flexShrink: 0 }} />
+            <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
               Studio User Onboarding & Multi-Project Assignment
             </h2>
           </div>
@@ -207,6 +208,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
               color: 'var(--text-muted)',
               cursor: 'pointer',
               padding: '4px',
+              flexShrink: 0,
             }}
           >
             <X size={20} />
@@ -214,7 +216,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
         </div>
 
         {/* Modal Body */}
-        <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
+        <div className="aum-body" style={{ overflowY: 'auto', flex: 1 }}>
           {feedback && (
             <div
               style={{
@@ -245,7 +247,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
                 marginBottom: '24px',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div className="aum-invite-header">
                 <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent-gold)', textTransform: 'uppercase' }}>
                   Secure Single-Use Setup Invitation Ready
                 </span>
@@ -271,10 +273,10 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
                 </button>
               </div>
               <pre
+                className="aum-invite-pre"
                 style={{
                   fontSize: '12px',
                   color: 'var(--text-secondary)',
-                  whiteSpace: 'pre-wrap',
                   backgroundColor: 'var(--bg-surface)',
                   padding: '12px',
                   borderRadius: 'var(--radius-sm)',
@@ -289,7 +291,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
 
           {/* Create User Form */}
           <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="aum-form-grid">
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '6px' }}>
                   Full Name *
@@ -313,30 +315,6 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
 
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  Role *
-                </label>
-                <select
-                  value={role}
-                  onChange={(e: any) => setRole(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    backgroundColor: 'var(--bg-surface)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 'var(--radius-sm)',
-                    color: 'var(--text-primary)',
-                    fontSize: '14px',
-                  }}
-                >
-                  <option value="ADMIN">Admin (Full System Access)</option>
-                  <option value="STAFF">Staff Architect (All Active Projects by Default)</option>
-                  <option value="CLIENT_LEADER">Client Leader (Drawings, Chat, Meetings & Approvals)</option>
-                  <option value="CLIENT_VIEWER">Client Viewer (Read-only Drawing Access)</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '6px' }}>
                   WhatsApp Mobile Number *
                 </label>
                 <input
@@ -355,7 +333,85 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
                   }}
                 />
               </div>
+            </div>
 
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                Role *
+              </label>
+              <select
+                value={role}
+                onChange={(e: any) => setRole(e.target.value)}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '10px 12px',
+                  backgroundColor: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: 'var(--text-primary)',
+                  fontSize: '14px',
+                }}
+              >
+                <option value="ADMIN">Admin (Full System Access)</option>
+                <option value="STAFF">Staff Architect (All Active Projects by Default)</option>
+                <option value="CLIENT_LEADER">Client Leader (Drawings, Chat, Meetings & Approvals)</option>
+                <option value="CLIENT_VIEWER">Client Viewer (Read-only Drawing Access)</option>
+              </select>
+            </div>
+
+            {/* Multi-Project Assignment Section */}
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                Multi-Project Assignment (Select one or more active studio projects)
+              </label>
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                  padding: '12px',
+                  backgroundColor: 'var(--bg-surface)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                }}
+              >
+                {projects.length === 0 ? (
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                    No active studio projects created yet.
+                  </span>
+                ) : (
+                  projects.map(p => {
+                    const isChecked = selectedProjects.includes(p.id);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => toggleProjectSelection(p.id)}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '20px',
+                          border: isChecked ? '1px solid var(--accent-gold)' : '1px solid var(--border-subtle)',
+                          backgroundColor: isChecked ? 'rgba(217, 119, 6, 0.15)' : 'var(--bg-tertiary)',
+                          color: isChecked ? 'var(--accent-gold)' : 'var(--text-secondary)',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <span>{isChecked ? '✓' : '+'}</span>
+                        <span>{p.projectCode} — {p.name}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            <div className="aum-form-grid">
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '6px' }}>
                   Username (Optional - auto-generated if blank)
@@ -376,50 +432,26 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
                   }}
                 />
               </div>
-            </div>
 
-            {/* Multi-Project Assignment Section */}
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                Multi-Project Assignment (Select one or more active studio projects)
-              </label>
-              <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '8px',
-                  padding: '12px',
-                  backgroundColor: 'var(--bg-surface)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 'var(--radius-md)',
-                }}
-              >
-                {projects.map(p => {
-                  const isChecked = selectedProjects.includes(p.id);
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => toggleProjectSelection(p.id)}
-                      style={{
-                        padding: '6px 14px',
-                        borderRadius: '20px',
-                        border: isChecked ? '1px solid var(--accent-gold)' : '1px solid var(--border-subtle)',
-                        backgroundColor: isChecked ? 'rgba(217, 119, 6, 0.15)' : 'var(--bg-tertiary)',
-                        color: isChecked ? 'var(--accent-gold)' : 'var(--text-secondary)',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                      }}
-                    >
-                      <span>{isChecked ? '✓' : '+'}</span>
-                      <span>{p.projectCode} — {p.name}</span>
-                    </button>
-                  );
-                })}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  Email (Optional)
+                </label>
+                <input
+                  type="email"
+                  placeholder="name@domain.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    backgroundColor: 'var(--bg-surface)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--text-primary)',
+                    fontSize: '14px',
+                  }}
+                />
               </div>
             </div>
 
@@ -427,6 +459,7 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
               <button
                 type="submit"
                 disabled={isLoading}
+                className="aum-submit-btn"
                 style={{
                   padding: '10px 20px',
                   backgroundColor: 'var(--accent-gold)',
@@ -452,8 +485,8 @@ export const AdminUserManagementModal: React.FC<AdminUserManagementModalProps> =
             <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px' }}>
               Active Studio Users ({users.length})
             </h3>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <div className="aum-table-wrap">
+              <table style={{ width: '100%', minWidth: '560px', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border-subtle)', textAlign: 'left', color: 'var(--text-muted)' }}>
                     <th style={{ padding: '8px 12px' }}>User</th>
