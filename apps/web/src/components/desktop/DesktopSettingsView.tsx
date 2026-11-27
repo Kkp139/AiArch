@@ -1046,18 +1046,6 @@ export const DesktopSettingsView: React.FC<DesktopSettingsViewProps> = ({
                         />
                       </div>
                       <div className="desk-form-group">
-                        <label>Username (Optional)</label>
-                        <input
-                          type="text"
-                          className="desk-form-input"
-                          placeholder="e.g. a.sharma"
-                          value={inviteUsername}
-                          onChange={(e) => setInviteUsername(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                      <div className="desk-form-group">
                         <label>Mobile Number</label>
                         <input
                           type="text"
@@ -1066,16 +1054,6 @@ export const DesktopSettingsView: React.FC<DesktopSettingsViewProps> = ({
                           value={inviteMobile}
                           onChange={(e) => setInviteMobile(e.target.value)}
                           required
-                        />
-                      </div>
-                      <div className="desk-form-group">
-                        <label>Email (Optional)</label>
-                        <input
-                          type="email"
-                          className="desk-form-input"
-                          placeholder="name@domain.com"
-                          value={inviteEmail}
-                          onChange={(e) => setInviteEmail(e.target.value)}
                         />
                       </div>
                     </div>
@@ -1094,28 +1072,56 @@ export const DesktopSettingsView: React.FC<DesktopSettingsViewProps> = ({
                     </div>
                     <div className="desk-form-group">
                       <label>Assign Projects</label>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {projects.map((p) => {
-                          const picked = inviteProjects.includes(p.id);
-                          return (
-                            <button
-                              key={p.id}
-                              type="button"
-                              className={`desk-btn desk-btn-sm ${
-                                picked ? 'desk-btn-primary' : 'desk-btn-secondary'
-                              }`}
-                              onClick={() =>
-                                setInviteProjects((prev) =>
-                                  prev.includes(p.id)
-                                    ? prev.filter((id) => id !== p.id)
-                                    : [...prev, p.id],
-                                )
-                              }
-                            >
-                              {p.projectCode}
-                            </button>
-                          );
-                        })}
+                      {projects.length === 0 ? (
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 0' }}>
+                          No projects created yet.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {projects.map((p) => {
+                            const picked = inviteProjects.includes(p.id);
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                className={`desk-btn desk-btn-sm ${
+                                  picked ? 'desk-btn-primary' : 'desk-btn-secondary'
+                                }`}
+                                onClick={() =>
+                                  setInviteProjects((prev) =>
+                                    prev.includes(p.id)
+                                      ? prev.filter((id) => id !== p.id)
+                                      : [...prev, p.id],
+                                  )
+                                }
+                              >
+                                {p.projectCode}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <div className="desk-form-group">
+                        <label>Username (Optional)</label>
+                        <input
+                          type="text"
+                          className="desk-form-input"
+                          placeholder="e.g. a.sharma"
+                          value={inviteUsername}
+                          onChange={(e) => setInviteUsername(e.target.value)}
+                        />
+                      </div>
+                      <div className="desk-form-group">
+                        <label>Email (Optional)</label>
+                        <input
+                          type="email"
+                          className="desk-form-input"
+                          placeholder="name@domain.com"
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                        />
                       </div>
                     </div>
                   </>

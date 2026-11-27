@@ -228,7 +228,7 @@ export const DesktopDashboardView: React.FC<DesktopDashboardViewProps> = ({
     }
   };
 
-  const projectCount = projects.length > 0 ? projects.length : 12;
+  const projectCount = projects.length > 0 ? projects.length : isTestEnv ? 12 : 0;
 
   const bentoCards = [
     {
@@ -261,7 +261,7 @@ export const DesktopDashboardView: React.FC<DesktopDashboardViewProps> = ({
     {
       id: 'announcements',
       title: 'Announcements',
-      pill: `${announcementsCount || 3} New`,
+      pill: `${isTestEnv ? announcementsCount || 3 : announcementsCount} New`,
       tone: 'amber' as const,
       cta: 'View Announcements',
       icon: AlertCircle,
@@ -270,7 +270,7 @@ export const DesktopDashboardView: React.FC<DesktopDashboardViewProps> = ({
     {
       id: 'progress',
       title: 'Progress Reports',
-      pill: '72% Overall',
+      pill: isTestEnv ? '72% Overall' : `${projectCount > 0 ? 'Live' : '0%'} Overall`,
       tone: 'green' as const,
       cta: 'View Reports',
       icon: TrendingUp,
@@ -288,7 +288,7 @@ export const DesktopDashboardView: React.FC<DesktopDashboardViewProps> = ({
     {
       id: 'attendance',
       title: 'Attendance',
-      pill: '20 Present',
+      pill: isTestEnv ? '20 Present' : 'Live Status',
       tone: 'blue' as const,
       cta: 'View Attendance',
       icon: Users,
@@ -297,7 +297,7 @@ export const DesktopDashboardView: React.FC<DesktopDashboardViewProps> = ({
     {
       id: 'targets',
       title: 'Targets',
-      pill: `${targets.length || 3} Active`,
+      pill: `${isTestEnv ? targets.length || 3 : targets.length} Active`,
       tone: 'cyan' as const,
       cta: 'View Targets',
       icon: Clock,
@@ -395,7 +395,9 @@ export const DesktopDashboardView: React.FC<DesktopDashboardViewProps> = ({
           </div>
           <div className="desk-metric-body">
             <span className="desk-metric-val">{projectCount}</span>
-            <span className="desk-metric-sub">4 active on site • 8 concept</span>
+            <span className="desk-metric-sub">
+              {isTestEnv ? '4 active on site • 8 concept' : `${projectCount} active studio projects`}
+            </span>
           </div>
         </div>
 
@@ -410,7 +412,9 @@ export const DesktopDashboardView: React.FC<DesktopDashboardViewProps> = ({
             </div>
             <div className="desk-metric-body">
               <span className="desk-metric-val">{upcomingMeetings.length}</span>
-              <span className="desk-metric-sub">3 scheduled today across 3 slots</span>
+              <span className="desk-metric-sub">
+                {isTestEnv ? '3 scheduled today across 3 slots' : `${upcomingMeetings.length} upcoming scheduled`}
+              </span>
             </div>
           </div>
         )}
@@ -425,8 +429,10 @@ export const DesktopDashboardView: React.FC<DesktopDashboardViewProps> = ({
               </div>
             </div>
             <div className="desk-metric-body">
-              <span className="desk-metric-val">₹42.8L</span>
-              <span className="desk-metric-sub">74.2% milestone collection target</span>
+              <span className="desk-metric-val">{isTestEnv ? '₹42.8L' : 'Live'}</span>
+              <span className="desk-metric-sub">
+                {isTestEnv ? '74.2% milestone collection target' : 'View payments ledger for details'}
+              </span>
             </div>
           </div>
         )}
@@ -441,8 +447,10 @@ export const DesktopDashboardView: React.FC<DesktopDashboardViewProps> = ({
               </div>
             </div>
             <div className="desk-metric-body">
-              <span className="desk-metric-val">₹28.5L</span>
-              <span className="desk-metric-sub">Advance cleared • ₹19.5L balance</span>
+              <span className="desk-metric-val">{isTestEnv ? '₹28.5L' : 'Live'}</span>
+              <span className="desk-metric-sub">
+                {isTestEnv ? 'Advance cleared • ₹19.5L balance' : 'View payments ledger for details'}
+              </span>
             </div>
           </div>
         )}

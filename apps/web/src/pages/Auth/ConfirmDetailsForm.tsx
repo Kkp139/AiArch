@@ -96,8 +96,8 @@ export const ConfirmDetailsForm: React.FC<ConfirmDetailsFormProps> = ({
               className="form-input"
               placeholder="e.g. Raj Patel"
               value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              disabled={isLoading}
+              readOnly
+              style={{ backgroundColor: '#f3f4f6', cursor: 'default' }}
               required
             />
           </div>
@@ -114,8 +114,8 @@ export const ConfirmDetailsForm: React.FC<ConfirmDetailsFormProps> = ({
               className="form-input"
               placeholder="+91 98251 99887"
               value={mobile}
-              onChange={(e) => setMobile(e.target.value)}
-              disabled={isLoading}
+              readOnly
+              style={{ backgroundColor: '#f3f4f6', cursor: 'default' }}
               required
             />
           </div>
