@@ -3,7 +3,8 @@ import {
   BellRing,
   CheckCircle2,
   Clock,
-  AlertCircle,
+  Calendar,
+  FolderClosed,
   Plus,
   Search,
   Trash2,
@@ -11,6 +12,9 @@ import {
   Lock,
   RefreshCw,
   Check,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
   X,
 } from 'lucide-react';
 import { UserRole } from '../../context/AuthContext';
@@ -26,6 +30,7 @@ export interface StudioReminderItem {
   projectName?: string;
   dueDate: string;
   dueTime?: string;
+  dueAt?: string;
   priority: ReminderPriority;
   isCompleted: boolean;
   notes?: string;
@@ -39,15 +44,46 @@ export interface DesktopRemindersViewProps {
   onRefreshCounts?: () => void;
 }
 
+const PAGE_SIZE = 8;
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+function toLocalDateInput(date: Date): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function toLocalTimeInput(date: Date): string {
+  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
 function normalizeReminder(raw: any): StudioReminderItem {
+  const rawDueAt = raw?.dueAt;
+  let dueDate = String(raw?.dueDate || '').slice(0, 10);
+  let dueTime = raw?.dueTime || '';
+
+  if (rawDueAt) {
+    const parsed = new Date(rawDueAt);
+    if (!Number.isNaN(parsed.getTime())) {
+      dueDate = toLocalDateInput(parsed);
+      dueTime = toLocalTimeInput(parsed);
+    }
+  }
+
+  if (!dueDate) {
+    dueDate = toLocalDateInput(new Date());
+  }
+
   return {
     id: String(raw?.id || ''),
     title: raw?.title || 'Untitled Reminder',
     projectId: raw?.projectId || undefined,
     projectCode: raw?.projectCode || raw?.project?.projectCode || undefined,
     projectName: raw?.projectName || raw?.project?.name || undefined,
-    dueDate: String(raw?.dueDate || new Date().toISOString()).slice(0, 10),
-    dueTime: raw?.dueTime || '',
+    dueDate,
+    dueTime,
+    dueAt: rawDueAt || undefined,
     priority: (raw?.priority || 'NORMAL') as ReminderPriority,
     isCompleted: Boolean(raw?.isCompleted),
     notes: raw?.notes || '',
@@ -66,6 +102,28 @@ function getPriorityPillClass(priority: ReminderPriority): string {
   }
 }
 
+function formatDisplayDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return dateStr;
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function formatDisplayTime(timeStr?: string): string {
+  if (!timeStr) return '';
+  const [hhStr, mmStr] = timeStr.split(':');
+  const hh = Number(hhStr);
+  const mm = Number(mmStr);
+  if (Number.isNaN(hh) || Number.isNaN(mm)) return timeStr;
+  const period = hh >= 12 ? 'PM' : 'AM';
+  const hour12 = hh % 12 === 0 ? 12 : hh % 12;
+  return `${pad2(hour12)}:${pad2(mm)} ${period}`;
+}
+
 export const DesktopRemindersView: React.FC<DesktopRemindersViewProps> = ({
   userRole,
   projects = [],
@@ -81,17 +139,20 @@ export const DesktopRemindersView: React.FC<DesktopRemindersViewProps> = ({
     null,
   );
 
-  // Filters
+  // Filters & sorting
   const [tab, setTab] = useState<'ALL' | 'PENDING' | 'COMPLETED'>('ALL');
+  const [priorityFilter, setPriorityFilter] = useState<'ALL' | ReminderPriority>('ALL');
   const [projectFilter, setProjectFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sortAsc, setSortAsc] = useState<boolean>(true);
+  const [page, setPage] = useState<number>(1);
 
   // Create / Edit Modal
   const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formTitle, setFormTitle] = useState<string>('');
   const [formProjectId, setFormProjectId] = useState<string>('');
-  const [formDueDate, setFormDueDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [formDueDate, setFormDueDate] = useState<string>(toLocalDateInput(new Date()));
   const [formDueTime, setFormDueTime] = useState<string>('10:30');
   const [formPriority, setFormPriority] = useState<ReminderPriority>('MEDIUM');
   const [formNotes, setFormNotes] = useState<string>('');
@@ -127,19 +188,28 @@ export const DesktopRemindersView: React.FC<DesktopRemindersViewProps> = ({
     void fetchReminders();
   }, [fetchReminders]);
 
-  const todayIso = new Date().toISOString().slice(0, 10);
+  useEffect(() => {
+    setPage(1);
+  }, [tab, priorityFilter, projectFilter, searchQuery]);
+
+  const todayIso = toLocalDateInput(new Date());
+  const nextWeekDate = new Date();
+  nextWeekDate.setDate(nextWeekDate.getDate() + 7);
+  const nextWeekIso = toLocalDateInput(nextWeekDate);
 
   const stats = useMemo(() => {
     const pending = reminders.filter((r) => !r.isCompleted);
     const completed = reminders.filter((r) => r.isCompleted);
-    const highOrDue = pending.filter((r) => r.priority === 'HIGH' || r.dueDate <= todayIso);
+    const dueThisWeek = pending.filter((r) => r.dueDate <= nextWeekIso);
+    const highPriority = pending.filter((r) => r.priority === 'HIGH');
     return {
       total: reminders.length,
       pending: pending.length,
-      highOrDue: highOrDue.length,
       completed: completed.length,
+      dueThisWeek: dueThisWeek.length,
+      highPriority: highPriority.length,
     };
-  }, [reminders, todayIso]);
+  }, [reminders, nextWeekIso]);
 
   const filteredReminders = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -147,6 +217,7 @@ export const DesktopRemindersView: React.FC<DesktopRemindersViewProps> = ({
       .filter((r) => {
         if (tab === 'PENDING' && r.isCompleted) return false;
         if (tab === 'COMPLETED' && !r.isCompleted) return false;
+        if (priorityFilter !== 'ALL' && r.priority !== priorityFilter) return false;
         if (projectFilter !== 'ALL' && r.projectCode !== projectFilter) return false;
         if (q) {
           const hay = [r.title, r.notes || '', r.projectCode || '', r.projectName || '']
@@ -158,9 +229,19 @@ export const DesktopRemindersView: React.FC<DesktopRemindersViewProps> = ({
       })
       .sort((a, b) => {
         if (a.isCompleted !== b.isCompleted) return a.isCompleted ? 1 : -1;
-        return a.dueDate.localeCompare(b.dueDate);
+        const cmp = `${a.dueDate}T${a.dueTime || '00:00'}`.localeCompare(
+          `${b.dueDate}T${b.dueTime || '00:00'}`,
+        );
+        return sortAsc ? cmp : -cmp;
       });
-  }, [reminders, tab, projectFilter, searchQuery]);
+  }, [reminders, tab, priorityFilter, projectFilter, searchQuery, sortAsc]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredReminders.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginatedReminders = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE;
+    return filteredReminders.slice(start, start + PAGE_SIZE);
+  }, [filteredReminders, safePage]);
 
   if (!isAdmin) {
     return (
@@ -193,7 +274,7 @@ export const DesktopRemindersView: React.FC<DesktopRemindersViewProps> = ({
     setFormTitle(r.title);
     setFormProjectId(r.projectId || '');
     setFormDueDate(r.dueDate);
-    setFormDueTime(r.dueTime || '');
+    setFormDueTime(r.dueTime || '10:30');
     setFormPriority(r.priority);
     setFormNotes(r.notes || '');
   };
@@ -206,13 +287,19 @@ export const DesktopRemindersView: React.FC<DesktopRemindersViewProps> = ({
     }
     setSubmitting(true);
     setBanner(null);
+
+    const timePart = formDueTime.trim() || '09:00';
+    const dueAtDate = new Date(`${formDueDate}T${timePart}`);
+    const dueAtIso = Number.isNaN(dueAtDate.getTime())
+      ? new Date().toISOString()
+      : dueAtDate.toISOString();
+
     const payload = {
       title: formTitle.trim(),
       projectId: formProjectId || null,
-      dueDate: formDueDate,
-      dueTime: formDueTime.trim() || undefined,
+      dueAt: dueAtIso,
       priority: formPriority,
-      notes: formNotes.trim() || undefined,
+      notes: formNotes.trim() || null,
     };
 
     try {
@@ -289,11 +376,12 @@ export const DesktopRemindersView: React.FC<DesktopRemindersViewProps> = ({
 
   return (
     <div>
+      {/* Page Header matching Figma 934:48127 */}
       <div className="desk-page-header">
         <div>
-          <h1 className="desk-page-title">Admin Reminders</h1>
+          <h1 className="desk-page-title">Reminders</h1>
           <p className="desk-page-subtitle">
-            Private leadership follow-ups for client approvals, municipal filings, and studio renewals.
+            Manage and track important tasks, deadlines and follow-ups.
           </p>
         </div>
         <div className="desk-header-actions">
@@ -308,7 +396,7 @@ export const DesktopRemindersView: React.FC<DesktopRemindersViewProps> = ({
           </button>
           <button type="button" className="desk-btn desk-btn-primary" onClick={openCreateModal}>
             <Plus size={16} />
-            <span>New Reminder</span>
+            <span>Create Reminder</span>
           </button>
         </div>
       </div>
@@ -322,7 +410,7 @@ export const DesktopRemindersView: React.FC<DesktopRemindersViewProps> = ({
         </div>
       )}
 
-      {/* 4 Summary Tiles matching Figma 932:46638 */}
+      {/* 4 Summary Tiles matching Figma 934:48132 */}
       <div className="desk-metrics-row">
         <div className="desk-metric-tile">
           <div className="desk-metric-tile-icon gold">
@@ -341,17 +429,9 @@ export const DesktopRemindersView: React.FC<DesktopRemindersViewProps> = ({
           <div>
             <div className="desk-metric-tile-label">Pending</div>
             <div className="desk-metric-tile-value">{stats.pending}</div>
-            <div className="desk-metric-tile-sub">Open action items</div>
-          </div>
-        </div>
-        <div className="desk-metric-tile">
-          <div className="desk-metric-tile-icon red">
-            <AlertCircle size={18} />
-          </div>
-          <div>
-            <div className="desk-metric-tile-label">Due / High Priority</div>
-            <div className="desk-metric-tile-value">{stats.highOrDue}</div>
-            <div className="desk-metric-tile-sub">Requires immediate attention</div>
+            <div className="desk-metric-tile-sub">
+              {stats.highPriority > 0 ? `${stats.highPriority} high priority` : 'Open action items'}
+            </div>
           </div>
         </div>
         <div className="desk-metric-tile">
@@ -364,10 +444,20 @@ export const DesktopRemindersView: React.FC<DesktopRemindersViewProps> = ({
             <div className="desk-metric-tile-sub">Checked off items</div>
           </div>
         </div>
+        <div className="desk-metric-tile">
+          <div className="desk-metric-tile-icon blue">
+            <Calendar size={18} />
+          </div>
+          <div>
+            <div className="desk-metric-tile-label">Due This Week</div>
+            <div className="desk-metric-tile-value">{stats.dueThisWeek}</div>
+            <div className="desk-metric-tile-sub">Upcoming &amp; overdue</div>
+          </div>
+        </div>
       </div>
 
-      {/* Filters Toolbar */}
-      <div className="desk-tabs-bar">
+      {/* Filters Toolbar matching Figma 934:48161 */}
+      <div className="desk-tabs-bar" style={{ flexWrap: 'wrap', gap: 12 }}>
         <div className="desk-tabs-group">
           {(
             [
@@ -387,10 +477,23 @@ export const DesktopRemindersView: React.FC<DesktopRemindersViewProps> = ({
           ))}
         </div>
 
-        <div className="desk-header-actions">
+        <div className="desk-header-actions" style={{ flexWrap: 'wrap' }}>
           <select
+            aria-label="Filter by priority"
             className="desk-form-select"
-            style={{ width: 200 }}
+            style={{ width: 150 }}
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value as 'ALL' | ReminderPriority)}
+          >
+            <option value="ALL">All Priorities</option>
+            <option value="HIGH">High Priority</option>
+            <option value="MEDIUM">Medium Priority</option>
+            <option value="NORMAL">Normal Priority</option>
+          </select>
+          <select
+            aria-label="Filter by project"
+            className="desk-form-select"
+            style={{ width: 190 }}
             value={projectFilter}
             onChange={(e) => setProjectFilter(e.target.value)}
           >
@@ -409,7 +512,7 @@ export const DesktopRemindersView: React.FC<DesktopRemindersViewProps> = ({
                 left: 12,
                 top: '50%',
                 transform: 'translateY(-50%)',
-                color: 'var(--text-muted)',
+                color: 'var(--desk-text-muted)',
               }}
             />
             <input
@@ -424,91 +527,233 @@ export const DesktopRemindersView: React.FC<DesktopRemindersViewProps> = ({
         </div>
       </div>
 
-      {/* Reminders List */}
+      {/* Reminders Table matching Figma 934:48183 */}
       {loading && filteredReminders.length === 0 ? (
         <div className="desk-empty-card">Loading reminders...</div>
       ) : filteredReminders.length === 0 ? (
         <div className="desk-empty-card">
-          <BellRing size={28} style={{ color: 'var(--brand-gold)', marginBottom: 8 }} />
+          <BellRing size={28} style={{ color: 'var(--desk-gold)', marginBottom: 8 }} />
           <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>No reminders found</div>
-          <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--text-secondary)' }}>
+          <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--desk-text-secondary)' }}>
             Create an Admin reminder for upcoming site follow-ups, billing dates, or regulatory filings.
           </p>
           <button type="button" className="desk-btn desk-btn-primary" onClick={openCreateModal}>
             <Plus size={15} />
-            <span>Add First Reminder</span>
+            <span>Create Reminder</span>
           </button>
         </div>
       ) : (
-        <div className="desk-list-stack">
-          {filteredReminders.map((r) => {
-            const isOverdue = !r.isCompleted && r.dueDate < todayIso;
-            return (
-              <div key={r.id} className="desk-list-row-card">
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, flex: 1 }}>
-                  <button
-                    type="button"
-                    className={`desk-btn desk-btn-sm ${
-                      r.isCompleted ? 'desk-btn-primary' : 'desk-btn-secondary'
-                    }`}
-                    style={{ width: 32, height: 32, padding: 0, justifyContent: 'center', marginTop: 2 }}
-                    disabled={submitting}
-                    onClick={() => void handleToggleComplete(r)}
-                    aria-label={r.isCompleted ? 'Mark pending' : 'Mark completed'}
-                  >
-                    <Check size={15} />
-                  </button>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-                      <span className={`desk-pill ${getPriorityPillClass(r.priority)}`}>
-                        {r.priority}
-                      </span>
-                      <span className={`desk-pill ${isOverdue ? 'red' : 'neutral'}`}>
-                        {r.dueDate}
-                        {r.dueTime ? ` · ${r.dueTime}` : ''}
-                      </span>
-                      {r.projectCode && <span className="desk-pill gold">{r.projectCode}</span>}
-                    </div>
-                    <div
+        <div className="desk-table-card">
+          <div className="desk-table-scroll">
+            <table className="desk-data-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 44 }}>Done</th>
+                  <th>Reminder</th>
+                  <th>Category</th>
+                  <th>
+                    <button
+                      type="button"
+                      onClick={() => setSortAsc((prev) => !prev)}
                       style={{
-                        fontSize: 15,
-                        fontWeight: 700,
-                        marginTop: 6,
-                        textDecoration: r.isCompleted ? 'line-through' : 'none',
-                        color: r.isCompleted ? 'var(--text-muted)' : 'var(--text-primary)',
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        font: 'inherit',
+                        color: 'inherit',
+                        cursor: 'pointer',
                       }}
                     >
-                      {r.title}
-                    </div>
-                    {r.notes && (
-                      <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
-                        {r.notes}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                      <span>Due Date &amp; Time</span>
+                      <ArrowUpDown size={13} />
+                    </button>
+                  </th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedReminders.map((r) => {
+                  const isOverdue = !r.isCompleted && r.dueDate < todayIso;
+                  const categoryLabel = r.projectName || r.projectCode || 'General';
+                  return (
+                    <tr key={r.id}>
+                      <td>
+                        <button
+                          type="button"
+                          className={`desk-btn desk-btn-sm ${
+                            r.isCompleted ? 'desk-btn-primary' : 'desk-btn-secondary'
+                          }`}
+                          style={{
+                            width: 26,
+                            height: 26,
+                            padding: 0,
+                            justifyContent: 'center',
+                            borderRadius: 6,
+                          }}
+                          disabled={submitting}
+                          onClick={() => void handleToggleComplete(r)}
+                          aria-label={r.isCompleted ? 'Mark pending' : 'Mark completed'}
+                        >
+                          {r.isCompleted && <Check size={14} />}
+                        </button>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div
+                            className="desk-soft-icon-box"
+                            style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0 }}
+                          >
+                            {r.projectId || r.projectCode ? (
+                              <FolderClosed size={18} />
+                            ) : (
+                              <BellRing size={18} />
+                            )}
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontSize: 14.5,
+                                fontWeight: 600,
+                                textDecoration: r.isCompleted ? 'line-through' : 'none',
+                                color: r.isCompleted
+                                  ? 'var(--desk-text-muted)'
+                                  : 'var(--desk-text-primary)',
+                              }}
+                            >
+                              {r.title}
+                            </div>
+                            {r.notes && (
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  color: 'var(--desk-text-secondary)',
+                                  marginTop: 2,
+                                }}
+                              >
+                                {r.notes}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                          <span className="desk-pill gold">{categoryLabel}</span>
+                          <span className={`desk-pill ${getPriorityPillClass(r.priority)}`}>
+                            {r.priority}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Calendar
+                            size={16}
+                            style={{
+                              color: isOverdue ? 'var(--desk-danger)' : 'var(--desk-text-muted)',
+                              flexShrink: 0,
+                            }}
+                          />
+                          <div>
+                            <div
+                              style={{
+                                fontSize: 13.5,
+                                fontWeight: 500,
+                                color: isOverdue ? 'var(--desk-danger)' : 'var(--desk-text-primary)',
+                              }}
+                            >
+                              {formatDisplayDate(r.dueDate)}
+                            </div>
+                            {r.dueTime && (
+                              <div style={{ fontSize: 12, color: 'var(--desk-text-secondary)' }}>
+                                {formatDisplayTime(r.dueTime)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span
+                          className={`desk-pill ${
+                            r.isCompleted ? 'green' : isOverdue ? 'red' : 'amber'
+                          }`}
+                        >
+                          {r.isCompleted ? 'Completed' : isOverdue ? 'Overdue' : 'Pending'}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            className="desk-btn desk-btn-sm desk-btn-secondary"
+                            onClick={() => openEditModal(r)}
+                            aria-label="Edit reminder"
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            className="desk-btn desk-btn-sm desk-btn-danger-outline"
+                            onClick={() => setDeleteTarget(r)}
+                            aria-label="Delete reminder"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
-                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  <button
-                    type="button"
-                    className="desk-btn desk-btn-sm desk-btn-secondary"
-                    onClick={() => openEditModal(r)}
-                    aria-label="Edit reminder"
-                  >
-                    <Edit3 size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    className="desk-btn desk-btn-sm desk-btn-danger-outline"
-                    onClick={() => setDeleteTarget(r)}
-                    aria-label="Delete reminder"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+          <div
+            className="desk-table-pagination"
+            style={{ justifyContent: 'space-between', padding: '14px 24px' }}
+          >
+            <span style={{ fontSize: 13, color: 'var(--desk-text-secondary)' }}>
+              Showing {(safePage - 1) * PAGE_SIZE + 1}–
+              {Math.min(safePage * PAGE_SIZE, filteredReminders.length)} of{' '}
+              {filteredReminders.length} reminders
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button
+                type="button"
+                className="desk-btn desk-btn-sm desk-btn-secondary"
+                disabled={safePage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                aria-label="Previous page"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <span
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  background: 'var(--desk-gold-soft)',
+                  border: '1px solid var(--desk-gold)',
+                  color: 'var(--desk-gold-dark)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+              >
+                {safePage}
+              </span>
+              <button
+                type="button"
+                className="desk-btn desk-btn-sm desk-btn-secondary"
+                disabled={safePage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                aria-label="Next page"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -632,7 +877,7 @@ export const DesktopRemindersView: React.FC<DesktopRemindersViewProps> = ({
               </button>
             </div>
             <div className="desk-modal-body">
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)' }}>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--desk-text-secondary)' }}>
                 Remove reminder <strong>{deleteTarget.title}</strong> permanently?
               </p>
             </div>

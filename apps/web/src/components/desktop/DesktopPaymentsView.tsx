@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   IndianRupee,
-  CheckCircle2,
-  Clock,
-  AlertTriangle,
   Plus,
   Search,
   Edit3,
@@ -14,6 +11,9 @@ import {
   List,
   RefreshCw,
   X,
+  Calendar,
+  CreditCard,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { UserRole } from '../../context/AuthContext';
 import type { ProjectSummary } from '../../App';
@@ -32,7 +32,7 @@ export interface DesktopPaymentsViewProps {
   payments?: PaymentRecord[];
   getAuthHeaders?: () => Record<string, string>;
   onRefresh?: () => Promise<void> | void;
-  onDownloadReceipt?: (record: PaymentRecord) => void;
+  onDownloadReceipt?: (paymentId: string) => void;
   onCreatePayment?: (payload: {
     projectCode: string;
     milestoneTitle: string;
@@ -77,6 +77,57 @@ function getStatusPillClass(status: PaymentRecord['status']): string {
     default:
       return 'neutral';
   }
+}
+
+function getStatusLabel(status: PaymentRecord['status']): string {
+  switch (status) {
+    case 'CONFIRMED':
+      return 'Confirmed';
+    case 'PENDING_CLEARANCE':
+      return 'Pending Clearance';
+    case 'REVISION_REQUESTED':
+      return 'Revision Requested';
+    default:
+      return String(status).replace(/_/g, ' ');
+  }
+}
+
+const PAYMENT_MODE_OPTIONS: Array<{
+  value: PaymentRecord['paymentMode'];
+  label: string;
+  refLabel: string;
+  refPlaceholder: string;
+}> = [
+  { value: 'CHEQUE', label: 'Cheque', refLabel: 'Cheque Number', refPlaceholder: 'e.g. CHQ #449210' },
+  { value: 'UPI', label: 'UPI', refLabel: 'UPI Reference ID', refPlaceholder: 'e.g. UPI/4321098765' },
+  { value: 'NEFT_RTGS', label: 'RTGS/NEFT', refLabel: 'UTR / Transaction ID', refPlaceholder: 'e.g. UTR-HDFC-99210' },
+  { value: 'CASH', label: 'Cash', refLabel: 'Receipt Reference', refPlaceholder: 'e.g. RCPT-004' },
+];
+
+function formatPaymentMode(mode: PaymentRecord['paymentMode']): string {
+  switch (mode) {
+    case 'NEFT_RTGS':
+      return 'Bank RTGS / NEFT';
+    case 'CHEQUE':
+      return 'Cheque';
+    case 'UPI':
+      return 'UPI';
+    case 'CASH':
+      return 'Cash';
+    default:
+      return mode;
+  }
+}
+
+function formatDisplayDate(dateStr: string): string {
+  const parsed = new Date(dateStr);
+  if (Number.isNaN(parsed.getTime())) return dateStr;
+  return parsed.toLocaleDateString('en-IN', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 const TEST_PAYMENTS_FIXTURE: PaymentRecord[] = [
@@ -137,11 +188,12 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
 }) => {
   const isAdmin = userRole === 'ADMIN';
   const isStaff = userRole === 'STAFF';
+  const isClientLeader = userRole === 'CLIENT_LEADER';
   const isClient = userRole === 'CLIENT_LEADER' || userRole === 'CLIENT_VIEWER';
-  const isTestEnv = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
+  const isTestEnv = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
 
   const [localPayments, setLocalPayments] = useState<PaymentRecord[]>(() =>
-    isTestEnv ? TEST_PAYMENTS_FIXTURE : []
+    isTestEnv ? TEST_PAYMENTS_FIXTURE : [],
   );
   const [loading, setLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -157,14 +209,22 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
 
-  // Create Payment Modal
+  // Filter popover state (Figma 891:14555)
+  const [showFilterPopover, setShowFilterPopover] = useState<boolean>(false);
+  const [draftProjectFilter, setDraftProjectFilter] = useState<string>(selectedProjectCode || 'ALL');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+  const [draftDateFrom, setDraftDateFrom] = useState<string>('');
+  const [draftDateTo, setDraftDateTo] = useState<string>('');
+
+  // Create Payment Modal (Figma 891:14290)
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [createProjectCode, setCreateProjectCode] = useState<string>(
     projects[0]?.projectCode || '',
   );
   const [createTitle, setCreateTitle] = useState<string>('');
   const [createAmount, setCreateAmount] = useState<string>('');
-  const [createMode, setCreateMode] = useState<PaymentRecord['paymentMode']>('NEFT_RTGS');
+  const [createMode, setCreateMode] = useState<PaymentRecord['paymentMode']>('CHEQUE');
   const [createStatus, setCreateStatus] = useState<'CONFIRMED' | 'PENDING_CLEARANCE'>('CONFIRMED');
   const [createRef, setCreateRef] = useState<string>('');
   const [createBank, setCreateBank] = useState<string>('');
@@ -177,6 +237,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
   const [editStatus, setEditStatus] = useState<PaymentRecord['status']>('CONFIRMED');
   const [editRef, setEditRef] = useState<string>('');
   const [editBank, setEditBank] = useState<string>('');
+  const [editDiscrepancyNote, setEditDiscrepancyNote] = useState<string>('');
 
   // Discrepancy Modal
   const [discrepancyTarget, setDiscrepancyTarget] = useState<PaymentRecord | null>(null);
@@ -188,6 +249,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
   useEffect(() => {
     if (selectedProjectCode) {
       setProjectFilter(selectedProjectCode);
+      setDraftProjectFilter(selectedProjectCode);
     }
   }, [selectedProjectCode]);
 
@@ -260,10 +322,10 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
   }, [isStaff, clientPricingAllowed, projectFilter, authHeaders]);
 
   useEffect(() => {
-    if (!payments) {
+    if (!payments && !isTestEnv) {
       void fetchPayments();
     }
-  }, [payments, fetchPayments]);
+  }, [payments, isTestEnv, fetchPayments]);
 
   const effectivePayments = useMemo(() => {
     const source = payments || localPayments;
@@ -272,12 +334,43 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [payments, localPayments]);
 
-  const filteredPayments = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+  const projectScopedPayments = useMemo(() => {
     return effectivePayments.filter((p) => {
       if (projectFilter !== 'ALL' && p.projectCode && p.projectCode !== projectFilter) {
         return false;
       }
+      if (dateFrom) {
+        const itemDate = p.createdAt.slice(0, 10);
+        if (itemDate < dateFrom) return false;
+      }
+      if (dateTo) {
+        const itemDate = p.createdAt.slice(0, 10);
+        if (itemDate > dateTo) return false;
+      }
+      return true;
+    });
+  }, [effectivePayments, projectFilter, dateFrom, dateTo]);
+
+  const statusCounts = useMemo(() => {
+    let confirmed = 0;
+    let pending = 0;
+    let revision = 0;
+    for (const p of projectScopedPayments) {
+      if (p.status === 'CONFIRMED') confirmed += 1;
+      else if (p.status === 'PENDING_CLEARANCE') pending += 1;
+      else if (p.status === 'REVISION_REQUESTED') revision += 1;
+    }
+    return {
+      ALL: projectScopedPayments.length,
+      CONFIRMED: confirmed,
+      PENDING_CLEARANCE: pending,
+      REVISION_REQUESTED: revision,
+    };
+  }, [projectScopedPayments]);
+
+  const filteredPayments = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return projectScopedPayments.filter((p) => {
       if (statusFilter !== 'ALL' && p.status !== statusFilter) return false;
       if (q) {
         const hay = [
@@ -286,6 +379,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
           p.projectName || '',
           p.referenceNumber || '',
           p.bankName || '',
+          p.paymentMode || '',
         ]
           .join(' ')
           .toLowerCase();
@@ -293,7 +387,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
       }
       return true;
     });
-  }, [effectivePayments, projectFilter, statusFilter, searchQuery]);
+  }, [projectScopedPayments, statusFilter, searchQuery]);
 
   const totals = useMemo(() => {
     const relevantProjects =
@@ -325,13 +419,14 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
     const balance = Math.max(0, totalAgreedFee - confirmedPaid);
     const pct =
       totalAgreedFee > 0 ? Math.round((confirmedPaid / totalAgreedFee) * 100) : 0;
+    const remainingPct = totalAgreedFee > 0 ? Math.max(0, 100 - pct) : 0;
 
-    return { totalAgreedFee, confirmedPaid, pendingClearance, balance, pct };
+    return { totalAgreedFee, confirmedPaid, pendingClearance, balance, pct, remainingPct };
   }, [projects, projectFilter, effectivePayments, propTotalAgreedFee, propAdvanceReceived]);
 
   const reloadPayments = async () => {
     if (onRefresh) await onRefresh();
-    if (!payments) await fetchPayments();
+    if (!payments && !isTestEnv) await fetchPayments();
   };
 
   if (isStaff) {
@@ -364,7 +459,27 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
 
   const handleProjectChange = (nextCode: string) => {
     setProjectFilter(nextCode);
+    setDraftProjectFilter(nextCode);
     onSelectProjectCode?.(nextCode);
+  };
+
+  const handleApplyFiltersPopover = () => {
+    setProjectFilter(draftProjectFilter);
+    setDateFrom(draftDateFrom);
+    setDateTo(draftDateTo);
+    onSelectProjectCode?.(draftProjectFilter);
+    setShowFilterPopover(false);
+  };
+
+  const handleResetFiltersPopover = () => {
+    setDraftProjectFilter('ALL');
+    setDraftDateFrom('');
+    setDraftDateTo('');
+    setProjectFilter('ALL');
+    setDateFrom('');
+    setDateTo('');
+    onSelectProjectCode?.('ALL');
+    setShowFilterPopover(false);
   };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -423,6 +538,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
     setEditStatus(record.status);
     setEditRef(record.referenceNumber || '');
     setEditBank(record.bankName || '');
+    setEditDiscrepancyNote(record.discrepancyNote || '');
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -443,6 +559,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
       status: editStatus,
       referenceNumber: editRef.trim() || undefined,
       bankName: editBank.trim() || undefined,
+      discrepancyNote: editDiscrepancyNote.trim() || undefined,
     };
 
     try {
@@ -485,7 +602,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
         const res = await fetch(`/api/payments/${targetId}/discrepancy`, {
           method: 'POST',
           headers: authHeaders(),
-          body: JSON.stringify({ discrepancyNote: cleanNote, note: cleanNote }),
+          body: JSON.stringify({ discrepancyNote: cleanNote }),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
@@ -504,8 +621,42 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
     }
   };
 
+  const handleDownloadReceipt = (record: PaymentRecord) => {
+    if (onDownloadReceipt) {
+      onDownloadReceipt(record.id);
+      return;
+    }
+    if (typeof window === 'undefined') return;
+    const receiptText = [
+      'A&F DESIGN — OFFICIAL ARCHITECTURAL TAX RECEIPT',
+      '==================================================',
+      `Receipt Ref   : ${record.referenceNumber || record.id}`,
+      `Project       : ${record.projectCode || 'STUDIO'} — ${record.projectName || ''}`,
+      `Milestone     : ${record.milestoneTitle}`,
+      `Amount Paid   : ${formatInr(record.amount)}`,
+      `Payment Mode  : ${formatPaymentMode(record.paymentMode)}`,
+      `Issuing Bank  : ${record.bankName || 'N/A'}`,
+      `Status        : ${getStatusLabel(record.status)}`,
+      `Recorded Date : ${formatDisplayDate(record.createdAt)}`,
+    ].join('\n');
+    const blob = new Blob([receiptText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `AF-Receipt-${record.referenceNumber || record.id}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const activeCreateModeMeta =
+    PAYMENT_MODE_OPTIONS.find((m) => m.value === createMode) || PAYMENT_MODE_OPTIONS[0];
+  const hasExtraFilters = Boolean(dateFrom || dateTo);
+
   return (
     <div>
+      {/* Page Heading (Figma 890:13033) */}
       <div className="desk-page-header">
         <div>
           <h1 className="desk-page-title">Payments &amp; Fee Ledger</h1>
@@ -530,7 +681,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
               onClick={() => setShowCreateModal(true)}
             >
               <Plus size={16} />
-              <span>Record Payment</span>
+              <span>Record Entry</span>
             </button>
           )}
         </div>
@@ -545,57 +696,173 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
         </div>
       )}
 
-      {/* Figma Summary Banner */}
-      <div className="desk-payment-summary-banner" data-testid="payment-metrics-banner" style={{ marginBottom: 20 }}>
-        <div className="desk-payment-split-boxes">
-          <div className="desk-payment-subbox">
-            <span className="desk-meta-label">Total Agreed Fee</span>
-            <strong style={{ fontSize: 22, color: 'var(--text-primary)' }}>
-              {formatInr(totals.totalAgreedFee)}
-            </strong>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              {projectFilter === 'ALL' ? 'Across visible projects' : projectFilter}
-            </span>
+      {/* Figma Payment Summary Banner (890:13258) */}
+      <div
+        className="desk-payment-summary-banner"
+        data-testid="payment-metrics-banner"
+        style={{
+          marginBottom: 20,
+          background: '#FFFFFF',
+          borderRadius: 10,
+          padding: '20px 24px',
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: 20,
+          border: '1px solid var(--border-subtle)',
+        }}
+      >
+        <div style={{ minWidth: 220, flex: '0 1 280px' }}>
+          <div style={{ fontSize: 15, color: '#686869', marginBottom: 6 }}>
+            Total Agreed Fee
           </div>
-          <div className="desk-payment-subbox">
-            <span className="desk-meta-label">Confirmed Paid</span>
-            <strong style={{ fontSize: 22, color: 'var(--status-green)' }}>
+          <div style={{ fontSize: 36, fontWeight: 700, color: '#1D1D1F', lineHeight: 1.15 }}>
+            {formatInr(totals.totalAgreedFee)}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+            {projectFilter === 'ALL' ? 'Across visible projects' : projectFilter}
+          </div>
+        </div>
+
+        <div
+          className="desk-payment-split-boxes"
+          style={{
+            flex: '1 1 520px',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: 16,
+          }}
+        >
+          <div
+            className="desk-payment-subbox"
+            style={{
+              background: '#F9F4EF',
+              borderRadius: 12,
+              padding: 14,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 6,
+            }}
+          >
+            <span style={{ fontSize: 14, color: '#BF935A', fontWeight: 500 }}>
+              Confirmed Received
+            </span>
+            <strong style={{ fontSize: 26, fontWeight: 600, color: '#1D1D1F' }}>
               {formatInr(totals.confirmedPaid)}
             </strong>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              <span>{totals.pct}%</span> realized
-            </span>
+            <div>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '4px 10px',
+                  borderRadius: 8,
+                  background: 'rgba(40, 199, 111, 0.16)',
+                  color: '#28C76F',
+                  fontSize: 13,
+                  fontWeight: 500,
+                }}
+              >
+                <span>{totals.pct}%</span>&nbsp;Paid
+              </span>
+            </div>
           </div>
-          <div className="desk-payment-subbox">
-            <span className="desk-meta-label">Pending Clearance</span>
-            <strong style={{ fontSize: 22, color: 'var(--status-amber)' }}>
-              {formatInr(totals.pendingClearance)}
-            </strong>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              Cheques / NEFT awaiting settlement
+
+          <div
+            className="desk-payment-subbox"
+            style={{
+              background: '#F9F4EF',
+              borderRadius: 12,
+              padding: 14,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 6,
+            }}
+          >
+            <span style={{ fontSize: 14, color: '#BF935A', fontWeight: 500 }}>
+              Balance Due
             </span>
-          </div>
-          <div className="desk-payment-subbox">
-            <span className="desk-meta-label">Remaining Balance</span>
-            <strong style={{ fontSize: 22, color: 'var(--brand-gold-dark)' }}>
+            <strong style={{ fontSize: 26, fontWeight: 600, color: '#1D1D1F' }}>
               {formatInr(totals.balance)}
             </strong>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              Due across upcoming stages
+            <div>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '4px 10px',
+                  borderRadius: 8,
+                  background: 'rgba(255, 159, 67, 0.16)',
+                  color: '#FF9F43',
+                  fontSize: 13,
+                  fontWeight: 500,
+                }}
+              >
+                {totals.remainingPct}% Remaining
+              </span>
+            </div>
+          </div>
+
+          <div
+            className="desk-payment-subbox"
+            style={{
+              background: '#F9F4EF',
+              borderRadius: 12,
+              padding: 14,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: 6,
+            }}
+          >
+            <span style={{ fontSize: 14, color: '#BF935A', fontWeight: 500 }}>
+              Pending Clearance
             </span>
+            <strong style={{ fontSize: 26, fontWeight: 600, color: '#1D1D1F' }}>
+              {formatInr(totals.pendingClearance)}
+            </strong>
+            <div>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '4px 10px',
+                  borderRadius: 8,
+                  background: 'rgba(191, 147, 90, 0.16)',
+                  color: '#695132',
+                  fontSize: 13,
+                  fontWeight: 500,
+                }}
+              >
+                {statusCounts.PENDING_CLEARANCE} Awaiting Settlement
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Filter Toolbar */}
-      <div className="desk-tabs-bar">
+      {/* Filter Toolbar (Figma 890:13038 + 891:14555) */}
+      <div
+        className="desk-tabs-bar"
+        style={{
+          position: 'relative',
+          borderBottom: '1px solid #E0EAF4',
+          marginBottom: 20,
+          paddingBottom: 6,
+        }}
+      >
         <div className="desk-tabs-group">
           {(
             [
-              { id: 'ALL', label: 'All Entries' },
-              { id: 'CONFIRMED', label: 'Confirmed' },
-              { id: 'PENDING_CLEARANCE', label: 'Pending Clearance' },
-              { id: 'REVISION_REQUESTED', label: 'Flagged Discrepancies' },
+              { id: 'ALL', label: `All (${statusCounts.ALL})` },
+              { id: 'PENDING_CLEARANCE', label: `Pending (${statusCounts.PENDING_CLEARANCE})` },
+              { id: 'CONFIRMED', label: `Confirmed (${statusCounts.CONFIRMED})` },
+              {
+                id: 'REVISION_REQUESTED',
+                label: `Revision Requested (${statusCounts.REVISION_REQUESTED})`,
+              },
             ] as const
           ).map((tab) => (
             <button
@@ -609,10 +876,11 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
           ))}
         </div>
 
-        <div className="desk-header-actions">
+        <div className="desk-header-actions" style={{ gap: 8 }}>
           <select
             className="desk-form-select"
-            style={{ width: 210 }}
+            style={{ width: 200 }}
+            aria-label="Filter by project"
             value={projectFilter}
             onChange={(e) => handleProjectChange(e.target.value)}
           >
@@ -638,12 +906,35 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
             <input
               type="text"
               className="desk-inline-search"
-              style={{ paddingLeft: 32 }}
+              style={{ paddingLeft: 32, borderRadius: 30 }}
               placeholder="Search milestone, UTR, bank..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+
+          <button
+            type="button"
+            aria-label="Open Filters"
+            className="desk-btn desk-btn-secondary"
+            style={{
+              width: 38,
+              height: 38,
+              padding: 0,
+              borderRadius: '50%',
+              justifyContent: 'center',
+              borderColor: hasExtraFilters ? '#BF935A' : undefined,
+              color: hasExtraFilters ? '#BF935A' : undefined,
+            }}
+            onClick={() => {
+              setDraftProjectFilter(projectFilter);
+              setDraftDateFrom(dateFrom);
+              setDraftDateTo(dateTo);
+              setShowFilterPopover((prev) => !prev);
+            }}
+          >
+            <SlidersHorizontal size={15} />
+          </button>
 
           <div className="desk-view-mode-toggle">
             <button
@@ -664,6 +955,89 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Figma 891:14555 Filter Payments Popover */}
+        {showFilterPopover && (
+          <div
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: '100%',
+              marginTop: 8,
+              width: 360,
+              background: '#FFFFFF',
+              borderRadius: 16,
+              padding: '16px 20px 20px',
+              boxShadow: '0 12px 32px rgba(29, 29, 31, 0.14)',
+              border: '1px solid #E1E1E4',
+              zIndex: 40,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <strong style={{ fontSize: 15, color: '#1D1D1F' }}>Filter Payments</strong>
+              <button
+                type="button"
+                className="desk-btn-close"
+                onClick={() => setShowFilterPopover(false)}
+              >
+                <X size={15} />
+              </button>
+            </div>
+            <div className="desk-form-group">
+              <label>Project</label>
+              <select
+                className="desk-form-select"
+                value={draftProjectFilter}
+                onChange={(e) => setDraftProjectFilter(e.target.value)}
+              >
+                <option value="ALL">All Projects</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.projectCode}>
+                    {p.projectCode} · {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+              <div className="desk-form-group" style={{ marginBottom: 0 }}>
+                <label>From</label>
+                <input
+                  type="date"
+                  className="desk-form-input"
+                  value={draftDateFrom}
+                  onChange={(e) => setDraftDateFrom(e.target.value)}
+                />
+              </div>
+              <div className="desk-form-group" style={{ marginBottom: 0 }}>
+                <label>To</label>
+                <input
+                  type="date"
+                  className="desk-form-input"
+                  value={draftDateTo}
+                  onChange={(e) => setDraftDateTo(e.target.value)}
+                />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                className="desk-btn desk-btn-secondary"
+                style={{ flex: 1, justifyContent: 'center' }}
+                onClick={handleResetFiltersPopover}
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                className="desk-btn desk-btn-primary"
+                style={{ flex: 1, justifyContent: 'center' }}
+                onClick={handleApplyFiltersPopover}
+              >
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Data Display */}
@@ -677,7 +1051,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
           </div>
           <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 13 }}>
             {isAdmin
-              ? 'Record the first advance or milestone payment using "Record Payment".'
+              ? 'Record the first advance or milestone payment using "Record Entry".'
               : 'No payment entries have been posted for the selected filter.'}
           </p>
         </div>
@@ -711,18 +1085,21 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
                       )}
                     </td>
                     <td>
-                      <div>{p.paymentMode.replace('_', '/')}</div>
+                      <div>{formatPaymentMode(p.paymentMode)}</div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                         {[p.referenceNumber, p.bankName].filter(Boolean).join(' · ') || '—'}
                       </div>
                     </td>
                     <td style={{ fontWeight: 700 }}>{formatInr(p.amount)}</td>
                     <td>
-                      <span className={`desk-pill ${getStatusPillClass(p.status)}`} data-testid={`status-${p.status.toLowerCase().replace(/_/g, '-')}`}>
-                        {p.status.replace(/_/g, ' ')}
+                      <span
+                        className={`desk-pill ${getStatusPillClass(p.status)}`}
+                        data-testid={`status-${p.status.toLowerCase().replace(/_/g, '-')}`}
+                      >
+                        {getStatusLabel(p.status)}
                       </span>
                     </td>
-                    <td>{new Date(p.createdAt).toLocaleDateString()}</td>
+                    <td>{formatDisplayDate(p.createdAt)}</td>
                     <td>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                         <button
@@ -731,7 +1108,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
                           data-testid={`receipt-preview-btn-${p.id}`}
                           onClick={() => {
                             setReceiptTarget(p);
-                            onDownloadReceipt?.(p);
+                            onDownloadReceipt?.(p.id);
                           }}
                         >
                           <Receipt size={13} />
@@ -747,7 +1124,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
                             <span>Edit</span>
                           </button>
                         )}
-                        {isClient && (
+                        {isClientLeader && (
                           <button
                             type="button"
                             className="desk-btn desk-btn-sm desk-btn-danger-outline"
@@ -770,29 +1147,61 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
           </div>
         </div>
       ) : (
-        <div className="desk-payments-cards-grid">
+        <div
+          className="desk-payments-cards-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+            gap: 20,
+          }}
+        >
           {filteredPayments.map((p) => (
-            <div key={p.id} className="desk-payment-card">
+            <div
+              key={p.id}
+              className="desk-payment-card"
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 10,
+                padding: '16px 14px',
+                border: '1px solid var(--border-subtle)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 14,
+              }}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span className="desk-pill gold">{p.projectCode || 'STUDIO'}</span>
-                <span className={`desk-pill ${getStatusPillClass(p.status)}`}>
-                  {p.status.replace(/_/g, ' ')}
+                <span
+                  style={{
+                    background: '#F9F4EF',
+                    color: '#695132',
+                    padding: '4px 10px',
+                    borderRadius: 4,
+                    fontSize: 13,
+                    fontWeight: 500,
+                  }}
+                >
+                  {p.projectName || p.projectCode || 'STUDIO'}
+                </span>
+                <span
+                  className={`desk-pill ${getStatusPillClass(p.status)}`}
+                  data-testid={`status-${p.status.toLowerCase().replace(/_/g, '-')}`}
+                >
+                  {getStatusLabel(p.status)}
                 </span>
               </div>
-              <h3 style={{ margin: '12px 0 4px', fontSize: 16, fontWeight: 700 }}>
-                {p.milestoneTitle}
-              </h3>
-              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' }}>
-                {formatInr(p.amount)}
+
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 600, color: '#1D1D1F', lineHeight: 1.3 }}>
+                  {formatInr(p.amount)}
+                </div>
+                <div style={{ fontSize: 14, color: '#686869', marginTop: 6 }}>
+                  {p.milestoneTitle}
+                </div>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 8 }}>
-                {p.paymentMode.replace('_', '/')} · {p.referenceNumber || 'No reference'} ·{' '}
-                {p.bankName || 'Bank N/A'}
-              </div>
+
               {p.discrepancyNote && (
                 <div
                   style={{
-                    marginTop: 8,
                     padding: '6px 10px',
                     borderRadius: 8,
                     background: 'rgba(180, 35, 24, 0.08)',
@@ -803,11 +1212,38 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
                   Discrepancy: {p.discrepancyNote}
                 </div>
               )}
-              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+
+              <div style={{ height: 1, background: '#F1F1F3' }} />
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  fontSize: 13,
+                  color: '#686869',
+                }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Calendar size={14} />
+                  {formatDisplayDate(p.createdAt)}
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <CreditCard size={14} />
+                  {formatPaymentMode(p.paymentMode)}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, paddingTop: 2 }}>
                 <button
                   type="button"
                   className="desk-btn desk-btn-sm desk-btn-secondary"
-                  onClick={() => setReceiptTarget(p)}
+                  data-testid={`receipt-preview-btn-${p.id}`}
+                  onClick={() => {
+                    setReceiptTarget(p);
+                    onDownloadReceipt?.(p);
+                  }}
                 >
                   <Receipt size={13} />
                   <span>Receipt</span>
@@ -822,10 +1258,11 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
                     <span>Edit</span>
                   </button>
                 )}
-                {isClient && (
+                {isClientLeader && (
                   <button
                     type="button"
                     className="desk-btn desk-btn-sm desk-btn-danger-outline"
+                    data-testid={`report-discrepancy-btn-${p.id}`}
                     onClick={() => {
                       setDiscrepancyTarget(p);
                       setDiscrepancyNote(p.discrepancyNote || '');
@@ -841,12 +1278,12 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
         </div>
       )}
 
-      {/* Admin Create Payment Modal */}
+      {/* Admin Create Payment Modal (Figma 891:14290) */}
       {showCreateModal && (
         <div className="desk-modal-overlay">
-          <div className="desk-modal-dialog" style={{ maxWidth: 500 }}>
+          <div className="desk-modal-dialog" style={{ maxWidth: 560 }}>
             <div className="desk-modal-header">
-              <h3 className="desk-modal-title">Record Studio Payment</h3>
+              <h3 className="desk-modal-title">Record Payment</h3>
               <button
                 type="button"
                 className="desk-btn-close"
@@ -858,7 +1295,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
             <form onSubmit={handleCreateSubmit}>
               <div className="desk-modal-body">
                 <div className="desk-form-group">
-                  <label>Project</label>
+                  <label>Project*</label>
                   <select
                     className="desk-form-select"
                     value={createProjectCode}
@@ -873,50 +1310,52 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
                     ))}
                   </select>
                 </div>
+
+                {/* Figma 891:14499 Payment Mode Segmented Tabs */}
                 <div className="desk-form-group">
-                  <label>Milestone Title</label>
-                  <input
-                    type="text"
-                    className="desk-form-input"
-                    placeholder="e.g. Concept Design Sign-Off Tranche"
-                    value={createTitle}
-                    onChange={(e) => setCreateTitle(e.target.value)}
-                    required
-                  />
+                  <label>Payment Mode*</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                    {PAYMENT_MODE_OPTIONS.map((opt) => {
+                      const active = createMode === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setCreateMode(opt.value)}
+                          style={{
+                            padding: '10px 6px',
+                            borderRadius: 9,
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: 13,
+                            fontWeight: active ? 600 : 400,
+                            background: active ? '#BF935A' : '#E8E8E9',
+                            color: active ? '#F9F4EF' : '#686869',
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div className="desk-form-group">
-                    <label>Amount (INR)</label>
+                    <label>Amount (INR)*</label>
                     <input
                       type="number"
                       min="1"
                       step="1"
                       className="desk-form-input"
-                      placeholder="250000"
+                      placeholder="150000"
                       value={createAmount}
                       onChange={(e) => setCreateAmount(e.target.value)}
                       required
                     />
                   </div>
                   <div className="desk-form-group">
-                    <label>Payment Mode</label>
-                    <select
-                      className="desk-form-select"
-                      value={createMode}
-                      onChange={(e) =>
-                        setCreateMode(e.target.value as PaymentRecord['paymentMode'])
-                      }
-                    >
-                      <option value="NEFT_RTGS">NEFT / RTGS</option>
-                      <option value="UPI">UPI</option>
-                      <option value="CHEQUE">Cheque</option>
-                      <option value="CASH">Cash</option>
-                    </select>
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div className="desk-form-group">
-                    <label>Clearance Status</label>
+                    <label>Clearance Status*</label>
                     <select
                       className="desk-form-select"
                       value={createStatus}
@@ -932,25 +1371,40 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
                       <option value="PENDING_CLEARANCE">Pending Clearance</option>
                     </select>
                   </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div className="desk-form-group">
-                    <label>Reference / Cheque / UTR</label>
+                    <label>{activeCreateModeMeta.refLabel}</label>
                     <input
                       type="text"
                       className="desk-form-input"
-                      placeholder="UTR / Cheque No."
+                      placeholder={activeCreateModeMeta.refPlaceholder}
                       value={createRef}
                       onChange={(e) => setCreateRef(e.target.value)}
                     />
                   </div>
+                  <div className="desk-form-group">
+                    <label>Issuing Bank (Optional)</label>
+                    <input
+                      type="text"
+                      className="desk-form-input"
+                      placeholder="e.g. HDFC Bank, Ahmedabad"
+                      value={createBank}
+                      onChange={(e) => setCreateBank(e.target.value)}
+                    />
+                  </div>
                 </div>
+
                 <div className="desk-form-group">
-                  <label>Bank Name (Optional)</label>
+                  <label>Payment Notes / Milestone Title*</label>
                   <input
                     type="text"
                     className="desk-form-input"
-                    placeholder="Issuing bank name"
-                    value={createBank}
-                    onChange={(e) => setCreateBank(e.target.value)}
+                    placeholder="e.g. Superstructure slab casting payment"
+                    value={createTitle}
+                    onChange={(e) => setCreateTitle(e.target.value)}
+                    required
                   />
                 </div>
               </div>
@@ -963,7 +1417,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
                   Cancel
                 </button>
                 <button type="submit" className="desk-btn desk-btn-primary" disabled={submitting}>
-                  {submitting ? 'Recording...' : 'Save Payment Entry'}
+                  {submitting ? 'Saving...' : 'Save Payment Entry'}
                 </button>
               </div>
             </form>
@@ -974,7 +1428,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
       {/* Admin Edit Payment Modal */}
       {editTarget && (
         <div className="desk-modal-overlay">
-          <div className="desk-modal-dialog" style={{ maxWidth: 500 }}>
+          <div className="desk-modal-dialog" style={{ maxWidth: 520 }}>
             <div className="desk-modal-header">
               <h3 className="desk-modal-title">Edit Payment Entry</h3>
               <button type="button" className="desk-btn-close" onClick={() => setEditTarget(null)}>
@@ -1053,6 +1507,18 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
                     onChange={(e) => setEditBank(e.target.value)}
                   />
                 </div>
+                {(editTarget.discrepancyNote || editStatus === 'REVISION_REQUESTED') && (
+                  <div className="desk-form-group">
+                    <label>Discrepancy Note</label>
+                    <textarea
+                      className="desk-form-textarea"
+                      rows={2}
+                      value={editDiscrepancyNote}
+                      onChange={(e) => setEditDiscrepancyNote(e.target.value)}
+                      placeholder="Resolution or discrepancy note..."
+                    />
+                  </div>
+                )}
               </div>
               <div className="desk-modal-footer">
                 <button
@@ -1071,7 +1537,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
         </div>
       )}
 
-      {/* Client Discrepancy Modal */}
+      {/* Client Leader Discrepancy Modal */}
       {discrepancyTarget && (
         <div className="desk-modal-overlay" data-testid="discrepancy-modal">
           <div className="desk-modal-dialog" style={{ maxWidth: 460 }}>
@@ -1112,7 +1578,12 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
                 >
                   Cancel
                 </button>
-                <button type="submit" className="desk-btn desk-btn-danger" data-testid="submit-discrepancy-btn" disabled={submitting}>
+                <button
+                  type="submit"
+                  className="desk-btn desk-btn-danger"
+                  data-testid="submit-discrepancy-btn"
+                  disabled={submitting}
+                >
                   {submitting ? 'Submitting...' : 'Submit Discrepancy'}
                 </button>
               </div>
@@ -1147,7 +1618,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
                   <strong>A&amp;F Design</strong>
                   <span className={`desk-pill ${getStatusPillClass(receiptTarget.status)}`}>
-                    {receiptTarget.status.replace(/_/g, ' ')}
+                    {getStatusLabel(receiptTarget.status)}
                   </span>
                 </div>
                 <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>
@@ -1161,7 +1632,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
                     <strong>Project:</strong> {receiptTarget.projectCode || 'Studio Ledger'}
                   </div>
                   <div>
-                    <strong>Mode:</strong> {receiptTarget.paymentMode.replace('_', '/')}
+                    <strong>Mode:</strong> {formatPaymentMode(receiptTarget.paymentMode)}
                   </div>
                   <div>
                     <strong>Reference:</strong> {receiptTarget.referenceNumber || 'N/A'}
@@ -1170,8 +1641,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
                     <strong>Bank:</strong> {receiptTarget.bankName || 'N/A'}
                   </div>
                   <div>
-                    <strong>Date:</strong>{' '}
-                    {new Date(receiptTarget.createdAt).toLocaleDateString()}
+                    <strong>Date:</strong> {formatDisplayDate(receiptTarget.createdAt)}
                   </div>
                 </div>
               </div>
@@ -1181,7 +1651,7 @@ export const DesktopPaymentsView: React.FC<DesktopPaymentsViewProps> = ({
                 type="button"
                 className="desk-btn desk-btn-primary"
                 data-testid="download-receipt-pdf-btn"
-                onClick={() => onDownloadReceipt?.(receiptTarget?.id as any)}
+                onClick={() => handleDownloadReceipt(receiptTarget)}
               >
                 Download Receipt PDF
               </button>
